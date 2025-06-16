@@ -1,0 +1,87 @@
+{
+  "name": "hardhat-project",
+  "scripts": {
+    "clean": "npx hardhat clean",
+    "compile": "npx hardhat compile",
+    "test": "node test/test-runner.js all",
+    "test:unit": "node test/test-runner.js unit",
+    "test:integration": "node test/test-runner.js integration",
+    "test:e2e": "node test/test-runner.js e2e",
+    "test:coverage": "node test/test-runner.js coverage",
+    "test:quick": "node test/test-runner.js quick",
+    "test:watch": "nodemon --exec \"npm run test:unit\" --watch test --watch contracts",
+    "test:single": "npx hardhat test",
+    "test:debug": "node --inspect-brk test/test-runner.js unit",
+    "test:verbose": "DEBUG=hardhat:* npm run test:unit",
+    "test:help": "node test/test-runner.js --help",
+    "coverage": "npx hardhat coverage",
+    "coverage:unit": "npx hardhat coverage --testfiles test/unit",
+    "node": "npx hardhat node",
+    "deploy:local": "npx hardhat ignition deploy ignition/modules/LocalDeploy.ts --network localhost",
+    "deploy:sepolia": "npx hardhat ignition deploy ignition/modules/PublicDeploy.ts --network sepolia --parameters sepolia.json",
+    "deploy:mainnet": "npx hardhat ignition deploy ignition/modules/PublicDeploy.ts --network mainnet --parameters mainnet.json",
+    "verify:sepolia": "npx hardhat ignition verify sepolia-deployment",
+    "verify:mainnet": "npx hardhat ignition verify mainnet-deployment",
+    "deploy:local:fresh": "npm run node & sleep 5 && npm run deploy:local",
+    "deploy:test": "npm run compile && npm run test && npm run deploy:local",
+    "deploy:sepolia:full": "npm run compile && npm run deploy:sepolia && npm run verify:sepolia",
+    "deploy:mainnet:full": "npm run compile && npm run deploy:mainnet && npm run verify:mainnet",
+    "size": "npx hardhat size-contracts",
+    "deploy:core": "npx hardhat ignition deploy ignition/modules/CoreModule.ts --network localhost",
+    "deploy:mocks": "npx hardhat ignition deploy ignition/modules/MockModule.ts --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^0.15.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^18.0.0",
+    "chai": "^4.3.0",
+    "glob": "^11.0.3",
+    "hardhat": "^2.23.0",
+    "mocha": "^10.8.2",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.3.0",
+    "dotenv": "^16.5.0",
+    "solc": "^0.8.28"
+  },
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": [
+      "ES2022"
+    ],
+    "declaration": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "./contracts",
+    "./test",
+    "./ignition",
+    "./scripts"
+  ],
+  "files": [
+    "./hardhat.config.ts"
+  ]
+}
