@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "./AccessControlCenter.sol";
 
 contract GasSubsidyManager {
     AccessControlCenter public access;
-    address public owner;
 
     // moduleId => user => имеет ли право на покрытие газа
     mapping(bytes32 => mapping(address => bool)) public isEligible;
@@ -17,7 +16,7 @@ contract GasSubsidyManager {
     event GasCoverageEnabled(bytes32 moduleId, address contractAddress, bool enabled);
 
     modifier onlyAdmin() {
-        require(msg.sender == owner, "not admin");
+        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         _;
     }
 
@@ -28,7 +27,6 @@ contract GasSubsidyManager {
 
     constructor(address accessControl) {
         access = AccessControlCenter(accessControl);
-        owner = msg.sender;
     }
 
     /// Пользователь получает право не платить за газ (его покроет система)

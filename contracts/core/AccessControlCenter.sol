@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
@@ -8,6 +8,7 @@ contract AccessControlCenter is AccessControl {
     bytes32 public constant FEATURE_OWNER_ROLE = keccak256("FEATURE_OWNER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+    bytes32 public constant MODULE_ROLE = keccak256("MODULE_ROLE");
 
     constructor(address admin) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);

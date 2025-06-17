@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "./AccessControlCenter.sol";
-import "./MultiValidator.sol";
+import "./TokenRegistry.sol";
 import "./CoreFeeManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract PaymentGateway is ReentrancyGuard {
     using Address for address payable;
+    using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
-    MultiValidator public validator;
+    TokenRegistry public tokenRegistry;
     CoreFeeManager public feeManager;
 
-    address public owner;
 
     event PaymentProcessed(
         address indexed payer,
@@ -32,15 +33,14 @@ contract PaymentGateway is ReentrancyGuard {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == owner, "not admin");
+        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         _;
     }
 
     constructor(address accessControl, address validator_, address feeManager_) {
         access = AccessControlCenter(accessControl);
-        validator = MultiValidator(validator_);
+        tokenRegistry = TokenRegistry(validator_);
         feeManager = CoreFeeManager(feeManager_);
-        owner = msg.sender;
     }
 
     function processPayment(
@@ -49,17 +49,20 @@ contract PaymentGateway is ReentrancyGuard {
         address payer,
         uint256 amount
     ) external onlyFeatureOwner nonReentrant returns (uint256 netAmount) {
-        require(validator.isTokenAllowed(moduleId, token), "token not allowed");
+        require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
 
-        // Сбор комиссии (может быть 0)
-        uint256 fee = feeManager.collect(moduleId, token, payer, amount);
+        IERC20(token).safeTransferFrom(payer, address(this), amount);
+        IERC20(token).forceApprove(address(feeManager), amount);
+        uint256 fee = feeManager.collect(moduleId, token, address(this), amount);
+        IERC20(token).forceApprove(address(feeManager), 0);
         netAmount = amount - fee;
+        IERC20(token).safeTransfer(msg.sender, netAmount);
 
         emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId);
     }
 
     function setValidator(address newValidator) external onlyAdmin {
-        validator = MultiValidator(newValidator);
+        tokenRegistry = TokenRegistry(newValidator);
     }
 
     function setFeeManager(address newManager) external onlyAdmin {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 interface ICoreFeeManager {
     function collect(bytes32 moduleId, address token, address payer, uint256 amount) external returns (uint256 feeAmount);
