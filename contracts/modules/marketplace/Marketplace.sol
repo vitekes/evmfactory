@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract Marketplace {
     using SafeERC20 for IERC20;
     Registry public immutable registry;
-    bytes32 public constant MODULE_ID = keccak256("Marketplace");
+    bytes32 public immutable MODULE_ID;
 
     struct Listing {
         address seller;
@@ -27,8 +27,9 @@ contract Marketplace {
     event Listed(uint256 indexed id, address indexed seller, address token, uint256 price);
     event Sold(uint256 indexed id, address indexed buyer);
 
-    constructor(address _registry, address paymentGateway) {
+    constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = Registry(_registry);
+        MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
     }
 

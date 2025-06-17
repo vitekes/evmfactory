@@ -68,11 +68,15 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         relayer.transfer(refund);
     }
 
+    receive() external payable {}
+
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
+        require(newImplementation != address(0), "invalid implementation");
+    }
 
     uint256[50] private __gap;
 }

@@ -58,6 +58,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         uint256 amount
     ) external onlyFeatureOwner nonReentrant returns (uint256 netAmount) {
         require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
+        require(payer == msg.sender || payer == tx.origin, "invalid payer");
 
         IERC20(token).safeTransferFrom(payer, address(this), amount);
         IERC20(token).forceApprove(address(feeManager), amount);
@@ -83,7 +84,9 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
     }
 
     /// @dev UUPS upgrade authorization
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
+        require(newImplementation != address(0), "invalid implementation");
+    }
 
     uint256[50] private __gap;
 }
