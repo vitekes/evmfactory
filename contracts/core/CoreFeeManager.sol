@@ -91,7 +91,9 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         access = AccessControlCenter(newAccess);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
+        require(newImplementation != address(0), "invalid implementation");
+    }
 
     uint256[50] private __gap;
 }

@@ -12,7 +12,7 @@ contract SubscriptionManager {
     using SafeERC20 for IERC20;
 
     Registry public immutable registry;
-    bytes32 public constant MODULE_ID = keccak256("Subscriptions");
+    bytes32 public immutable MODULE_ID;
 
     struct Plan {
         address token;
@@ -37,9 +37,10 @@ contract SubscriptionManager {
         _;
     }
 
-    constructor(address _registry, address paymentGateway) {
+    constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = Registry(_registry);
         owner = msg.sender;
+        MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
     }
 
@@ -59,6 +60,8 @@ contract SubscriptionManager {
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
         ).processPayment(MODULE_ID, p.token, msg.sender, p.price);
 
+        IERC20(p.token).safeTransfer(owner, netAmount);
+
         userPlan[msg.sender] = planId;
         nextPayment[msg.sender] = block.timestamp + p.period;
         paidAmount[msg.sender] += netAmount;
@@ -76,6 +79,8 @@ contract SubscriptionManager {
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
         ).processPayment(MODULE_ID, p.token, user, p.price);
+
+        IERC20(p.token).safeTransfer(owner, netAmount);
 
         nextPayment[user] = block.timestamp + p.period;
         paidAmount[user] += netAmount;
