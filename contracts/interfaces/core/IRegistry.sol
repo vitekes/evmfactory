@@ -9,6 +9,6 @@ interface IRegistry {
     function getCoreService(bytes32 serviceId) external view returns (address);
     function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) external;
     function getModuleService(bytes32 moduleId, bytes32 serviceId) external view returns (address);
-    function setModuleServiceAlias(bytes32 moduleId, string calldata alias, address addr) external;
-    function getModuleService(bytes32 moduleId, string calldata alias) external view returns (address);
+    function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external;
+    function getModuleService(bytes32 moduleId, string calldata serviceAlias) external view returns (address);
 }

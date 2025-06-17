@@ -70,7 +70,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             // 1) взимаем комиссию за on-chain действие
             if (commissionFee > 0) {
                 PaymentGateway(
-                    registry.getModuleService(MODULE_ID, "PaymentGateway")
+                    registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
                 ).processPayment(
                     MODULE_ID,
                     commissionToken,
@@ -104,7 +104,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
 
             // уведомляем остальные модули
             EventRouter(
-                registry.getModuleService(MODULE_ID, "EventRouter")
+                registry.getModuleService(MODULE_ID, keccak256(bytes("EventRouter")))
             ).route(
                 keccak256("ContestFinalized"),
                 abi.encode(creator, winners, prizes)
@@ -113,7 +113,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             // чеканим бейджи
             string[] memory uris = new string[](winners.length);
             NFTManager(
-                registry.getModuleService(MODULE_ID, "NFTManager")
+                registry.getModuleService(MODULE_ID, keccak256(bytes("NFTManager")))
             ).mintBatch(winners, uris, false);
 
             emit ContestFinalized(winners);

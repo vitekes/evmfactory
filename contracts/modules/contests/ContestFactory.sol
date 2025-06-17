@@ -67,7 +67,7 @@ contract ContestFactory is ReentrancyGuard {
     ) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
         TokenRegistry validator = TokenRegistry(
-            registry.getModuleService(MODULE_ID, "TokenRegistry")
+            registry.getModuleService(MODULE_ID, keccak256(bytes("TokenRegistry")))
         );
         uint256 totalMonetary;
         bytes32 moduleId = MODULE_ID;
@@ -90,7 +90,7 @@ contract ContestFactory is ReentrancyGuard {
         // 2) Сбор призового пула
         if (totalMonetary > 0) {
             PaymentGateway(
-                registry.getModuleService(MODULE_ID, "PaymentGateway")
+                registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
             ).processPayment(
             /*moduleId*/ moduleId,
                 slots[0].token,
@@ -102,7 +102,7 @@ contract ContestFactory is ReentrancyGuard {
         // 3) Сбор комиссии за finalize()
         if (params.commissionFee > 0) {
             PaymentGateway(
-                registry.getModuleService(MODULE_ID, "PaymentGateway")
+                registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
             ).processPayment(
             /*moduleId*/ moduleId,
                 params.commissionToken,
