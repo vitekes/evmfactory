@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract AccessControlCenter is AccessControl {
+    // Роли
+    bytes32 public constant FEATURE_OWNER_ROLE = keccak256("FEATURE_OWNER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+
+    constructor(address admin) {
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+    }
+
+    // Позволяет владельцу делегировать роли другим адресам
+    function grantMultipleRoles(address account, bytes32[] calldata roles) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < roles.length; i++) {
+            _grantRole(roles[i], account);
+        }
+    }
+
+    // Вспомогательная функция для проверки нескольких ролей
+    function hasAnyRole(address account, bytes32[] memory roles) public view returns (bool) {
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (hasRole(roles[i], account)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
