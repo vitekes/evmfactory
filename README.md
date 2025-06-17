@@ -62,6 +62,16 @@ For detailed information, see:
 - **Migrations & Deployment**: `docs/migrations.md`
 - **CHANGELOG**: `CHANGELOG.md`
 
+## Deployment notes
+
+After deploying the core `PaymentGateway` contract, make sure to register it in the `Registry` for each module:
+
+```solidity
+registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", gatewayAddress);
+```
+
+Without this step modules won't be able to discover the gateway service.
+
 ## Contributing & Support
 
 - **GitHub Issues**: [https://github.com/vitekes/evmcontest/issues](https://github.com/vitekes/evmcontest/issues)
@@ -70,4 +80,5 @@ For detailed information, see:
 ## License
 
 MIT License. © 2025 evmcontest team
+
 

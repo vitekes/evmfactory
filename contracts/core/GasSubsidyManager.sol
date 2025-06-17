@@ -61,8 +61,9 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
 
     /// @notice Refund gas to relayer with per-transaction limit check
     function refundGas(bytes32 moduleId, address payable relayer, uint256 gasUsed) external onlyAdmin {
-        uint256 refund = tx.gasprice * gasUsed;
-        require(refund <= gasRefundPerTx[moduleId], "Exceeds refund limit");
+        uint256 price = tx.gasprice;
+        require(gasUsed <= gasRefundPerTx[moduleId] / price, "Exceeds refund limit");
+        uint256 refund = price * gasUsed;
         require(address(this).balance >= refund, "Insufficient balance");
         relayer.transfer(refund);
     }
