@@ -84,7 +84,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
     }
 
     /// @dev UUPS upgrade authorization
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
+    function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
         require(newImplementation != address(0), "invalid implementation");
     }
 

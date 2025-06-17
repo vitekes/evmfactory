@@ -19,7 +19,7 @@ contract EventRouter is Initializable, UUPSUpgradeable {
         emit Routed(eventType, data);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override {
+    function _authorizeUpgrade(address newImplementation) internal view override {
         require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         require(newImplementation != address(0), "invalid implementation");
     }

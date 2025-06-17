@@ -35,7 +35,7 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
         return false;
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function _authorizeUpgrade(address newImplementation) internal view override onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newImplementation != address(0), "invalid implementation");
     }
 
