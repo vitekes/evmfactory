@@ -2,8 +2,10 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract TokenRegistry {
+contract TokenRegistry is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
 
     // moduleId => token => allowed
@@ -21,7 +23,8 @@ contract TokenRegistry {
         _;
     }
 
-    constructor(address accessControl) {
+    function initialize(address accessControl) public initializer {
+        __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
@@ -45,4 +48,8 @@ contract TokenRegistry {
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+
+    uint256[50] private __gap;
 }

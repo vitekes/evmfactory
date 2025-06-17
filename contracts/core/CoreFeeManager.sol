@@ -2,14 +2,16 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract CoreFeeManager is ReentrancyGuard {
-    using Address for address payable;
-    using SafeERC20 for IERC20;
+contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
+    using AddressUpgradeable for address payable;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     AccessControlCenter public access;
 
@@ -38,7 +40,9 @@ contract CoreFeeManager is ReentrancyGuard {
         _;
     }
 
-    constructor(address accessControl) {
+    function initialize(address accessControl) public initializer {
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
@@ -52,7 +56,7 @@ contract CoreFeeManager is ReentrancyGuard {
         feeAmount = fFee + ((amount * pFee) / 10_000);
         require(feeAmount < amount, "fee >= amount");
         if (feeAmount > 0) {
-            IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
+            IERC20Upgradeable(token).safeTransferFrom(payer, address(this), feeAmount);
             collectedFees[moduleId][token] += feeAmount;
             emit FeeCollected(moduleId, token, feeAmount);
         }
@@ -63,7 +67,7 @@ contract CoreFeeManager is ReentrancyGuard {
         require(amount > 0, "nothing to withdraw");
 
         collectedFees[moduleId][token] = 0;
-        IERC20(token).safeTransfer(to, amount);
+        IERC20Upgradeable(token).safeTransfer(to, amount);
         emit FeeWithdrawn(moduleId, token, to, amount);
     }
 
@@ -84,4 +88,8 @@ contract CoreFeeManager is ReentrancyGuard {
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+
+    uint256[50] private __gap;
 }

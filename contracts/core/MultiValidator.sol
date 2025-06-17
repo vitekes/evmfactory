@@ -3,6 +3,9 @@ pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
 
+/// @title MultiValidator (deprecated)
+/// @notice Legacy token whitelist contract, replaced by {TokenRegistry}.
+
 contract MultiValidator {
     AccessControlCenter public access;
 
