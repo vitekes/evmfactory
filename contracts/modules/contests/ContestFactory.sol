@@ -16,7 +16,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract ContestFactory is ReentrancyGuard {
     Registry public immutable registry;
     bytes32 public constant FACTORY_ADMIN = keccak256("FACTORY_ADMIN");
-    bytes32 public constant MODULE_ID = keccak256("CONTEST_MODULE");
+    /// @dev Identifier used when interacting with registry services
+    bytes32 public constant MODULE_ID = keccak256("Contest");
 
     event ContestCreated(address indexed creator, address contest);
 
@@ -37,13 +38,13 @@ contract ContestFactory is ReentrancyGuard {
     ) external nonReentrant {
         // Проверяем роль
         AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService("AccessControlCenter")
+            registry.getCoreService(keccak256("AccessControlCenter"))
         );
         require(acl.hasRole(FACTORY_ADMIN, msg.sender), "Not FACTORY_ADMIN");
 
         // Получаем шаблон
         (PrizeInfo[] memory slots,) = IPrizeManager(
-            registry.getCoreService("PrizeManager")
+            registry.getCoreService(keccak256("PrizeManager"))
         ).getTemplate(templateId);
 
         _deployContest(slots, params);
@@ -54,7 +55,7 @@ contract ContestFactory is ReentrancyGuard {
         ContestParams calldata params
     ) external nonReentrant {
         AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService("AccessControlCenter")
+            registry.getCoreService(keccak256("AccessControlCenter"))
         );
         require(acl.hasRole(FACTORY_ADMIN, msg.sender), "Not FACTORY_ADMIN");
 
