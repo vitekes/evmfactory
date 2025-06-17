@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity ^0.8.30;
 
 import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
@@ -9,12 +9,14 @@ import "./shared/PrizeInfo.sol";
 import "./interfaces/IContestEscrow.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Ошибки для экономии газа вместо строковых require
     error ContestAlreadyFinalized();
     error WrongWinnersCount();
 
 contract ContestEscrow is IContestEscrow, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     Registry    public immutable registry;
     address     public immutable creator;
     PrizeInfo[] public prizes;
@@ -82,7 +84,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
                 uint256 amount = p.distribution == 0
                     ? p.amount
                     : _computeDescending(p.amount, i);
-                IERC20(p.token).transfer(_winners[i], amount);
+                IERC20(p.token).safeTransfer(_winners[i], amount);
                 emit MonetaryPrizePaid(_winners[i], amount);
             } else {
                 emit PromoPrizeIssued(i, _winners[i]);

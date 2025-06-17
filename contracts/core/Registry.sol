@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "./AccessControlCenter.sol";
 
@@ -13,9 +13,6 @@ contract Registry {
 
     /// @notice Адрес контракта AccessControlCenter
     AccessControlCenter public access;
-
-    /// @notice Администратор имеет полные права (может заменить AccessControl)
-    address public owner;
 
     /// @notice Все зарегистрированные фичи
     mapping(bytes32 => Feature) private features;
@@ -31,7 +28,7 @@ contract Registry {
     event ModuleServiceSet(bytes32 indexed moduleId, bytes32 indexed serviceId, address serviceAddress);
 
     modifier onlyAdmin() {
-        require(msg.sender == owner, "not admin");
+        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         _;
     }
 
@@ -42,7 +39,6 @@ contract Registry {
 
     constructor(address accessControl) {
         access = AccessControlCenter(accessControl);
-        owner = msg.sender;
     }
 
     function registerFeature(bytes32 id, address impl, uint8 context) external onlyFeatureOwner {

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "./AccessControlCenter.sol";
 
 contract MultiValidator {
     AccessControlCenter public access;
-    address public owner;
 
     // moduleId => token => разрешено ли
     mapping(bytes32 => mapping(address => bool)) public isAllowed;
@@ -18,13 +17,12 @@ contract MultiValidator {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == owner, "not admin");
+        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         _;
     }
 
     constructor(address accessControl) {
         access = AccessControlCenter(accessControl);
-        owner = msg.sender;
     }
 
     function setAllowed(bytes32 moduleId, address token, bool allowed) external onlyFeatureOwner {

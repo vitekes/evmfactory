@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import "./AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract CoreFeeManager is ReentrancyGuard {
     using Address for address payable;
+    using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
-    address public owner;
 
     /// @notice moduleId => token => fee % (в 10000 базисных точках: 100 = 1%)
     mapping(bytes32 => mapping(address => uint16)) public percentFee;
@@ -33,13 +34,12 @@ contract CoreFeeManager is ReentrancyGuard {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == owner, "not admin");
+        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
         _;
     }
 
     constructor(address accessControl) {
         access = AccessControlCenter(accessControl);
-        owner = msg.sender;
     }
 
     function collect(bytes32 moduleId, address token, address payer, uint256 amount) external onlyFeatureOwner nonReentrant returns (uint256 feeAmount) {
@@ -50,7 +50,7 @@ contract CoreFeeManager is ReentrancyGuard {
 
         feeAmount = fFee + ((amount * pFee) / 10_000);
         if (feeAmount > 0) {
-            IERC20(token).transferFrom(payer, address(this), feeAmount);
+            IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
             collectedFees[moduleId][token] += feeAmount;
             emit FeeCollected(moduleId, token, feeAmount);
         }
@@ -61,7 +61,7 @@ contract CoreFeeManager is ReentrancyGuard {
         require(amount > 0, "nothing to withdraw");
 
         collectedFees[moduleId][token] = 0;
-        IERC20(token).transfer(to, amount);
+        IERC20(token).safeTransfer(to, amount);
         emit FeeWithdrawn(moduleId, token, to, amount);
     }
 

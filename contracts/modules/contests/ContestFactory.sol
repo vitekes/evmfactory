@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity ^0.8.30;
 
 import "../../core/Registry.sol";
 import "../../core/AccessControlCenter.sol";
-import "../../core/MultiValidator.sol";
+import "../../core/TokenRegistry.sol";
 import "../../core/PaymentGateway.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
@@ -11,7 +11,9 @@ import "./ContestEscrow.sol";
 
 /// @title ContestFactory
 /// @notice Фабрика для создания конкурсов — по шаблону или с кастомным набором слотов
-contract ContestFactory {
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract ContestFactory is ReentrancyGuard {
     Registry public immutable registry;
     bytes32 public constant FACTORY_ADMIN = keccak256("FACTORY_ADMIN");
     bytes32 public constant MODULE_ID = keccak256("CONTEST_MODULE");
@@ -32,7 +34,7 @@ contract ContestFactory {
     function createContestByTemplate(
         uint256 templateId,
         ContestParams calldata params
-    ) external {
+    ) external nonReentrant {
         // Проверяем роль
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService("AccessControlCenter")
@@ -50,7 +52,7 @@ contract ContestFactory {
     function createCustomContest(
         PrizeInfo[] calldata slots,
         ContestParams calldata params
-    ) external {
+    ) external nonReentrant {
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService("AccessControlCenter")
         );
@@ -64,8 +66,8 @@ contract ContestFactory {
         ContestParams memory params
     ) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
-        MultiValidator validator = MultiValidator(
-            registry.getModuleService(MODULE_ID, "MultiValidator")
+        TokenRegistry validator = TokenRegistry(
+            registry.getModuleService(MODULE_ID, "TokenRegistry")
         );
         uint256 totalMonetary;
         bytes32 moduleId = MODULE_ID;

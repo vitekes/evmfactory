@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 interface IRegistry {
     function registerFeature(bytes32 id, address impl, uint8 context) external;

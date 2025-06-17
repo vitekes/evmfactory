@@ -7,7 +7,7 @@ import "@typechain/hardhat";
 
 const config: HardhatUserConfig = {
     solidity: {
-        version: "0.8.28",
+        version: "0.8.30",
         settings: {
             optimizer: {
                 enabled: true,
