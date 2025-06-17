@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import "./shared/PrizeInfo.sol";
-import "/core/AccessControlCenter.sol";
+import "../../core/AccessControlCenter.sol";
 import "./interfaces/IPrizeManager.sol";
 
 /// @title PrizeManager

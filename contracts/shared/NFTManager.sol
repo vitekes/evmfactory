@@ -10,7 +10,10 @@ contract NFTManager is ERC721URIStorage, Ownable {
 
     event Minted(address indexed to, uint256 indexed tokenId, string uri, bool soulbound);
 
-    constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
+    constructor(string memory name_, string memory symbol_)
+        ERC721(name_, symbol_)
+        Ownable(msg.sender)
+    {}
 
     /// @notice Выпуск NFT или SBT
     function mint(
@@ -28,14 +31,17 @@ contract NFTManager is ERC721URIStorage, Ownable {
     }
 
     /// @notice Soulbound токены нельзя переводить
-    function _beforeTokenTransfer(
-        address from,
+    function _update(
         address to,
         uint256 tokenId,
-        uint256 batchSize
-    ) internal override {
-        require(!isSoulbound[tokenId] || from == address(0), "SBT is non-transferable");
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        address auth
+    ) internal override returns (address) {
+        address from = ERC721.ownerOf(tokenId);
+        require(
+            from == address(0) || to == address(0) || !isSoulbound[tokenId],
+            "SBT is non-transferable"
+        );
+        return super._update(to, tokenId, auth);
     }
 
     /// В случае чего админ может сжечь токен

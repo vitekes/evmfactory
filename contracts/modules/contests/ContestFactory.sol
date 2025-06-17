@@ -5,7 +5,7 @@ import "../../core/Registry.sol";
 import "../../core/AccessControlCenter.sol";
 import "../../core/MultiValidator.sol";
 import "../../core/PaymentGateway.sol";
-import "../shared/PrizeInfo.sol";
+import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
 

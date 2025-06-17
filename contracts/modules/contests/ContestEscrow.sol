@@ -5,7 +5,7 @@ import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
 import "../../core/EventRouter.sol";
 import "../../shared/NFTManager.sol";
-import "../shared/PrizeInfo.sol";
+import "./shared/PrizeInfo.sol";
 import "./interfaces/IContestEscrow.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -98,9 +98,10 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         );
 
         // 4) чеканим бейджи
+        string[] memory uris = new string[](_winners.length);
         NFTManager(
             registry.getModuleService(MODULE_ID, "NFTManager")
-        ).mintBatch(_winners, /* badge data */);
+        ).mintBatch(_winners, uris, false);
 
         emit ContestFinalized(_winners);
     }
