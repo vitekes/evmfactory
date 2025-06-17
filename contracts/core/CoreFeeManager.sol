@@ -5,9 +5,11 @@ import "./AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract CoreFeeManager is ReentrancyGuard {
+contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
     using Address for address payable;
     using SafeERC20 for IERC20;
 
@@ -38,7 +40,9 @@ contract CoreFeeManager is ReentrancyGuard {
         _;
     }
 
-    constructor(address accessControl) {
+    function initialize(address accessControl) public initializer {
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
@@ -84,4 +88,8 @@ contract CoreFeeManager is ReentrancyGuard {
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+
+    uint256[50] private __gap;
 }

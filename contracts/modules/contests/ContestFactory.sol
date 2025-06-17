@@ -123,6 +123,15 @@ contract ContestFactory is ReentrancyGuard {
             params.metadata
         );
 
+        // Grant module permissions to the new contest contract
+        AccessControlCenter acl = AccessControlCenter(
+            registry.getCoreService(keccak256("AccessControlCenter"))
+        );
+        bytes32[] memory roles = new bytes32[](2);
+        roles[0] = acl.MODULE_ROLE();
+        roles[1] = acl.FEATURE_OWNER_ROLE();
+        acl.grantMultipleRoles(address(esc), roles);
+
         // 5) Регистрация в реестре
         registry.registerFeature(
             keccak256(abi.encodePacked("Contest:", address(esc))),
