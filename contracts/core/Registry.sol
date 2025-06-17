@@ -26,7 +26,7 @@ contract Registry {
     event FeatureRegistered(bytes32 indexed id, address implementation, uint8 context);
     event CoreServiceSet(bytes32 indexed id, address serviceAddress);
     event ModuleServiceSet(bytes32 indexed moduleId, bytes32 indexed serviceId, address serviceAddress);
-    event ModuleRegistered(bytes32 indexed moduleId, string alias, address serviceAddress);
+    event ModuleRegistered(bytes32 indexed moduleId, string serviceAlias, address serviceAddress);
 
     modifier onlyAdmin() {
         require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
@@ -70,16 +70,16 @@ contract Registry {
     }
 
     /// @notice Привязать сервис к конкретному модулю
-    function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) external onlyFeatureOwner {
+    function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) public onlyFeatureOwner {
         require(features[moduleId].exists, "module not registered");
         moduleServices[moduleId][serviceId] = addr;
         emit ModuleServiceSet(moduleId, serviceId, addr);
     }
 
-    function setModuleServiceAlias(bytes32 moduleId, string calldata alias, address addr) external onlyFeatureOwner {
-        bytes32 serviceId = keccak256(bytes(alias));
+    function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external onlyFeatureOwner {
+        bytes32 serviceId = keccak256(bytes(serviceAlias));
         setModuleService(moduleId, serviceId, addr);
-        emit ModuleRegistered(moduleId, alias, addr);
+        emit ModuleRegistered(moduleId, serviceAlias, addr);
     }
 
     /// @notice Получить сервис, закреплённый за модулем
@@ -87,8 +87,8 @@ contract Registry {
         return moduleServices[moduleId][serviceId];
     }
 
-    function getModuleService(bytes32 moduleId, string calldata alias) external view returns (address) {
-        return moduleServices[moduleId][keccak256(bytes(alias))];
+    function getModuleService(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
+        return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
     }
 
     /// Позволяет заменить AccessControlCenter, если понадобится
