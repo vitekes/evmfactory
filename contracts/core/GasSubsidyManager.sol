@@ -12,8 +12,18 @@ contract GasSubsidyManager {
     // moduleId => адрес контракта => включено ли покрытие газа
     mapping(bytes32 => mapping(address => bool)) public gasCoverageEnabled;
 
+    event GasRefundLimitSet(bytes32 moduleId, uint256 limit);
+    // moduleId => максимальный возврат газа за транзакцию
+    mapping(bytes32 => uint256) public gasRefundPerTx;
+
     event EligibilitySet(bytes32 moduleId, address user, bool allowed);
     event GasCoverageEnabled(bytes32 moduleId, address contractAddress, bool enabled);
+
+    /// Установить лимит возврата газа на одну транзакцию для модуля
+    function setGasRefundLimit(bytes32 moduleId, uint256 limit) external onlyAdmin {
+        gasRefundPerTx[moduleId] = limit;
+        emit GasRefundLimitSet(moduleId, limit);
+    }
 
     modifier onlyAdmin() {
         require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");

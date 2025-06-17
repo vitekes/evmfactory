@@ -48,7 +48,9 @@ contract CoreFeeManager is ReentrancyGuard {
         uint16 pFee = percentFee[moduleId][token];
         uint256 fFee = fixedFee[moduleId][token];
 
+        require(pFee <= 10_000, "fee too high");
         feeAmount = fFee + ((amount * pFee) / 10_000);
+        require(feeAmount < amount, "fee >= amount");
         if (feeAmount > 0) {
             IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
             collectedFees[moduleId][token] += feeAmount;

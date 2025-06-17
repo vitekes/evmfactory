@@ -24,6 +24,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     uint256     public commissionFee;
     bool        public isFinalized;
     address[]   public winners;
+    uint256     public processedWinners;
+    uint8       public maxWinnersPerTx = 20;
 
     event MonetaryPrizePaid(address indexed to, uint256 amount);
     event PromoPrizeIssued(uint8 indexed slot, address indexed to);
@@ -60,52 +62,62 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     nonReentrant
     onlyCreator
     {
-        if (isFinalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
-        isFinalized = true;
-        winners = _winners;
 
-        // 1) взимаем комиссию за on-chain действие
-        if (commissionFee > 0) {
-            PaymentGateway(
-                registry.getModuleService(MODULE_ID, "PaymentGateway")
-            ).processPayment(
-                MODULE_ID,
-                commissionToken,
-                creator,
-                commissionFee
-            );
+        if (winners.length == 0) {
+            winners = _winners;
+
+            // 1) взимаем комиссию за on-chain действие
+            if (commissionFee > 0) {
+                PaymentGateway(
+                    registry.getModuleService(MODULE_ID, "PaymentGateway")
+                ).processPayment(
+                    MODULE_ID,
+                    commissionToken,
+                    creator,
+                    commissionFee
+                );
+            }
         }
 
-        // 2) раздача призов
-        for (uint8 i = 0; i < prizes.length; i++) {
+        uint256 start = processedWinners;
+        uint256 end = start + maxWinnersPerTx;
+        if (end > prizes.length) end = prizes.length;
+
+        for (uint8 i = uint8(start); i < end; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY) {
                 uint256 amount = p.distribution == 0
                     ? p.amount
                     : _computeDescending(p.amount, i);
-                IERC20(p.token).safeTransfer(_winners[i], amount);
-                emit MonetaryPrizePaid(_winners[i], amount);
+                IERC20(p.token).safeTransfer(winners[i], amount);
+                emit MonetaryPrizePaid(winners[i], amount);
             } else {
-                emit PromoPrizeIssued(i, _winners[i]);
+                emit PromoPrizeIssued(i, winners[i]);
             }
         }
 
-        // 3) уведомляем остальные модули
-        EventRouter(
-            registry.getModuleService(MODULE_ID, "EventRouter")
-        ).route(
-            keccak256("ContestFinalized"),
-            abi.encode(creator, _winners, prizes)
-        );
+        processedWinners = end;
 
-        // 4) чеканим бейджи
-        string[] memory uris = new string[](_winners.length);
-        NFTManager(
-            registry.getModuleService(MODULE_ID, "NFTManager")
-        ).mintBatch(_winners, uris, false);
+        if (processedWinners == prizes.length && !isFinalized) {
+            isFinalized = true;
 
-        emit ContestFinalized(_winners);
+            // уведомляем остальные модули
+            EventRouter(
+                registry.getModuleService(MODULE_ID, "EventRouter")
+            ).route(
+                keccak256("ContestFinalized"),
+                abi.encode(creator, winners, prizes)
+            );
+
+            // чеканим бейджи
+            string[] memory uris = new string[](winners.length);
+            NFTManager(
+                registry.getModuleService(MODULE_ID, "NFTManager")
+            ).mintBatch(winners, uris, false);
+
+            emit ContestFinalized(winners);
+        }
     }
 
     function _computeDescending(uint256 amount, uint8 idx)
