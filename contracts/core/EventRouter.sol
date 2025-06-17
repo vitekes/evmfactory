@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.10;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
 
 contract EventRouter {
     event Routed(bytes32 indexed eventType, bytes data);

@@ -1,4 +1,4 @@
-// contracts/interfaces/modules/contests/IPrizeManager.sol
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
 import "../shared/PrizeInfo.sol";
