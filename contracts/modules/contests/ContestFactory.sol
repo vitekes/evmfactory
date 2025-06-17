@@ -28,8 +28,9 @@ contract ContestFactory is ReentrancyGuard {
         uint256 commissionFee;
     }
 
-    constructor(address _registry) {
+    constructor(address _registry, address paymentGateway) {
         registry = Registry(_registry);
+        registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
     }
 
     function createContestByTemplate(

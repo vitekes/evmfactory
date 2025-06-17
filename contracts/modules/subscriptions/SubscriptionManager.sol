@@ -3,28 +3,83 @@ pragma solidity ^0.8.28;
 
 import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title SubscriptionManager
 /// @notice Example subscription manager that charges users via PaymentGateway.
 contract SubscriptionManager {
+    using SafeERC20 for IERC20;
+
     Registry public immutable registry;
     bytes32 public constant MODULE_ID = keccak256("Subscriptions");
 
-    mapping(address => uint256) public paidAmount;
-
-    event Subscribed(address indexed user, uint256 amount, address token);
-
-    constructor(address _registry) {
-        registry = Registry(_registry);
+    struct Plan {
+        address token;
+        uint256 price;
+        uint256 period;
     }
 
-    /// @notice Charge user for subscription using PaymentGateway
-    function subscribe(address token, uint256 amount) external {
-        PaymentGateway(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, token, msg.sender, amount);
+    mapping(uint256 => Plan) public plans;
+    uint256 public nextPlanId;
 
-        paidAmount[msg.sender] += amount;
-        emit Subscribed(msg.sender, amount, token);
+    mapping(address => uint256) public userPlan;
+    mapping(address => uint256) public nextPayment;
+    mapping(address => uint256) public paidAmount;
+
+    address public owner;
+
+    event PlanCreated(uint256 id, address token, uint256 price, uint256 period);
+    event Subscribed(address indexed user, uint256 planId, uint256 amount, address token);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+
+    constructor(address _registry, address paymentGateway) {
+        registry = Registry(_registry);
+        owner = msg.sender;
+        registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+    }
+
+    /// @notice Add a new subscription plan
+    function createPlan(address token, uint256 price, uint256 period) external onlyOwner returns (uint256 id) {
+        id = nextPlanId++;
+        plans[id] = Plan(token, price, period);
+        emit PlanCreated(id, token, price, period);
+    }
+
+    /// @notice Subscribe user to a plan and charge first payment
+    function subscribe(uint256 planId) external {
+        Plan memory p = plans[planId];
+        require(p.token != address(0), "plan not found");
+
+        uint256 netAmount = PaymentGateway(
+            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
+        ).processPayment(MODULE_ID, p.token, msg.sender, p.price);
+
+        userPlan[msg.sender] = planId;
+        nextPayment[msg.sender] = block.timestamp + p.period;
+        paidAmount[msg.sender] += netAmount;
+
+        emit Subscribed(msg.sender, planId, p.price, p.token);
+    }
+
+    /// @notice Charge recurring payment, callable by keeper/relayer
+    function charge(address user) external {
+        uint256 planId = userPlan[user];
+        Plan memory p = plans[planId];
+        require(p.token != address(0), "no plan");
+        require(block.timestamp >= nextPayment[user], "not due");
+
+        uint256 netAmount = PaymentGateway(
+            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
+        ).processPayment(MODULE_ID, p.token, user, p.price);
+
+        nextPayment[user] = block.timestamp + p.period;
+        paidAmount[user] += netAmount;
+
+        emit Subscribed(user, planId, p.price, p.token);
     }
 }
