@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract NFTManager is ERC721URIStorage, Ownable {
     uint256 public tokenIdCounter;
+    uint256 public constant MAX_BATCH_MINT = 50;
     mapping(uint256 => bool) public isSoulbound;
 
     event Minted(address indexed to, uint256 indexed tokenId, string uri, bool soulbound);
@@ -22,7 +23,7 @@ contract NFTManager is ERC721URIStorage, Ownable {
         bool soulbound
     ) external onlyOwner returns (uint256) {
         uint256 tokenId = ++tokenIdCounter;
-        _mint(to, tokenId);
+        _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
         isSoulbound[tokenId] = soulbound;
 
@@ -52,9 +53,10 @@ contract NFTManager is ERC721URIStorage, Ownable {
     /// @notice Массовый выпуск NFT
     function mintBatch(address[] calldata recipients, string[] calldata uris, bool soulbound) external onlyOwner {
         require(recipients.length == uris.length, "length mismatch");
+        require(recipients.length <= MAX_BATCH_MINT, "batch too large");
         for (uint256 i = 0; i < recipients.length; i++) {
             uint256 id = ++tokenIdCounter;
-            _mint(recipients[i], id);
+            _safeMint(recipients[i], id);
             _setTokenURI(id, uris[i]);
             isSoulbound[id] = soulbound;
             emit Minted(recipients[i], id, uris[i], soulbound);

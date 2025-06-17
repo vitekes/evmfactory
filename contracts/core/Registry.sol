@@ -26,6 +26,7 @@ contract Registry {
     event FeatureRegistered(bytes32 indexed id, address implementation, uint8 context);
     event CoreServiceSet(bytes32 indexed id, address serviceAddress);
     event ModuleServiceSet(bytes32 indexed moduleId, bytes32 indexed serviceId, address serviceAddress);
+    event ModuleRegistered(bytes32 indexed moduleId, string alias, address serviceAddress);
 
     modifier onlyAdmin() {
         require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
@@ -75,9 +76,19 @@ contract Registry {
         emit ModuleServiceSet(moduleId, serviceId, addr);
     }
 
+    function setModuleServiceAlias(bytes32 moduleId, string calldata alias, address addr) external onlyFeatureOwner {
+        bytes32 serviceId = keccak256(bytes(alias));
+        setModuleService(moduleId, serviceId, addr);
+        emit ModuleRegistered(moduleId, alias, addr);
+    }
+
     /// @notice Получить сервис, закреплённый за модулем
     function getModuleService(bytes32 moduleId, bytes32 serviceId) external view returns (address) {
         return moduleServices[moduleId][serviceId];
+    }
+
+    function getModuleService(bytes32 moduleId, string calldata alias) external view returns (address) {
+        return moduleServices[moduleId][keccak256(bytes(alias))];
     }
 
     /// Позволяет заменить AccessControlCenter, если понадобится
