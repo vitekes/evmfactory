@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
 /// @notice Тип приза: монетарный (ERC-20) или промо (офлайн-код)

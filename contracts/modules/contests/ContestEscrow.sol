@@ -40,8 +40,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         PrizeInfo[] memory _prizes,
         address     _commissionToken,
         uint256     _commissionFee,
-        address[] memory _judges,
-        bytes memory _metadata
+        address[] memory /* _judges */, // unused for now
+        bytes memory /* _metadata */
     ) {
         registry        = _registry;
         creator         = _creator;
