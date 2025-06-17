@@ -4,16 +4,16 @@ pragma solidity ^0.8.28;
 import "./AccessControlCenter.sol";
 import "./TokenRegistry.sol";
 import "./CoreFeeManager.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
-    using AddressUpgradeable for address payable;
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using Address for address payable;
+    using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
     TokenRegistry public tokenRegistry;
@@ -59,12 +59,13 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
     ) external onlyFeatureOwner nonReentrant returns (uint256 netAmount) {
         require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
 
-        IERC20Upgradeable(token).safeTransferFrom(payer, address(this), amount);
-        IERC20Upgradeable(token).forceApprove(address(feeManager), amount);
+        IERC20(token).safeTransferFrom(payer, address(this), amount);
+        IERC20(token).forceApprove(address(feeManager), amount);
         uint256 fee = feeManager.collect(moduleId, token, address(this), amount);
-        IERC20Upgradeable(token).forceApprove(address(feeManager), 0);
+        IERC20(token).forceApprove(address(feeManager), 0);
         netAmount = amount - fee;
-        IERC20Upgradeable(token).safeTransfer(msg.sender, netAmount);
+        IERC20(token).safeTransfer(msg.sender, netAmount);
+
 
         emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId);
     }

@@ -2,16 +2,16 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
-    using AddressUpgradeable for address payable;
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using Address for address payable;
+    using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
 
@@ -56,7 +56,8 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         feeAmount = fFee + ((amount * pFee) / 10_000);
         require(feeAmount < amount, "fee >= amount");
         if (feeAmount > 0) {
-            IERC20Upgradeable(token).safeTransferFrom(payer, address(this), feeAmount);
+            IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
+
             collectedFees[moduleId][token] += feeAmount;
             emit FeeCollected(moduleId, token, feeAmount);
         }
@@ -67,7 +68,8 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         require(amount > 0, "nothing to withdraw");
 
         collectedFees[moduleId][token] = 0;
-        IERC20Upgradeable(token).safeTransfer(to, amount);
+        IERC20(token).safeTransfer(to, amount);
+
         emit FeeWithdrawn(moduleId, token, to, amount);
     }
 
