@@ -31,7 +31,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     event PromoPrizeIssued(uint8 indexed slot, address indexed to);
     event ContestFinalized(address[] winners);
 
-    bytes32 public constant MODULE_ID = keccak256("CONTEST_MODULE");
+    /// @dev Identifier used when interacting with registry services
+    bytes32 public constant MODULE_ID = keccak256("Contest");
 
     modifier onlyCreator() {
         require(msg.sender == creator, "Not creator");
