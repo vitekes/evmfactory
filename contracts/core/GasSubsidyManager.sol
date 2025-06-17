@@ -2,8 +2,10 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract GasSubsidyManager {
+contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
 
     // moduleId => user => имеет ли право на покрытие газа
@@ -35,7 +37,8 @@ contract GasSubsidyManager {
         _;
     }
 
-    constructor(address accessControl) {
+    function initialize(address accessControl) public initializer {
+        __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
@@ -56,7 +59,19 @@ contract GasSubsidyManager {
         return gasCoverageEnabled[moduleId][contractAddress] && isEligible[moduleId][user];
     }
 
+    /// @notice Refund gas to relayer with per-transaction limit check
+    function refundGas(bytes32 moduleId, address payable relayer, uint256 gasUsed) external onlyAdmin {
+        uint256 refund = tx.gasprice * gasUsed;
+        require(refund <= gasRefundPerTx[moduleId], "Exceeds refund limit");
+        require(address(this).balance >= refund, "Insufficient balance");
+        relayer.transfer(refund);
+    }
+
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+
+    uint256[50] private __gap;
 }

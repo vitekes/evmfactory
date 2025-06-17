@@ -2,8 +2,10 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract Registry {
+contract Registry is Initializable, UUPSUpgradeable {
     /// @dev Хранение информации о фичах
     struct Feature {
         address implementation;
@@ -38,7 +40,8 @@ contract Registry {
         _;
     }
 
-    constructor(address accessControl) {
+    function initialize(address accessControl) public initializer {
+        __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
@@ -95,4 +98,8 @@ contract Registry {
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+
+    uint256[50] private __gap;
 }
