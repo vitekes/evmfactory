@@ -66,6 +66,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         netAmount = amount - fee;
         IERC20(token).safeTransfer(msg.sender, netAmount);
 
+
         emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId);
     }
 

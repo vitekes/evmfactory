@@ -57,6 +57,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         require(feeAmount < amount, "fee >= amount");
         if (feeAmount > 0) {
             IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
+
             collectedFees[moduleId][token] += feeAmount;
             emit FeeCollected(moduleId, token, feeAmount);
         }
@@ -68,6 +69,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
 
         collectedFees[moduleId][token] = 0;
         IERC20(token).safeTransfer(to, amount);
+
         emit FeeWithdrawn(moduleId, token, to, amount);
     }
 
