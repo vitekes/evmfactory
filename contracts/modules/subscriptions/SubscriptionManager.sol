@@ -6,6 +6,7 @@ import "../../core/PaymentGateway.sol";
 import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @title SubscriptionManager
@@ -99,7 +100,18 @@ contract SubscriptionManager {
         require(chainAllowed, "invalid chain");
 
         if (permitSig.length > 0) {
-            (bool ok, ) = plan.token.call(permitSig);
+            bytes4 selector;
+            assembly {
+                selector := shr(224, calldataload(permitSig.offset))
+            }
+            address target = plan.token;
+            if (selector != IERC20Permit.permit.selector) {
+                target = registry.getModuleService(
+                    MODULE_ID,
+                    keccak256(bytes("Permit2"))
+                );
+            }
+            (bool ok, ) = target.call(permitSig);
             require(ok, "permit failed");
         }
 
