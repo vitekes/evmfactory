@@ -11,32 +11,56 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../../lib/SignatureLib.sol";
 
-/// @title SubscriptionManager
-/// @notice Subscription system with off-chain plan creation using EIP-712
+/// @title Subscription Manager
+/// @notice Handles recurring payments with off-chain plan creation using EIP-712
 contract SubscriptionManager is AccessManaged {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
+    /// @notice Thrown when merchant signature does not match the plan
     error InvalidSignature();
 
+    /// @notice Core registry used for service discovery
     Registry public immutable registry;
+    /// @notice Identifier of the module within the registry
     bytes32 public immutable MODULE_ID;
 
 
 
+    /// @notice Subscription data for a user
     struct Subscriber {
-        uint256 nextBilling;
-        bytes32 planHash;
+        uint256 nextBilling; // timestamp of the next charge
+        bytes32 planHash;    // plan this user is subscribed to
     }
 
+    /// @notice Registered plans by their hash
     mapping(bytes32 => SignatureLib.Plan) public plans;
+    /// @notice Active subscriber info mapped by user address
     mapping(address => Subscriber) public subscribers;
 
+    /// @notice EIP-712 domain separator for plan signatures
     bytes32 public DOMAIN_SEPARATOR;
 
+    /// @notice Emitted when a user subscribes to a plan
+    /// @param user Subscriber address
+    /// @param planHash Hash of the plan parameters
+    /// @param amount Price paid by the user
+    /// @param token Payment token address
     event Subscribed(address indexed user, bytes32 indexed planHash, uint256 amount, address token);
+    /// @notice Emitted when a user cancels their subscription
+    /// @param user Subscriber address
+    /// @param planHash Hash of the plan
     event Unsubscribed(address indexed user, bytes32 indexed planHash);
+    /// @notice Emitted after a successful recurring charge
+    /// @param user Subscriber address
+    /// @param planHash Hash of the plan
+    /// @param amount Amount charged
+    /// @param nextBilling Next timestamp for payment
     event SubscriptionCharged(address indexed user, bytes32 indexed planHash, uint256 amount, uint256 nextBilling);
 
+    /// @notice Initializes the subscription manager and registers services
+    /// @param _registry Address of the core Registry contract
+    /// @param paymentGateway Payment gateway used to process fees
+    /// @param moduleId Unique module identifier
     constructor(address _registry, address paymentGateway, bytes32 moduleId)
         AccessManaged(Registry(_registry).getCoreService(keccak256("AccessControlCenter")))
     {
@@ -59,11 +83,18 @@ contract SubscriptionManager is AccessManaged {
         _grantSelfRoles(roles);
     }
 
+    /// @notice Calculates the EIP-712 hash of a subscription plan
+    /// @param plan Plan parameters
+    /// @return Hash to be signed by the merchant
     function hashPlan(SignatureLib.Plan calldata plan) public view returns (bytes32) {
         bytes32 structHash = SignatureLib.hashPlan(plan);
         return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
     }
 
+    /// @notice Subscribe caller to a plan
+    /// @param plan Plan parameters signed by the merchant
+    /// @param sigMerchant Merchant signature over the plan
+    /// @param permitSig Optional permit or Permit2 signature for token spending
     function subscribe(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
         bytes32 planHash = hashPlan(plan);
         if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
@@ -107,6 +138,7 @@ contract SubscriptionManager is AccessManaged {
         emit Subscribed(msg.sender, planHash, plan.price, plan.token);
     }
 
+    /// @dev Restricts calls to automation addresses configured in ACL
     modifier onlyAutomation() {
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService(keccak256("AccessControlCenter"))
@@ -115,6 +147,8 @@ contract SubscriptionManager is AccessManaged {
         _;
     }
 
+    /// @notice Charge a user according to their plan
+    /// @param user Address of the subscriber to charge
     function charge(address user) public onlyAutomation {
         Subscriber storage s = subscribers[user];
         SignatureLib.Plan memory plan = plans[s.planHash];
@@ -132,6 +166,8 @@ contract SubscriptionManager is AccessManaged {
         emit SubscriptionCharged(user, s.planHash, plan.price, s.nextBilling);
     }
 
+    /// @notice Charge multiple users in a single transaction
+    /// @param users List of subscriber addresses
     function chargeBatch(address[] calldata users) external onlyAutomation {
         require(users.length <= 50, "batch limit");
         unchecked {
@@ -141,6 +177,7 @@ contract SubscriptionManager is AccessManaged {
         }
     }
 
+    /// @notice Cancel caller's subscription
     function unsubscribe() external {
         Subscriber memory s = subscribers[msg.sender];
         delete subscribers[msg.sender];

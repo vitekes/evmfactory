@@ -72,6 +72,26 @@ registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", gatewayAddress);
 
 Without this step modules won't be able to discover the gateway service.
 
+## Как добавить модуль
+
+1. Создайте смарт‑контракты модуля и необходимые сервисы.
+2. Задеплойте их в сеть и получите `moduleId`.
+3. Зарегистрируйте модуль в `Registry`:
+   ```solidity
+   registry.registerFeature(moduleId, moduleAddress, 1);
+   ```
+4. Установите алиасы сервисов, например `PaymentGateway`:
+   ```solidity
+   registry.setModuleServiceAlias(moduleId, "PaymentGateway", gatewayAddress);
+   ```
+
+```mermaid
+graph TD
+    A(Deploy contracts) --> B{Register in Registry}
+    B --> C[Set service aliases]
+    C --> D[Module ready]
+```
+
 ## Contributing & Support
 
 - **GitHub Issues**: [https://github.com/vitekes/evmcontest/issues](https://github.com/vitekes/evmcontest/issues)
