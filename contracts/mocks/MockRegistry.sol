@@ -5,6 +5,8 @@ contract MockRegistry {
     mapping(bytes32 => mapping(bytes32 => address)) public moduleServices;
     mapping(bytes32 => address) public coreServices;
 
+    mapping(bytes32 => address) public features;
+
     function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external {
         moduleServices[moduleId][keccak256(bytes(serviceAlias))] = addr;
     }
@@ -19,5 +21,9 @@ contract MockRegistry {
 
     function getCoreService(bytes32 serviceId) external view returns (address) {
         return coreServices[serviceId];
+    }
+
+    function registerFeature(bytes32 id, address impl, uint8) external {
+        features[id] = impl;
     }
 }
