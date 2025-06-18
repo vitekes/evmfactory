@@ -17,6 +17,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
     using SafeERC20 for IERC20;
+    error NotAllowedToken();
+    error InvalidSignature();
 
     AccessControlCenter public access;
     IRegistry public registry;
@@ -74,10 +76,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
         address val = registry.getModuleService(moduleId, keccak256(bytes("Validator")));
-        require(
-            IValidator(val).isAllowed(token),
-            "token not allowed"
-        );
+        if (!IValidator(val).isAllowed(token)) revert NotAllowedToken();
         // Skip signature verification for automation bots and trusted relayers
         if (
             payer != msg.sender &&
@@ -101,7 +100,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
                     )
                 )
             );
-            require(ECDSA.recover(digest, signature) == payer, "invalid signature");
+            if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
         }
 
         IERC20(token).safeTransferFrom(payer, address(this), amount);
