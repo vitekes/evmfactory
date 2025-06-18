@@ -37,6 +37,9 @@ contract SubscriptionManager is AccessManaged {
     /// @notice Active subscriber info mapped by user address
     mapping(address => Subscriber) public subscribers;
 
+    /// @notice Maximum number of users to charge in a single batch. 0 disables the limit.
+    uint16 public batchLimit;
+
     /// @notice EIP-712 domain separator for plan signatures
     bytes32 public DOMAIN_SEPARATOR;
 
@@ -50,6 +53,11 @@ contract SubscriptionManager is AccessManaged {
     /// @param user Subscriber address
     /// @param planHash Hash of the plan
     event Unsubscribed(address indexed user, bytes32 indexed planHash);
+    /// @notice Emitted when a plan is cancelled
+    /// @param user Subscriber address
+    /// @param planHash Hash of the plan
+    /// @param ts Timestamp of cancellation
+    event PlanCancelled(address indexed user, bytes32 indexed planHash, uint256 ts);
     /// @notice Emitted after a successful recurring charge
     /// @param user Subscriber address
     /// @param planHash Hash of the plan
@@ -81,6 +89,8 @@ contract SubscriptionManager is AccessManaged {
         roles[0] = acl.MODULE_ROLE();
         roles[1] = acl.FEATURE_OWNER_ROLE();
         _grantSelfRoles(roles);
+
+        batchLimit = 0;
     }
 
     /// @notice Calculates the EIP-712 hash of a subscription plan
@@ -169,12 +179,21 @@ contract SubscriptionManager is AccessManaged {
     /// @notice Charge multiple users in a single transaction
     /// @param users List of subscriber addresses
     function chargeBatch(address[] calldata users) external onlyAutomation {
-        require(users.length <= 50, "batch limit");
+        uint256 limit = users.length;
+        if (batchLimit > 0 && limit > batchLimit) {
+            limit = batchLimit;
+        }
         unchecked {
-            for (uint256 i = 0; i < users.length; i++) {
+            for (uint256 i = 0; i < limit; i++) {
                 charge(users[i]);
             }
         }
+    }
+
+    /// @notice Sets the maximum batch charge limit
+    /// @param newLimit New limit value (0 to disable)
+    function setBatchLimit(uint16 newLimit) external onlyRole(AccessControlCenter(_ACC).GOVERNOR_ROLE()) {
+        batchLimit = newLimit;
     }
 
     /// @notice Cancel caller's subscription
@@ -182,6 +201,7 @@ contract SubscriptionManager is AccessManaged {
         Subscriber memory s = subscribers[msg.sender];
         delete subscribers[msg.sender];
         emit Unsubscribed(msg.sender, s.planHash);
+        emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
     }
 }
 

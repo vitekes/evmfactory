@@ -47,6 +47,11 @@ contract Marketplace is AccessManaged {
         bytes32 listingHash,
         uint256 chainId
     );
+    /// @notice Emitted when a listing price is updated
+    /// @param hash Listing identifier hash
+    /// @param oldPrice Previous price
+    /// @param newPrice New price value
+    event ListingUpdated(bytes32 indexed hash, uint256 oldPrice, uint256 newPrice);
 
     constructor(address _registry, address paymentGateway, bytes32 moduleId)
         AccessManaged(Registry(_registry).getCoreService(keccak256("AccessControlCenter")))
@@ -75,6 +80,18 @@ contract Marketplace is AccessManaged {
         id = nextId++;
         listings[id] = OnchainListing(msg.sender, token, price, true);
         emit MarketplaceListingCreated(id, msg.sender, token, price);
+    }
+
+    /// @notice Update price for an existing listing
+    /// @param id Listing identifier
+    /// @param newPrice New price value
+    function updateListingPrice(uint256 id, uint256 newPrice) external {
+        OnchainListing storage l = listings[id];
+        require(l.seller == msg.sender, "not seller");
+        uint256 oldPrice = l.price;
+        l.price = newPrice;
+        bytes32 hash = keccak256(abi.encodePacked(id, l.seller, l.token));
+        emit ListingUpdated(hash, oldPrice, newPrice);
     }
 
     /// @notice Purchase a listed item, paying through PaymentGateway
