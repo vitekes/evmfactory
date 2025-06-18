@@ -7,6 +7,7 @@ import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../../lib/SignatureLib.sol";
 
 /// @title Marketplace
 /// @notice Minimal marketplace example demonstrating registration of sales and
@@ -24,15 +25,6 @@ contract Marketplace {
         bool active;
     }
 
-    struct Listing {
-        uint256[] chainIds;
-        address token;
-        uint256 price;
-        bytes32 sku;
-        address seller;
-        uint256 salt;
-        uint64 expiry;
-    }
 
     uint256 public nextId;
     mapping(uint256 => OnchainListing) public listings;
@@ -40,9 +32,6 @@ contract Marketplace {
     mapping(bytes32 => mapping(address => bool)) public consumed;
 
     bytes32 public DOMAIN_SEPARATOR;
-    bytes32 public constant LISTING_TYPEHASH = keccak256(
-        "Listing(uint256[] chainIds,address token,uint256 price,bytes32 sku,address seller,uint256 salt,uint64 expiry)"
-    );
 
     event Listed(uint256 indexed id, address indexed seller, address token, uint256 price);
     event Sold(uint256 indexed id, address indexed buyer);
@@ -93,7 +82,7 @@ contract Marketplace {
     }
 
     /// @notice Purchase a lazily listed item using EIP-712 signature
-    function buy(Listing calldata listing, bytes calldata sigSeller) external {
+    function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external {
         bytes32 listingHash = hashListing(listing);
         require(
             listingHash.recover(sigSeller) == listing.seller,
@@ -123,22 +112,8 @@ contract Marketplace {
         emit ListingPurchased(msg.sender, listingHash, block.chainid);
     }
 
-    function hashListing(Listing calldata listing) public view returns (bytes32) {
-        bytes32 chainHash = keccak256(
-            abi.encode(listing.chainIds.length, listing.chainIds)
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                LISTING_TYPEHASH,
-                chainHash,
-                listing.token,
-                listing.price,
-                listing.sku,
-                listing.seller,
-                listing.salt,
-                listing.expiry
-            )
-        );
+    function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
+        bytes32 structHash = SignatureLib.hashListing(listing);
         return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
     }
 }
