@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "../../interfaces/core/IRegistry.sol";
 import "../../core/Registry.sol";
 import "../../core/AccessControlCenter.sol";
-import "../../core/TokenRegistry.sol";
+import "../../interfaces/core/IMultiValidator.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "../../core/PaymentGateway.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
@@ -14,7 +16,7 @@ import "./ContestEscrow.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract ContestFactory is ReentrancyGuard {
-    Registry public immutable registry;
+    IRegistry public immutable registry;
     bytes32 public constant FACTORY_ADMIN = keccak256("FACTORY_ADMIN");
     /// @dev Identifier used when interacting with registry services
     bytes32 public constant MODULE_ID = keccak256("Contest");
@@ -28,9 +30,20 @@ contract ContestFactory is ReentrancyGuard {
         uint256 commissionFee;
     }
 
-    constructor(address _registry, address paymentGateway) {
-        registry = Registry(_registry);
+    constructor(address _registry, address paymentGateway, address validatorLogic) {
+        registry = IRegistry(_registry);
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+
+        AccessControlCenter acl = AccessControlCenter(
+            registry.getCoreService(keccak256("AccessControlCenter"))
+        );
+
+        address val = Clones.cloneDeterministic(
+            validatorLogic,
+            keccak256(abi.encodePacked("Validator", MODULE_ID))
+        );
+        IMultiValidator(val).initialize(address(acl));
+        registry.setModuleServiceAlias(MODULE_ID, "Validator", val);
     }
 
     function createContestByTemplate(
@@ -68,8 +81,8 @@ contract ContestFactory is ReentrancyGuard {
         ContestParams memory params
     ) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
-        TokenRegistry validator = TokenRegistry(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("TokenRegistry")))
+        IMultiValidator validator = IMultiValidator(
+            registry.getModuleService(MODULE_ID, keccak256(bytes("Validator")))
         );
         uint256 totalMonetary;
         bytes32 moduleId = MODULE_ID;
@@ -77,7 +90,7 @@ contract ContestFactory is ReentrancyGuard {
             if (slots[i].prizeType == PrizeType.MONETARY) {
                 // проверяем, что токен разрешён в этом контексте
                 require(
-                    validator.isTokenAllowed(moduleId, slots[i].token),
+                    validator.isAllowed(slots[i].token),
                     "Token not allowed"
                 );
                 // проверяем корректность схемы распределения
@@ -117,7 +130,7 @@ contract ContestFactory is ReentrancyGuard {
 
         // 4) Деплой эскроу-контракта
         ContestEscrow esc = new ContestEscrow(
-            registry,
+            Registry(address(registry)),
             msg.sender,
             slots,
             params.commissionToken,
