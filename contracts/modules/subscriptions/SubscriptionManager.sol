@@ -15,6 +15,7 @@ import "../../lib/SignatureLib.sol";
 contract SubscriptionManager {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
+    error InvalidSignature();
 
     Registry public immutable registry;
     bytes32 public immutable MODULE_ID;
@@ -64,7 +65,7 @@ contract SubscriptionManager {
 
     function subscribe(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
         bytes32 planHash = hashPlan(plan);
-        require(planHash.recover(sigMerchant) == plan.merchant, "invalid signature");
+        if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
         require(plan.expiry == 0 || plan.expiry >= block.timestamp, "expired");
         bool chainAllowed = false;
         for (uint256 i = 0; i < plan.chainIds.length; i++) {

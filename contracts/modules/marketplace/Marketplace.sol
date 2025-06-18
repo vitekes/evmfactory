@@ -15,6 +15,7 @@ import "../../lib/SignatureLib.sol";
 contract Marketplace {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
+    error InvalidSignature();
     Registry public immutable registry;
     bytes32 public immutable MODULE_ID;
 
@@ -33,9 +34,18 @@ contract Marketplace {
 
     bytes32 public DOMAIN_SEPARATOR;
 
-    event Listed(uint256 indexed id, address indexed seller, address token, uint256 price);
-    event Sold(uint256 indexed id, address indexed buyer);
-    event ListingPurchased(address indexed buyer, bytes32 listingHash, uint256 chainId);
+    event MarketplaceListingCreated(
+        uint256 indexed id,
+        address indexed seller,
+        address token,
+        uint256 price
+    );
+    event MarketplaceListingSold(uint256 indexed id, address indexed buyer);
+    event MarketplaceListingPurchased(
+        address indexed buyer,
+        bytes32 listingHash,
+        uint256 chainId
+    );
 
     constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = Registry(_registry);
@@ -63,7 +73,7 @@ contract Marketplace {
     function list(address token, uint256 price) external returns (uint256 id) {
         id = nextId++;
         listings[id] = OnchainListing(msg.sender, token, price, true);
-        emit Listed(id, msg.sender, token, price);
+        emit MarketplaceListingCreated(id, msg.sender, token, price);
     }
 
     /// @notice Purchase a listed item, paying through PaymentGateway
@@ -78,16 +88,13 @@ contract Marketplace {
         IERC20(l.token).safeTransfer(l.seller, netAmount);
 
         l.active = false;
-        emit Sold(id, msg.sender);
+        emit MarketplaceListingSold(id, msg.sender);
     }
 
     /// @notice Purchase a lazily listed item using EIP-712 signature
     function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external {
         bytes32 listingHash = hashListing(listing);
-        require(
-            listingHash.recover(sigSeller) == listing.seller,
-            "invalid signature"
-        );
+        if (listingHash.recover(sigSeller) != listing.seller) revert InvalidSignature();
         require(!consumed[listingHash][msg.sender], "already purchased");
         require(
             listing.expiry == 0 || listing.expiry >= block.timestamp,
@@ -109,7 +116,7 @@ contract Marketplace {
         IERC20(listing.token).safeTransfer(listing.seller, netAmount);
 
         consumed[listingHash][msg.sender] = true;
-        emit ListingPurchased(msg.sender, listingHash, block.chainid);
+        emit MarketplaceListingPurchased(msg.sender, listingHash, block.chainid);
     }
 
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {

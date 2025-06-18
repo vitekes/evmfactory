@@ -18,6 +18,7 @@ import "../../shared/BaseFactory.sol";
 contract ContestFactory is BaseFactory {
 
     event ContestCreated(address indexed creator, address contest);
+    error NotAllowedToken();
 
     struct ContestParams {
         address[] judges;
@@ -77,10 +78,7 @@ contract ContestFactory is BaseFactory {
         for (uint i = 0; i < slots.length; i++) {
             if (slots[i].prizeType == PrizeType.MONETARY) {
                 // проверяем, что токен разрешён в этом контексте
-                require(
-                    validator.isAllowed(slots[i].token),
-                    "Token not allowed"
-                );
+                if (!validator.isAllowed(slots[i].token)) revert NotAllowedToken();
                 // проверяем корректность схемы распределения
                 require(
                     slots[i].distribution <= 1,
