@@ -73,15 +73,27 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
         require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
-        if (payer != msg.sender) {
-            bytes32 digest = keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonces[payer]++, block.chainid))
-                )
-            );
-            require(ECDSA.recover(digest, signature) == payer, "invalid signature");
+        if (!access.hasRole(access.AUTOMATION_ROLE(), msg.sender)) {
+            if (payer != msg.sender) {
+                bytes32 digest = keccak256(
+                    abi.encodePacked(
+                        "\x19\x01",
+                        DOMAIN_SEPARATOR,
+                        keccak256(
+                            abi.encode(
+                                PROCESS_TYPEHASH,
+                                payer,
+                                moduleId,
+                                token,
+                                amount,
+                                nonces[payer]++,
+                                block.chainid
+                            )
+                        )
+                    )
+                );
+                require(ECDSA.recover(digest, signature) == payer, "invalid signature");
+            }
         }
 
         IERC20(token).safeTransferFrom(payer, address(this), amount);
