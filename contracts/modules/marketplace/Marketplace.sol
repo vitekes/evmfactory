@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "../../core/Registry.sol";
 import "../../interfaces/IGateway.sol";
 import "../../core/AccessControlCenter.sol";
+import "../../shared/AccessManaged.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -12,7 +13,7 @@ import "../../lib/SignatureLib.sol";
 /// @title Marketplace
 /// @notice Minimal marketplace example demonstrating registration of sales and
 /// payment processing via the PaymentGateway core service.
-contract Marketplace {
+contract Marketplace is AccessManaged {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
     error InvalidSignature();
@@ -47,7 +48,9 @@ contract Marketplace {
         uint256 chainId
     );
 
-    constructor(address _registry, address paymentGateway, bytes32 moduleId) {
+    constructor(address _registry, address paymentGateway, bytes32 moduleId)
+        AccessManaged(Registry(_registry).getCoreService(keccak256("AccessControlCenter")))
+    {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
@@ -60,13 +63,11 @@ contract Marketplace {
             )
         );
 
-        AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService(keccak256("AccessControlCenter"))
-        );
+        AccessControlCenter acl = AccessControlCenter(_ACC);
         bytes32[] memory roles = new bytes32[](2);
         roles[0] = acl.MODULE_ROLE();
         roles[1] = acl.FEATURE_OWNER_ROLE();
-        acl.grantMultipleRoles(address(this), roles);
+        _grantSelfRoles(roles);
     }
 
     /// @notice Put an item for sale
