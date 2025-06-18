@@ -7,6 +7,7 @@ import "../../core/AccessControlCenter.sol";
 import "../../interfaces/core/IMultiValidator.sol";
 import "../../interfaces/IGateway.sol";
 import "../../interfaces/IValidator.sol";
+import "../../interfaces/IPriceFeed.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
@@ -20,11 +21,14 @@ contract ContestFactory is BaseFactory {
     event ContestCreated(address indexed creator, address contest);
     error NotAllowedToken();
 
+    IPriceFeed public priceFeed;
+    uint256 public usdFeeMin;
+    uint256 public usdFeeMax;
+
     struct ContestParams {
         address[] judges;
         bytes metadata;
         address commissionToken;
-        uint256 commissionFee;
     }
 
     constructor(address _registry, address paymentGateway, address validatorLogic)
@@ -102,17 +106,19 @@ contract ContestFactory is BaseFactory {
         }
 
         // 3) Сбор комиссии за finalize()
-        if (params.commissionFee > 0) {
-            IGateway(
-                registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-            ).processPayment(
-                moduleId,
-                params.commissionToken,
-                msg.sender,
-                params.commissionFee,
-                ""
-            );
-        }
+        uint256 tokenUsd = priceFeed.tokenPriceUsd(params.commissionToken);
+        require(tokenUsd > 0, "price zero");
+        uint256 usdFee = (usdFeeMin + usdFeeMax) / 2;
+        uint256 commissionFee = (usdFee * 1e18) / tokenUsd;
+        IGateway(
+            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
+        ).processPayment(
+            moduleId,
+            params.commissionToken,
+            msg.sender,
+            commissionFee,
+            ""
+        );
 
         // 4) Деплой эскроу-контракта
         ContestEscrow esc = new ContestEscrow(
@@ -120,7 +126,7 @@ contract ContestFactory is BaseFactory {
             msg.sender,
             slots,
             params.commissionToken,
-            params.commissionFee,
+            commissionFee,
             params.judges,
             params.metadata
         );
@@ -142,5 +148,15 @@ contract ContestFactory is BaseFactory {
         );
 
         emit ContestCreated(msg.sender, address(esc));
+    }
+
+    function setPriceFeed(address newFeed) external onlyFactoryAdmin {
+        priceFeed = IPriceFeed(newFeed);
+    }
+
+    function setUsdFeeBounds(uint256 minFee, uint256 maxFee) external onlyFactoryAdmin {
+        require(minFee <= maxFee, "invalid bounds");
+        usdFeeMin = minFee;
+        usdFeeMax = maxFee;
     }
 }
