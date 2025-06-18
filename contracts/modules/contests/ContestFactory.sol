@@ -6,7 +6,8 @@ import "../../core/Registry.sol";
 import "../../core/AccessControlCenter.sol";
 import "../../interfaces/core/IMultiValidator.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "../../core/PaymentGateway.sol";
+import "../../interfaces/IGateway.sol";
+import "../../interfaces/IValidator.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
@@ -89,7 +90,7 @@ contract ContestFactory is ReentrancyGuard {
         ContestParams memory params
     ) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
-        IMultiValidator validator = IMultiValidator(
+        IValidator validator = IValidator(
             registry.getModuleService(MODULE_ID, keccak256(bytes("Validator")))
         );
         uint256 totalMonetary;
@@ -112,10 +113,10 @@ contract ContestFactory is ReentrancyGuard {
 
         // 2) Сбор призового пула
         if (totalMonetary > 0) {
-            PaymentGateway(
+            IGateway(
                 registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
             ).processPayment(
-            /*moduleId*/ moduleId,
+                moduleId,
                 slots[0].token,
                 msg.sender,
                 totalMonetary,
@@ -125,10 +126,10 @@ contract ContestFactory is ReentrancyGuard {
 
         // 3) Сбор комиссии за finalize()
         if (params.commissionFee > 0) {
-            PaymentGateway(
+            IGateway(
                 registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
             ).processPayment(
-            /*moduleId*/ moduleId,
+                moduleId,
                 params.commissionToken,
                 msg.sender,
                 params.commissionFee,
