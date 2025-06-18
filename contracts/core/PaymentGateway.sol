@@ -2,7 +2,8 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
-import "./TokenRegistry.sol";
+import "../interfaces/core/IRegistry.sol";
+import "../interfaces/core/IMultiValidator.sol";
 import "./CoreFeeManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,7 +19,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
     using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
-    TokenRegistry public tokenRegistry;
+    IRegistry public registry;
     CoreFeeManager public feeManager;
 
     mapping(address => uint256) public nonces;
@@ -47,14 +48,14 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     function initialize(
         address accessControl,
-        address validator_,
+        address registry_,
         address feeManager_
     ) public initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
-        tokenRegistry = TokenRegistry(validator_);
+        registry = IRegistry(registry_);
         feeManager = CoreFeeManager(feeManager_);
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
@@ -72,7 +73,11 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         uint256 amount,
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
-        require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
+        address val = registry.getModuleService(moduleId, keccak256(bytes("Validator")));
+        require(
+            IMultiValidator(val).isAllowed(token),
+            "token not allowed"
+        );
         // Skip signature verification for automation bots and trusted relayers
         if (
             payer != msg.sender &&
@@ -110,8 +115,8 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId);
     }
 
-    function setValidator(address newValidator) external onlyAdmin {
-        tokenRegistry = TokenRegistry(newValidator);
+    function setRegistry(address newRegistry) external onlyAdmin {
+        registry = IRegistry(newRegistry);
     }
 
     function setFeeManager(address newManager) external onlyAdmin {
