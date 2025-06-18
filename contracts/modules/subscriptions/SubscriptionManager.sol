@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../../lib/SignatureLib.sol";
 
 /// @title SubscriptionManager
 /// @notice Subscription system with off-chain plan creation using EIP-712
@@ -18,28 +19,17 @@ contract SubscriptionManager {
     Registry public immutable registry;
     bytes32 public immutable MODULE_ID;
 
-    struct Plan {
-        uint256[] chainIds;
-        uint256 price;
-        uint256 period;
-        address token;
-        address merchant;
-        uint256 salt;
-        uint64 expiry;
-    }
+
 
     struct Subscriber {
         uint256 nextBilling;
         bytes32 planHash;
     }
 
-    mapping(bytes32 => Plan) public plans;
+    mapping(bytes32 => SignatureLib.Plan) public plans;
     mapping(address => Subscriber) public subscribers;
 
     bytes32 public DOMAIN_SEPARATOR;
-    bytes32 public constant PLAN_TYPEHASH = keccak256(
-        "Plan(uint256[] chainIds,uint256 price,uint256 period,address token,address merchant,uint256 salt,uint64 expiry)"
-    );
 
     event Subscribed(address indexed user, bytes32 indexed planHash, uint256 amount, address token);
     event Unsubscribed(address indexed user, bytes32 indexed planHash);
@@ -67,26 +57,12 @@ contract SubscriptionManager {
         acl.grantMultipleRoles(address(this), roles);
     }
 
-    function hashPlan(Plan calldata plan) public view returns (bytes32) {
-        bytes32 chainHash = keccak256(
-            abi.encode(plan.chainIds.length, plan.chainIds)
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                PLAN_TYPEHASH,
-                chainHash,
-                plan.price,
-                plan.period,
-                plan.token,
-                plan.merchant,
-                plan.salt,
-                plan.expiry
-            )
-        );
+    function hashPlan(SignatureLib.Plan calldata plan) public view returns (bytes32) {
+        bytes32 structHash = SignatureLib.hashPlan(plan);
         return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
     }
 
-    function subscribe(Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
+    function subscribe(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
         bytes32 planHash = hashPlan(plan);
         require(planHash.recover(sigMerchant) == plan.merchant, "invalid signature");
         require(plan.expiry == 0 || plan.expiry >= block.timestamp, "expired");
@@ -139,7 +115,7 @@ contract SubscriptionManager {
 
     function charge(address user) public onlyAutomation {
         Subscriber storage s = subscribers[user];
-        Plan memory plan = plans[s.planHash];
+        SignatureLib.Plan memory plan = plans[s.planHash];
         require(plan.merchant != address(0), "no plan");
         require(block.timestamp >= s.nextBilling, "not due");
 

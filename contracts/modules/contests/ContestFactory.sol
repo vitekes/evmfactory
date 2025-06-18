@@ -5,22 +5,17 @@ import "../../interfaces/core/IRegistry.sol";
 import "../../core/Registry.sol";
 import "../../core/AccessControlCenter.sol";
 import "../../interfaces/core/IMultiValidator.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "../../interfaces/IGateway.sol";
 import "../../interfaces/IValidator.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
+import "../../shared/BaseFactory.sol";
 
 /// @title ContestFactory
 /// @notice Фабрика для создания конкурсов — по шаблону или с кастомным набором слотов
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract ContestFactory is ReentrancyGuard {
-    IRegistry public immutable registry;
-    bytes32 public constant FACTORY_ADMIN = keccak256("FACTORY_ADMIN");
-    /// @dev Identifier used when interacting with registry services
-    bytes32 public constant MODULE_ID = keccak256("Contest");
+contract ContestFactory is BaseFactory {
 
     event ContestCreated(address indexed creator, address contest);
 
@@ -31,39 +26,27 @@ contract ContestFactory is ReentrancyGuard {
         uint256 commissionFee;
     }
 
-    constructor(address _registry, address paymentGateway, address validatorLogic) {
-        registry = IRegistry(_registry);
-        registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
-
+    constructor(address _registry, address paymentGateway, address validatorLogic)
+        BaseFactory(_registry, paymentGateway, keccak256("Contest"))
+    {
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService(keccak256("AccessControlCenter"))
         );
-
         bytes32 salt = keccak256(
             abi.encodePacked("Validator", MODULE_ID, address(this))
         );
-        address predicted = Clones.predictDeterministicAddress(
+        address val = _clone(
             validatorLogic,
             salt,
-            address(this)
+            abi.encodeWithSelector(IMultiValidator.initialize.selector, address(acl))
         );
-        address val = predicted;
-        if (predicted.code.length == 0) {
-            val = Clones.cloneDeterministic(validatorLogic, salt);
-            IMultiValidator(val).initialize(address(acl));
-        }
         registry.setModuleServiceAlias(MODULE_ID, "Validator", val);
     }
 
     function createContestByTemplate(
         uint256 templateId,
         ContestParams calldata params
-    ) external nonReentrant {
-        // Проверяем роль
-        AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService(keccak256("AccessControlCenter"))
-        );
-        require(acl.hasRole(FACTORY_ADMIN, msg.sender), "Not FACTORY_ADMIN");
+    ) external nonReentrant onlyFactoryAdmin {
 
         // Получаем шаблон
         (PrizeInfo[] memory slots,) = IPrizeManager(
@@ -76,11 +59,7 @@ contract ContestFactory is ReentrancyGuard {
     function createCustomContest(
         PrizeInfo[] calldata slots,
         ContestParams calldata params
-    ) external nonReentrant {
-        AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService(keccak256("AccessControlCenter"))
-        );
-        require(acl.hasRole(FACTORY_ADMIN, msg.sender), "Not FACTORY_ADMIN");
+    ) external nonReentrant onlyFactoryAdmin {
 
         _deployContest(slots, params);
     }
