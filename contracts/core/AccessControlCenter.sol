@@ -11,6 +11,8 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     bytes32 public constant MODULE_ROLE = keccak256("MODULE_ROLE");
+    /// Role for automated keepers/cron jobs
+    bytes32 public constant AUTOMATION_ROLE = keccak256("AUTOMATION_ROLE");
 
     function initialize(address admin) public initializer {
         __AccessControl_init();
