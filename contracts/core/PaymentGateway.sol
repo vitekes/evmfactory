@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
 import "../interfaces/core/IRegistry.sol";
-import "../interfaces/core/IMultiValidator.sol";
+import "../interfaces/IValidator.sol";
 import "./CoreFeeManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -75,7 +75,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
         address val = registry.getModuleService(moduleId, keccak256(bytes("Validator")));
         require(
-            IMultiValidator(val).isAllowed(token),
+            IValidator(val).isAllowed(token),
             "token not allowed"
         );
         // Skip signature verification for automation bots and trusted relayers

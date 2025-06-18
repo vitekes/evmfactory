@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../../core/Registry.sol";
-import "../../core/PaymentGateway.sol";
+import "../../interfaces/IGateway.sol";
 import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -115,7 +115,7 @@ contract SubscriptionManager {
             require(ok, "permit failed");
         }
 
-        uint256 netAmount = PaymentGateway(
+        uint256 netAmount = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
         ).processPayment(MODULE_ID, plan.token, msg.sender, plan.price, "");
 
@@ -143,7 +143,7 @@ contract SubscriptionManager {
         require(plan.merchant != address(0), "no plan");
         require(block.timestamp >= s.nextBilling, "not due");
 
-        uint256 netAmount = PaymentGateway(
+        uint256 netAmount = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
         ).processPayment(MODULE_ID, plan.token, user, plan.price, "");
 
