@@ -6,43 +6,56 @@ import "../../core/PaymentGateway.sol";
 import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @title SubscriptionManager
-/// @notice Example subscription manager that charges users via PaymentGateway.
+/// @notice Subscription system with off-chain plan creation using EIP-712
 contract SubscriptionManager {
     using SafeERC20 for IERC20;
+    using ECDSA for bytes32;
 
     Registry public immutable registry;
     bytes32 public immutable MODULE_ID;
 
     struct Plan {
-        address token;
+        uint256[] chainIds;
         uint256 price;
         uint256 period;
+        address token;
+        address merchant;
+        uint256 salt;
+        uint64 expiry;
     }
 
-    mapping(uint256 => Plan) public plans;
-    uint256 public nextPlanId;
-
-    mapping(address => uint256) public userPlan;
-    mapping(address => uint256) public nextPayment;
-    mapping(address => uint256) public paidAmount;
-
-    address public owner;
-
-    event PlanCreated(uint256 id, address token, uint256 price, uint256 period);
-    event Subscribed(address indexed user, uint256 planId, uint256 amount, address token);
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "not owner");
-        _;
+    struct Subscriber {
+        uint256 nextBilling;
+        bytes32 planHash;
     }
+
+    mapping(bytes32 => Plan) public plans;
+    mapping(address => Subscriber) public subscribers;
+
+    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 public constant PLAN_TYPEHASH = keccak256(
+        "Plan(uint256[] chainIds,uint256 price,uint256 period,address token,address merchant,uint256 salt,uint64 expiry)"
+    );
+
+    event Subscribed(address indexed user, bytes32 indexed planHash, uint256 amount, address token);
+    event Unsubscribed(address indexed user, bytes32 indexed planHash);
+    event SubscriptionCharged(address indexed user, bytes32 indexed planHash, uint256 amount, uint256 nextBilling);
 
     constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = Registry(_registry);
-        owner = msg.sender;
         MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
+                block.chainid,
+                address(this)
+            )
+        );
 
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService(keccak256("AccessControlCenter"))
@@ -53,58 +66,90 @@ contract SubscriptionManager {
         acl.grantMultipleRoles(address(this), roles);
     }
 
-    /// @notice Add a new subscription plan
-    function createPlan(address token, uint256 price, uint256 period) external onlyOwner returns (uint256 id) {
-        id = nextPlanId++;
-        plans[id] = Plan(token, price, period);
-        emit PlanCreated(id, token, price, period);
+    function hashPlan(Plan calldata plan) public view returns (bytes32) {
+        bytes32 chainHash = keccak256(abi.encodePacked(plan.chainIds));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                PLAN_TYPEHASH,
+                chainHash,
+                plan.price,
+                plan.period,
+                plan.token,
+                plan.merchant,
+                plan.salt,
+                plan.expiry
+            )
+        );
+        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
     }
 
-    /// @notice Subscribe user to a plan and charge first payment
-    function subscribe(uint256 planId) external {
-        Plan memory p = plans[planId];
-        require(p.token != address(0), "plan not found");
+    function subscribe(Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
+        bytes32 planHash = hashPlan(plan);
+        require(planHash.recover(sigMerchant) == plan.merchant, "invalid signature");
+        require(plan.expiry == 0 || plan.expiry >= block.timestamp, "expired");
+        bool chainAllowed = false;
+        for (uint256 i = 0; i < plan.chainIds.length; i++) {
+            if (plan.chainIds[i] == block.chainid) {
+                chainAllowed = true;
+                break;
+            }
+        }
+        require(chainAllowed, "invalid chain");
+
+        if (permitSig.length > 0) {
+            (bool ok, ) = plan.token.call(permitSig);
+            require(ok, "permit failed");
+        }
 
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, p.token, msg.sender, p.price, "");
+        ).processPayment(MODULE_ID, plan.token, msg.sender, plan.price, "");
 
-        IERC20(p.token).safeTransfer(owner, netAmount);
+        IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
-        userPlan[msg.sender] = planId;
-        nextPayment[msg.sender] = block.timestamp + p.period;
-        paidAmount[msg.sender] += netAmount;
+        if (plans[planHash].merchant == address(0)) {
+            plans[planHash] = plan;
+        }
+        subscribers[msg.sender] = Subscriber({ nextBilling: block.timestamp + plan.period, planHash: planHash });
 
-        emit Subscribed(msg.sender, planId, p.price, p.token);
+        emit Subscribed(msg.sender, planHash, plan.price, plan.token);
     }
 
-    /// @notice Charge recurring payment, callable by keeper/relayer
-    function charge(address user) external {
-        uint256 planId = userPlan[user];
-        Plan memory p = plans[planId];
-        require(p.token != address(0), "no plan");
-        require(block.timestamp >= nextPayment[user], "not due");
+    modifier onlyAutomation() {
+        AccessControlCenter acl = AccessControlCenter(
+            registry.getCoreService(keccak256("AccessControlCenter"))
+        );
+        require(acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender), "not automation");
+        _;
+    }
+
+    function charge(address user) public onlyAutomation {
+        Subscriber storage s = subscribers[user];
+        Plan memory plan = plans[s.planHash];
+        require(plan.merchant != address(0), "no plan");
+        require(block.timestamp >= s.nextBilling, "not due");
 
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, p.token, user, p.price, "");
+        ).processPayment(MODULE_ID, plan.token, user, plan.price, "");
 
-        IERC20(p.token).safeTransfer(owner, netAmount);
+        IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
-        nextPayment[user] = block.timestamp + p.period;
-        paidAmount[user] += netAmount;
+        s.nextBilling += plan.period;
 
-        emit Subscribed(user, planId, p.price, p.token);
+        emit SubscriptionCharged(user, s.planHash, plan.price, s.nextBilling);
     }
 
-    function chargeBatch(address[] calldata users) external {
+    function chargeBatch(address[] calldata users) external onlyAutomation {
         for (uint256 i = 0; i < users.length; i++) {
             charge(users[i]);
         }
     }
 
     function unsubscribe() external {
-        userPlan[msg.sender] = 0;
-        nextPayment[msg.sender] = 0;
+        Subscriber memory s = subscribers[msg.sender];
+        delete subscribers[msg.sender];
+        emit Unsubscribed(msg.sender, s.planHash);
     }
 }
+
