@@ -10,6 +10,7 @@ import "../../core/PaymentGateway.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 /// @title ContestFactory
 /// @notice Фабрика для создания конкурсов — по шаблону или с кастомным набором слотов
@@ -38,11 +39,19 @@ contract ContestFactory is ReentrancyGuard {
             registry.getCoreService(keccak256("AccessControlCenter"))
         );
 
-        address val = Clones.cloneDeterministic(
-            validatorLogic,
-            keccak256(abi.encodePacked("Validator", MODULE_ID))
+        bytes32 salt = keccak256(
+            abi.encodePacked("Validator", MODULE_ID, address(this))
         );
-        IMultiValidator(val).initialize(address(acl));
+        address predicted = Clones.predictDeterministicAddress(
+            validatorLogic,
+            salt,
+            address(this)
+        );
+        address val = predicted;
+        if (!Address.isContract(predicted)) {
+            val = Clones.cloneDeterministic(validatorLogic, salt);
+            IMultiValidator(val).initialize(address(acl));
+        }
         registry.setModuleServiceAlias(MODULE_ID, "Validator", val);
     }
 
