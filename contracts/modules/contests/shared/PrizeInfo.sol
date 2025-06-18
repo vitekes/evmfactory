@@ -10,4 +10,5 @@ pragma solidity ^0.8.28;
         address   token;        // адрес ERC-20-токена (для MONETARY)
         uint256   amount;       // сумма токенов (для MONETARY)
         uint8     distribution; // схема распределения (0 = равномерно, 1 = нисходяще)
+        string    uri;          // описание/URI для неденежных призов
     }

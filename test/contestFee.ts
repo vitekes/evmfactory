@@ -27,13 +27,13 @@ async function deployFactory() {
   await factory.setPriceFeed(await priceFeed.getAddress());
   await factory.setUsdFeeBounds(ethers.parseEther("5"), ethers.parseEther("10"));
 
-  return { factory, token, priceFeed, registry };
+  return { factory, token, priceFeed, registry, gateway };
 }
 
 describe("ContestFactory fee", function () {
   it("uses price feed for commission", async function () {
     const [creator] = await ethers.getSigners();
-    const { factory, token, priceFeed } = await deployFactory();
+    const { factory, token, priceFeed, gateway } = await deployFactory();
 
     const params = {
       judges: [] as string[],
@@ -42,7 +42,7 @@ describe("ContestFactory fee", function () {
     };
 
     // Approve factory to pull tokens via gateway mock
-    await token.approve(await factory.getAddress(), ethers.parseEther("100"));
+  await token.approve(await gateway.getAddress(), ethers.parseEther("100"));
 
     // test price 0.95 USD
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("0.95"));
