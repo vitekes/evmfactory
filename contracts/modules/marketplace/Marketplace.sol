@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
+import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -31,6 +32,14 @@ contract Marketplace {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+
+        AccessControlCenter acl = AccessControlCenter(
+            registry.getCoreService(keccak256("AccessControlCenter"))
+        );
+        bytes32[] memory roles = new bytes32[](2);
+        roles[0] = acl.MODULE_ROLE();
+        roles[1] = acl.FEATURE_OWNER_ROLE();
+        acl.grantMultipleRoles(address(this), roles);
     }
 
     /// @notice Put an item for sale
@@ -47,7 +56,7 @@ contract Marketplace {
 
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, l.token, msg.sender, l.price);
+        ).processPayment(MODULE_ID, l.token, msg.sender, l.price, "");
 
         IERC20(l.token).safeTransfer(l.seller, netAmount);
 

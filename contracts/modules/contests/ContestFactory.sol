@@ -97,7 +97,8 @@ contract ContestFactory is ReentrancyGuard {
             /*moduleId*/ moduleId,
                 slots[0].token,
                 msg.sender,
-                totalMonetary
+                totalMonetary,
+                ""
             );
         }
 
@@ -109,7 +110,8 @@ contract ContestFactory is ReentrancyGuard {
             /*moduleId*/ moduleId,
                 params.commissionToken,
                 msg.sender,
-                params.commissionFee
+                params.commissionFee,
+                ""
             );
         }
 

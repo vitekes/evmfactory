@@ -7,17 +7,23 @@ import "./CoreFeeManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
+contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
     using SafeERC20 for IERC20;
 
     AccessControlCenter public access;
     TokenRegistry public tokenRegistry;
     CoreFeeManager public feeManager;
+
+    mapping(address => uint256) public nonces;
+    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 private constant PROCESS_TYPEHASH = keccak256("ProcessPayment(address payer,bytes32 moduleId,address token,uint256 amount,uint256 nonce,uint256 chainId)");
 
 
     event PaymentProcessed(
@@ -45,20 +51,38 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         address feeManager_
     ) public initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
         tokenRegistry = TokenRegistry(validator_);
         feeManager = CoreFeeManager(feeManager_);
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     function processPayment(
         bytes32 moduleId,
         address token,
         address payer,
-        uint256 amount
-    ) external onlyFeatureOwner nonReentrant returns (uint256 netAmount) {
+        uint256 amount,
+        bytes calldata signature
+    ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
         require(tokenRegistry.isTokenAllowed(moduleId, token), "token not allowed");
-        require(payer == msg.sender || payer == tx.origin, "invalid payer");
+        if (payer != msg.sender) {
+            bytes32 digest = keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    DOMAIN_SEPARATOR,
+                    keccak256(abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonces[payer]++, block.chainid))
+                )
+            );
+            require(ECDSA.recover(digest, signature) == payer, "invalid signature");
+        }
 
         IERC20(token).safeTransferFrom(payer, address(this), amount);
         IERC20(token).forceApprove(address(feeManager), amount);
@@ -81,6 +105,14 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
 
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
+    }
+
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     /// @dev UUPS upgrade authorization

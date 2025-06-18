@@ -6,10 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
+contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
     using SafeERC20 for IERC20;
 
@@ -42,11 +43,12 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
 
     function initialize(address accessControl) public initializer {
         __ReentrancyGuard_init();
+        __Pausable_init();
         __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
-    function collect(bytes32 moduleId, address token, address payer, uint256 amount) external onlyFeatureOwner nonReentrant returns (uint256 feeAmount) {
+    function collect(bytes32 moduleId, address token, address payer, uint256 amount) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 feeAmount) {
         if (isZeroFeeAddress[moduleId][payer]) return 0;
 
         uint16 pFee = percentFee[moduleId][token];
@@ -63,7 +65,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
         }
     }
 
-    function withdrawFees(bytes32 moduleId, address token, address to) external onlyAdmin nonReentrant {
+    function withdrawFees(bytes32 moduleId, address token, address to) external onlyAdmin nonReentrant whenNotPaused {
         uint256 amount = collectedFees[moduleId][token];
         require(amount > 0, "nothing to withdraw");
 
@@ -89,6 +91,14 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrad
     /// Позволяет заменить AccessControl
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
+    }
+
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
