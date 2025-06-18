@@ -67,7 +67,9 @@ contract SubscriptionManager {
     }
 
     function hashPlan(Plan calldata plan) public view returns (bytes32) {
-        bytes32 chainHash = keccak256(abi.encodePacked(plan.chainIds));
+        bytes32 chainHash = keccak256(
+            abi.encode(plan.chainIds.length, plan.chainIds)
+        );
         bytes32 structHash = keccak256(
             abi.encode(
                 PLAN_TYPEHASH,

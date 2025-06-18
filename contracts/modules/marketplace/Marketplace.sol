@@ -124,7 +124,9 @@ contract Marketplace {
     }
 
     function hashListing(Listing calldata listing) public view returns (bytes32) {
-        bytes32 chainHash = keccak256(abi.encodePacked(listing.chainIds));
+        bytes32 chainHash = keccak256(
+            abi.encode(listing.chainIds.length, listing.chainIds)
+        );
         bytes32 structHash = keccak256(
             abi.encode(
                 LISTING_TYPEHASH,
