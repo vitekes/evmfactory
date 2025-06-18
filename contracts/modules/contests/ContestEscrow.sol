@@ -28,7 +28,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     uint8       public maxWinnersPerTx = 20;
 
     event MonetaryPrizePaid(address indexed to, uint256 amount);
-    event PromoPrizeIssued(uint8 indexed slot, address indexed to);
+    event PromoPrizeIssued(uint8 indexed slot, address indexed to, string uri);
+    event PrizeAdded(uint256 indexed slot, address indexed token, uint256 amount, string uri);
     event ContestFinalized(address[] winners);
 
     /// @dev Identifier used when interacting with registry services
@@ -58,6 +59,17 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         // store judges & metadata if needed
     }
 
+    function addPrizes(PrizeInfo[] calldata _prizes) external onlyCreator nonReentrant {
+        for (uint256 i = 0; i < _prizes.length; i++) {
+            prizes.push(_prizes[i]);
+            uint256 idx = prizes.length - 1;
+            if (_prizes[i].amount > 0) {
+                IERC20(_prizes[i].token).safeTransferFrom(msg.sender, address(this), _prizes[i].amount);
+            }
+            emit PrizeAdded(idx, _prizes[i].token, _prizes[i].amount, _prizes[i].uri);
+        }
+    }
+
     function finalize(address[] calldata _winners)
     external
     nonReentrant
@@ -75,14 +87,14 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
 
         for (uint8 i = uint8(start); i < end; i++) {
             PrizeInfo memory p = prizes[i];
-            if (p.prizeType == PrizeType.MONETARY) {
+            if (p.amount > 0) {
                 uint256 amount = p.distribution == 0
                     ? p.amount
                     : _computeDescending(p.amount, i);
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
-                emit PromoPrizeIssued(i, winners[i]);
+                emit PromoPrizeIssued(i, winners[i], p.uri);
             }
         }
 

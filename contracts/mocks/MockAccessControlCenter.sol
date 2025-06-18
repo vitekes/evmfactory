@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 contract MockAccessControlCenter {
     bytes32 public constant FACTORY_ADMIN = keccak256("FACTORY_ADMIN");
+    bytes32 public constant GOVERNOR_ROLE = keccak256("GOVERNOR_ROLE");
+    bytes32 public constant DEFAULT_ADMIN_ROLE = keccak256("DEFAULT_ADMIN_ROLE");
 
     function MODULE_ROLE() external pure returns (bytes32) {
         return keccak256("MODULE_ROLE");
@@ -13,6 +15,8 @@ contract MockAccessControlCenter {
     }
 
     function grantMultipleRoles(address, bytes32[] calldata) external {}
+
+    function grantRole(bytes32, address) external {}
 
     function hasRole(bytes32, address) external pure returns (bool) {
         return true;
