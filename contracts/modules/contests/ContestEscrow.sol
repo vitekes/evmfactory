@@ -67,18 +67,6 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
 
         if (winners.length == 0) {
             winners = _winners;
-
-            // 1) взимаем комиссию за on-chain действие
-            if (commissionFee > 0) {
-                PaymentGateway(
-                    registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-                ).processPayment(
-                    MODULE_ID,
-                    commissionToken,
-                    creator,
-                    commissionFee
-                );
-            }
         }
 
         uint256 start = processedWinners;

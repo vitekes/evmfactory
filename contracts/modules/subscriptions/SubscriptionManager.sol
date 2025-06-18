@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
+import "../../core/AccessControlCenter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -42,6 +43,14 @@ contract SubscriptionManager {
         owner = msg.sender;
         MODULE_ID = moduleId;
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+
+        AccessControlCenter acl = AccessControlCenter(
+            registry.getCoreService(keccak256("AccessControlCenter"))
+        );
+        bytes32[] memory roles = new bytes32[](2);
+        roles[0] = acl.MODULE_ROLE();
+        roles[1] = acl.FEATURE_OWNER_ROLE();
+        acl.grantMultipleRoles(address(this), roles);
     }
 
     /// @notice Add a new subscription plan
@@ -58,7 +67,7 @@ contract SubscriptionManager {
 
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, p.token, msg.sender, p.price);
+        ).processPayment(MODULE_ID, p.token, msg.sender, p.price, "");
 
         IERC20(p.token).safeTransfer(owner, netAmount);
 
@@ -78,7 +87,7 @@ contract SubscriptionManager {
 
         uint256 netAmount = PaymentGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, p.token, user, p.price);
+        ).processPayment(MODULE_ID, p.token, user, p.price, "");
 
         IERC20(p.token).safeTransfer(owner, netAmount);
 
@@ -86,5 +95,16 @@ contract SubscriptionManager {
         paidAmount[user] += netAmount;
 
         emit Subscribed(user, planId, p.price, p.token);
+    }
+
+    function chargeBatch(address[] calldata users) external {
+        for (uint256 i = 0; i < users.length; i++) {
+            charge(users[i]);
+        }
+    }
+
+    function unsubscribe() external {
+        userPlan[msg.sender] = 0;
+        nextPayment[msg.sender] = 0;
     }
 }
