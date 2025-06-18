@@ -155,8 +155,11 @@ contract SubscriptionManager {
     }
 
     function chargeBatch(address[] calldata users) external onlyAutomation {
-        for (uint256 i = 0; i < users.length; i++) {
-            charge(users[i]);
+        require(users.length <= 50, "batch limit");
+        unchecked {
+            for (uint256 i = 0; i < users.length; i++) {
+                charge(users[i]);
+            }
         }
     }
 
