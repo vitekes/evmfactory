@@ -59,9 +59,23 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         return gasCoverageEnabled[moduleId][contractAddress] && isEligible[moduleId][user];
     }
 
+    modifier onlyAutomation() {
+        require(access.hasRole(access.AUTOMATION_ROLE(), msg.sender), "not automation");
+        _;
+    }
+
     /// @notice Refund gas to relayer with per-transaction limit check
-    function refundGas(bytes32 moduleId, address payable relayer, uint256 gasUsed) external onlyAdmin {
-        uint256 price = tx.gasprice;
+    function refundGas(
+        bytes32 moduleId,
+        address payable relayer,
+        uint256 gasUsed,
+        uint256 priorityCap
+    ) external onlyAutomation {
+        uint256 price =
+            tx.gasprice < block.basefee + priorityCap
+                ? tx.gasprice
+                : block.basefee + priorityCap;
+        require(price > 0, "price zero");
         uint256 limit = gasRefundPerTx[moduleId];
         require(limit > 0, "refund disabled");
         require(gasUsed <= limit / price, "Exceeds refund limit");
