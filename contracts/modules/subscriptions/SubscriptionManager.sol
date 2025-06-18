@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../../interfaces/IPermit2.sol";
 import "../../lib/SignatureLib.sol";
 
 /// @title Subscription Manager
@@ -119,19 +120,51 @@ contract SubscriptionManager is AccessManaged {
         require(chainAllowed, "invalid chain");
 
         if (permitSig.length > 0) {
-            bytes4 selector;
-            assembly {
-                selector := shr(224, calldataload(permitSig.offset))
-            }
-            address target = plan.token;
-            if (selector != IERC20Permit.permit.selector) {
-                target = registry.getModuleService(
+            (
+                uint256 deadline,
+                uint8 v,
+                bytes32 r,
+                bytes32 s
+            ) = abi.decode(permitSig, (uint256, uint8, bytes32, bytes32));
+            address gateway = registry.getModuleService(
+                MODULE_ID,
+                keccak256(bytes("PaymentGateway"))
+            );
+            try IERC20Permit(plan.token).permit(
+                msg.sender,
+                gateway,
+                plan.price,
+                deadline,
+                v,
+                r,
+                s
+            ) {
+                // ok
+            } catch {
+                address permit2 = registry.getModuleService(
                     MODULE_ID,
                     keccak256(bytes("Permit2"))
                 );
+                bytes memory data = abi.encodeWithSelector(
+                    IPermit2.permitTransferFrom.selector,
+                    IPermit2.PermitTransferFrom({
+                        permitted: IPermit2.TokenPermissions({
+                            token: plan.token,
+                            amount: plan.price
+                        }),
+                        nonce: 0,
+                        deadline: deadline
+                    }),
+                    IPermit2.SignatureTransferDetails({
+                        to: gateway,
+                        requestedAmount: plan.price
+                    }),
+                    msg.sender,
+                    abi.encodePacked(r, s, v)
+                );
+                (bool ok, ) = permit2.call(data);
+                require(ok, "permit failed");
             }
-            (bool ok, ) = target.call(permitSig);
-            require(ok, "permit failed");
         }
 
         uint256 netAmount = IGateway(
