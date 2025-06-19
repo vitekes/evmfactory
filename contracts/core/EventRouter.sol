@@ -8,16 +8,29 @@ import "../errors/Errors.sol";
 
 contract EventRouter is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
-    event Routed(bytes32 indexed eventType, bytes data);
+
+    enum EventKind {
+        Unknown,
+        ListingCreated,
+        PlanCancelled,
+        ContestFinalized
+    }
+
+    struct RoutedEvent {
+        EventKind kind;
+        bytes payload;
+    }
+
+    event EventRouted(EventKind indexed kind, bytes payload);
 
     function initialize(address accessControl) public initializer {
         __UUPSUpgradeable_init();
         access = AccessControlCenter(accessControl);
     }
 
-    function route(bytes32 eventType, bytes calldata data) external {
+    function route(EventKind kind, bytes calldata data) external {
         if (!access.hasRole(access.MODULE_ROLE(), msg.sender)) revert NotModule();
-        emit Routed(eventType, data);
+        emit EventRouted(kind, data);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {

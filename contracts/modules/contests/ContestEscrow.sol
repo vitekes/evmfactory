@@ -125,7 +125,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             EventRouter(
                 registry.getModuleService(MODULE_ID, keccak256(bytes("EventRouter")))
             ).route(
-                keccak256("ContestFinalized"),
+                EventRouter.EventKind.ContestFinalized,
                 abi.encode(creator, winners, prizes)
             );
 
