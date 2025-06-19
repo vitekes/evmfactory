@@ -12,11 +12,16 @@ import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
 import "../../shared/BaseFactory.sol";
+import "../../interfaces/core/ICoreFeeManager.sol";
+import "../../core/PaymentGateway.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ContestFactory
 /// @notice Фабрика для создания конкурсов — по шаблону или с кастомным набором слотов
 
 contract ContestFactory is BaseFactory {
+    using SafeERC20 for IERC20;
 
     event ContestCreated(address indexed creator, address contest);
     error NotAllowedToken();
@@ -110,7 +115,7 @@ contract ContestFactory is BaseFactory {
         require(tokenUsd > 0, "price zero");
         uint256 usdFee = (usdFeeMin + usdFeeMax) / 2;
         uint256 commissionFee = (usdFee * 1e18) / tokenUsd;
-        IGateway(
+        uint256 netCommission = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
         ).processPayment(
             moduleId,
@@ -120,6 +125,16 @@ contract ContestFactory is BaseFactory {
             ""
         );
 
+        uint256 gasShare = (netCommission * 60) / 100;
+        uint256 feeShare = netCommission - gasShare;
+
+        address feeManagerAddr = address(PaymentGateway(
+            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
+        ).feeManager());
+        IERC20(params.commissionToken).forceApprove(feeManagerAddr, feeShare);
+        ICoreFeeManager(feeManagerAddr).depositFee(MODULE_ID, params.commissionToken, feeShare);
+        IERC20(params.commissionToken).forceApprove(feeManagerAddr, 0);
+
         // 4) Деплой эскроу-контракта
         ContestEscrow esc = new ContestEscrow(
             Registry(address(registry)),
@@ -127,9 +142,14 @@ contract ContestFactory is BaseFactory {
             slots,
             params.commissionToken,
             commissionFee,
+            gasShare,
             params.judges,
             params.metadata
         );
+
+        if (gasShare > 0) {
+            IERC20(params.commissionToken).safeTransfer(address(esc), gasShare);
+        }
 
         // Grant module permissions to the new contest contract
         AccessControlCenter acl = AccessControlCenter(
