@@ -4,8 +4,10 @@ import path from "path";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ignition";
 import "@typechain/hardhat";
+import "@nomicfoundation/hardhat-network-helpers";
 
 const config: HardhatUserConfig = {
+    defaultNetwork: "hardhat",
     solidity: {
         version: "0.8.28",
         settings: {
@@ -21,10 +23,11 @@ const config: HardhatUserConfig = {
             url: "http://127.0.0.1:8545"
         },
         hardhat: {
-            // Встроенная тестовая сеть
+            // Встроенная тестовая сеть с возможностью форка
             gas: 200000000,
             blockGasLimit: 200000000,
-            allowUnlimitedContractSize: true
+            allowUnlimitedContractSize: true,
+            forking: process.env.FORK_URL ? { url: process.env.FORK_URL } : undefined
         },
         sepolia: {
             url: process.env.SEPOLIA_URL || "",
