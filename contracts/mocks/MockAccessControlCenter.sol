@@ -14,11 +14,19 @@ contract MockAccessControlCenter {
         return keccak256("FEATURE_OWNER_ROLE");
     }
 
+    function RELAYER_ROLE() external pure returns (bytes32) {
+        return keccak256("RELAYER_ROLE");
+    }
+
+    function AUTOMATION_ROLE() external pure returns (bytes32) {
+        return keccak256("AUTOMATION_ROLE");
+    }
+
     function grantMultipleRoles(address, bytes32[] calldata) external {}
 
     function grantRole(bytes32, address) external {}
 
-    function hasRole(bytes32, address) external pure returns (bool) {
-        return true;
+    function hasRole(bytes32 role, address) external pure returns (bool) {
+        return role == keccak256("FEATURE_OWNER_ROLE");
     }
 }
