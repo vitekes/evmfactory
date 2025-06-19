@@ -30,6 +30,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
 
     event MonetaryPrizePaid(address indexed to, uint256 amount);
     event PromoPrizeIssued(uint8 indexed slot, address indexed to, string uri);
+    event PrizeAssigned(address winner, string uri);
     event PrizeAdded(uint256 indexed slot, address indexed token, uint256 amount, string uri);
     event ContestFinalized(address[] winners);
     event GasRefunded(address indexed to, uint256 amount);
@@ -101,6 +102,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
                 emit PromoPrizeIssued(i, winners[i], p.uri);
+                emit PrizeAssigned(winners[i], p.uri);
             }
         }
 
