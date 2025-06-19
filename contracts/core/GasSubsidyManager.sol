@@ -22,6 +22,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     event EligibilitySet(bytes32 moduleId, address user, bool allowed);
     event GasCoverageEnabled(bytes32 moduleId, address contractAddress, bool enabled);
     event GasRefunded(bytes32 moduleId, address relayer, uint256 refund);
+    event GasTankFunded(address indexed from, uint256 value, uint256 newBalance);
 
     /// Установить лимит возврата газа на одну транзакцию для модуля
     function setGasRefundLimit(bytes32 moduleId, uint256 limit) external onlyAdmin {
@@ -88,7 +89,9 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         emit GasRefunded(moduleId, relayer, refund);
     }
 
-    receive() external payable {}
+    receive() external payable {
+        emit GasTankFunded(msg.sender, msg.value, address(this).balance);
+    }
 
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
