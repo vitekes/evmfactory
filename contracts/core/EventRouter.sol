@@ -30,6 +30,7 @@ contract EventRouter is Initializable, UUPSUpgradeable {
 
     function route(EventKind kind, bytes calldata data) external {
         if (!access.hasRole(access.MODULE_ROLE(), msg.sender)) revert NotModule();
+        if (kind == EventKind.Unknown) revert InvalidKind();
         emit EventRouted(kind, data);
     }
 

@@ -22,6 +22,8 @@ error NotGovernor();
 error NotCreator();
 error NotFactoryAdmin();
 error NotTemplateAdmin();
+error InvalidKind();
+error Overflow();
 error AlreadyPurchased();
 error AmountZero();
 error BatchTooLarge();

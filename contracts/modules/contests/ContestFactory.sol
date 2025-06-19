@@ -27,7 +27,9 @@ contract ContestFactory is BaseFactory {
     event ContestCreated(address indexed creator, address contest);
 
     IPriceFeed public priceFeed;
+    /// @notice Minimum contest commission in USD
     uint256 public usdFeeMin;
+    /// @notice Maximum contest commission in USD
     uint256 public usdFeeMax;
 
     struct ContestParams {

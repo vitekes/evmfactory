@@ -23,6 +23,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     PrizeInfo[] public prizes;
     address     public commissionToken;
     uint256     public commissionFee;
+    /// @notice Pool of commission tokens to refund gas to the creator
     uint256     public gasPool;
     bool        public isFinalized;
     address[]   public winners;
