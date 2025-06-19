@@ -33,16 +33,23 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
         access.grantRole(access.GOVERNOR_ROLE(), msg.sender);
     }
 
-    function allow(address token, bool status) external onlyGovernor {
+    function setToken(address token, bool status) public onlyGovernor {
         require(token != address(0), "zero address");
         allowed[token] = status;
         emit TokenAllowed(token, status);
     }
 
-    function bulkAllow(address[] calldata tokens, bool status) external onlyGovernor {
+    function addToken(address token) external onlyGovernor {
+        setToken(token, true);
+    }
+
+    function removeToken(address token) external onlyGovernor {
+        setToken(token, false);
+    }
+
+    function bulkSetToken(address[] calldata tokens, bool status) external onlyGovernor {
         for (uint i = 0; i < tokens.length; i++) {
-            allowed[tokens[i]] = status;
-            emit TokenAllowed(tokens[i], status);
+            setToken(tokens[i], status);
         }
     }
 
