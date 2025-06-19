@@ -51,6 +51,18 @@
    npm run test
    ```
 
+## Как запустить Foundry
+
+1. Установите инструментарий Foundry:
+   ```bash
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
+   ```
+2. Запустите тесты:
+   ```bash
+   forge test
+   ```
+
 ## Documentation
 
 For detailed information, see:
