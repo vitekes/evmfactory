@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "./AccessControlCenter.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../errors/Errors.sol";
 
 contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
@@ -29,12 +30,12 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     }
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
     modifier onlyFeatureOwner() {
-        require(access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender), "not feature owner");
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
@@ -61,7 +62,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     }
 
     modifier onlyAutomation() {
-        require(access.hasRole(access.AUTOMATION_ROLE(), msg.sender), "not automation");
+        if (!access.hasRole(access.AUTOMATION_ROLE(), msg.sender)) revert NotAutomation();
         _;
     }
 
@@ -76,13 +77,13 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
             tx.gasprice < block.basefee + priorityCap
                 ? tx.gasprice
                 : block.basefee + priorityCap;
-        require(price > 0, "price zero");
+        if (price == 0) revert PriceZero();
         uint256 limit = gasRefundPerTx[moduleId];
-        require(limit > 0, "refund disabled");
-        require(gasUsed > 0, "gas zero");
-        require(gasUsed <= limit / price, "Exceeds refund limit");
+        if (limit == 0) revert RefundDisabled();
+        if (gasUsed == 0) revert GasZero();
+        if (gasUsed > limit / price) revert ExceedsRefundLimit();
         uint256 refund = price * gasUsed;
-        require(address(this).balance >= refund, "Insufficient balance");
+        if (address(this).balance < refund) revert InsufficientBalance();
         relayer.transfer(refund);
         emit GasRefunded(moduleId, relayer, refund);
     }
@@ -94,7 +95,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "./AccessControlCenter.sol";
+import "../errors/Errors.sol";
 
 /// @title MultiValidator
 /// @notice Module-specific token whitelist deployed via minimal proxy clones.
@@ -18,12 +19,12 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     event TokenAllowed(address indexed token, bool allowed);
 
     modifier onlyGovernor() {
-        require(access.hasRole(access.GOVERNOR_ROLE(), msg.sender), "not governor");
+        if (!access.hasRole(access.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
         _;
     }
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -34,7 +35,7 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     }
 
     function setToken(address token, bool status) public onlyGovernor {
-        require(token != address(0), "zero address");
+        if (token == address(0)) revert ZeroAddress();
         allowed[token] = status;
         emit TokenAllowed(token, status);
     }
@@ -62,7 +63,7 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import "../errors/Errors.sol";
 
 abstract contract CloneFactory {
     function _clone(
@@ -14,7 +15,7 @@ abstract contract CloneFactory {
             instance = Clones.cloneDeterministic(implementation, salt);
             if (initData.length > 0) {
                 (bool ok, ) = instance.call(initData);
-                require(ok, "init failed");
+                if (!ok) revert InitFailed();
             }
         }
     }

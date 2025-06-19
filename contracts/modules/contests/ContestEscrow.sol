@@ -5,6 +5,7 @@ import "../../core/Registry.sol";
 import "../../core/PaymentGateway.sol";
 import "../../core/EventRouter.sol";
 import "../../shared/NFTManager.sol";
+import "../../errors/Errors.sol";
 import "./shared/PrizeInfo.sol";
 import "./interfaces/IContestEscrow.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -39,7 +40,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     bytes32 public constant MODULE_ID = keccak256("Contest");
 
     modifier onlyCreator() {
-        require(msg.sender == creator, "Not creator");
+        if (msg.sender != creator) revert NotCreator();
         _;
     }
 

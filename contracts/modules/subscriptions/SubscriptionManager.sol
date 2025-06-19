@@ -11,14 +11,13 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../../interfaces/IPermit2.sol";
 import "../../lib/SignatureLib.sol";
+import "../../errors/Errors.sol";
 
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
 contract SubscriptionManager is AccessManaged {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
-    /// @notice Thrown when merchant signature does not match the plan
-    error InvalidSignature();
 
     /// @notice Core registry used for service discovery
     Registry public immutable registry;
@@ -109,7 +108,7 @@ contract SubscriptionManager is AccessManaged {
     function subscribe(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
         bytes32 planHash = hashPlan(plan);
         if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
-        require(plan.expiry == 0 || plan.expiry >= block.timestamp, "expired");
+        if (!(plan.expiry == 0 || plan.expiry >= block.timestamp)) revert Expired();
         bool chainAllowed = false;
         for (uint256 i = 0; i < plan.chainIds.length; i++) {
             if (plan.chainIds[i] == block.chainid) {
@@ -117,7 +116,7 @@ contract SubscriptionManager is AccessManaged {
                 break;
             }
         }
-        require(chainAllowed, "invalid chain");
+        if (!chainAllowed) revert InvalidChain();
 
         if (permitSig.length > 0) {
             (
@@ -163,7 +162,7 @@ contract SubscriptionManager is AccessManaged {
                     abi.encodePacked(r, s, v)
                 );
                 (bool ok, ) = permit2.call(data);
-                require(ok, "permit failed");
+                if (!ok) revert PermitFailed();
             }
         }
 
@@ -186,7 +185,7 @@ contract SubscriptionManager is AccessManaged {
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService(keccak256("AccessControlCenter"))
         );
-        require(acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender), "not automation");
+        if (!acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender)) revert NotAutomation();
         _;
     }
 
@@ -195,8 +194,8 @@ contract SubscriptionManager is AccessManaged {
     function charge(address user) public onlyAutomation {
         Subscriber storage s = subscribers[user];
         SignatureLib.Plan memory plan = plans[s.planHash];
-        require(plan.merchant != address(0), "no plan");
-        require(block.timestamp >= s.nextBilling, "not due");
+        if (plan.merchant == address(0)) revert NoPlan();
+        if (block.timestamp < s.nextBilling) revert NotDue();
 
         uint256 netAmount = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))

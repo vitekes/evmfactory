@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "../errors/Errors.sol";
 
 contract NFTManager is ERC721URIStorage, Ownable {
     uint256 public tokenIdCounter;
@@ -38,10 +39,7 @@ contract NFTManager is ERC721URIStorage, Ownable {
         address auth
     ) internal override returns (address) {
         address from = ERC721.ownerOf(tokenId);
-        require(
-            from == address(0) || to == address(0) || !isSoulbound[tokenId],
-            "SBT is non-transferable"
-        );
+        if (!(from == address(0) || to == address(0) || !isSoulbound[tokenId])) revert SbtNonTransferable();
         return super._update(to, tokenId, auth);
     }
 
@@ -52,8 +50,8 @@ contract NFTManager is ERC721URIStorage, Ownable {
 
     /// @notice Массовый выпуск NFT
     function mintBatch(address[] calldata recipients, string[] calldata uris, bool soulbound) external onlyOwner {
-        require(recipients.length == uris.length, "length mismatch");
-        require(recipients.length <= MAX_BATCH_MINT, "batch too large");
+        if (recipients.length != uris.length) revert LengthMismatch();
+        if (recipients.length > MAX_BATCH_MINT) revert BatchTooLarge();
         for (uint256 i = 0; i < recipients.length; i++) {
             uint256 id = ++tokenIdCounter;
             _safeMint(recipients[i], id);

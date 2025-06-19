@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../errors/Errors.sol";
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
@@ -32,12 +33,12 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     event FeeWithdrawn(bytes32 indexed moduleId, address indexed token, address to, uint256 amount);
 
     modifier onlyFeatureOwner() {
-        require(access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender), "not feature owner");
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -54,9 +55,9 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         uint16 pFee = percentFee[moduleId][token];
         uint256 fFee = fixedFee[moduleId][token];
 
-        require(pFee <= 10_000, "fee too high");
+        if (pFee > 10_000) revert FeeTooHigh();
         feeAmount = fFee + ((amount * pFee) / 10_000);
-        require(feeAmount < amount, "fee >= amount");
+        if (feeAmount >= amount) revert FeeExceedsAmount();
         if (feeAmount > 0) {
             IERC20(token).safeTransferFrom(payer, address(this), feeAmount);
 
@@ -67,7 +68,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     /// @notice Deposit a specific amount of fees for a module without calculation
     function depositFee(bytes32 moduleId, address token, uint256 amount) external onlyFeatureOwner nonReentrant whenNotPaused {
-        require(amount > 0, "amount zero");
+        if (amount == 0) revert AmountZero();
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         collectedFees[moduleId][token] += amount;
         emit FeeCollected(moduleId, token, amount);
@@ -75,7 +76,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     function withdrawFees(bytes32 moduleId, address token, address to) external onlyAdmin nonReentrant whenNotPaused {
         uint256 amount = collectedFees[moduleId][token];
-        require(amount > 0, "nothing to withdraw");
+        if (amount == 0) revert NothingToWithdraw();
 
         collectedFees[moduleId][token] = 0;
         IERC20(token).safeTransfer(to, amount);
@@ -84,7 +85,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     }
 
     function setPercentFee(bytes32 moduleId, address token, uint16 feeBps) external onlyFeatureOwner {
-        require(feeBps <= 10_000, "fee too high");
+        if (feeBps > 10_000) revert FeeTooHigh();
         percentFee[moduleId][token] = feeBps;
     }
 
@@ -110,7 +111,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

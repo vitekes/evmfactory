@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../core/AccessControlCenter.sol";
+import "../errors/Errors.sol";
 
 abstract contract AccessManaged {
     address public immutable _ACC;
@@ -16,7 +17,7 @@ abstract contract AccessManaged {
 
     modifier onlyRole(bytes32 role) {
         AccessControlCenter acc = AccessControlCenter(_ACC);
-        require(acc.hasRole(role, msg.sender), "AC: forbidden");
+        if (!acc.hasRole(role, msg.sender)) revert Forbidden();
         _;
     }
 }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "./AccessControlCenter.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../errors/Errors.sol";
 
 contract Registry is Initializable, UUPSUpgradeable {
     /// @dev Хранение информации о фичах
@@ -31,12 +32,12 @@ contract Registry is Initializable, UUPSUpgradeable {
     event ModuleRegistered(bytes32 indexed moduleId, string serviceAlias, address serviceAddress);
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
     modifier onlyFeatureOwner() {
-        require(access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender), "not feature owner");
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
@@ -46,20 +47,20 @@ contract Registry is Initializable, UUPSUpgradeable {
     }
 
     function registerFeature(bytes32 id, address impl, uint8 context) external onlyFeatureOwner {
-        require(impl != address(0), "invalid impl");
+        if (impl == address(0)) revert InvalidImplementation();
         features[id] = Feature(impl, context, true);
         emit FeatureRegistered(id, impl, context);
     }
 
     function getFeature(bytes32 id) external view returns (address impl, uint8 context) {
         Feature storage f = features[id];
-        require(f.exists, "not found");
+        if (!f.exists) revert NotFound();
         return (f.implementation, f.context);
     }
 
     function getContext(bytes32 id) external view returns (uint8) {
         Feature storage f = features[id];
-        require(f.exists, "not found");
+        if (!f.exists) revert NotFound();
         return f.context;
     }
 
@@ -74,7 +75,7 @@ contract Registry is Initializable, UUPSUpgradeable {
 
     /// @notice Привязать сервис к конкретному модулю
     function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) public onlyFeatureOwner {
-        require(features[moduleId].exists, "module not registered");
+        if (!features[moduleId].exists) revert ModuleNotRegistered();
         moduleServices[moduleId][serviceId] = addr;
         emit ModuleServiceSet(moduleId, serviceId, addr);
     }
@@ -100,7 +101,7 @@ contract Registry is Initializable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;
