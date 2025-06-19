@@ -31,6 +31,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     event FeeCollected(bytes32 indexed moduleId, address indexed token, uint256 amount);
     event FeeWithdrawn(bytes32 indexed moduleId, address indexed token, address to, uint256 amount);
+    event GasTankFunded(address indexed from, uint256 value, uint256 newBalance);
 
     modifier onlyFeatureOwner() {
         if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
@@ -82,6 +83,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         IERC20(token).safeTransfer(to, amount);
 
         emit FeeWithdrawn(moduleId, token, to, amount);
+        emit GasTankFunded(to, amount, IERC20(token).balanceOf(to));
     }
 
     function setPercentFee(bytes32 moduleId, address token, uint16 feeBps) external onlyFeatureOwner {
