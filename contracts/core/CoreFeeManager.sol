@@ -65,6 +65,14 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         }
     }
 
+    /// @notice Deposit a specific amount of fees for a module without calculation
+    function depositFee(bytes32 moduleId, address token, uint256 amount) external onlyFeatureOwner nonReentrant whenNotPaused {
+        require(amount > 0, "amount zero");
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        collectedFees[moduleId][token] += amount;
+        emit FeeCollected(moduleId, token, amount);
+    }
+
     function withdrawFees(bytes32 moduleId, address token, address to) external onlyAdmin nonReentrant whenNotPaused {
         uint256 amount = collectedFees[moduleId][token];
         require(amount > 0, "nothing to withdraw");

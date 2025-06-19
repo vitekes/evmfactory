@@ -22,6 +22,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     PrizeInfo[] public prizes;
     address     public commissionToken;
     uint256     public commissionFee;
+    uint256     public gasPool;
     bool        public isFinalized;
     address[]   public winners;
     uint256     public processedWinners;
@@ -31,6 +32,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     event PromoPrizeIssued(uint8 indexed slot, address indexed to, string uri);
     event PrizeAdded(uint256 indexed slot, address indexed token, uint256 amount, string uri);
     event ContestFinalized(address[] winners);
+    event GasRefunded(address indexed to, uint256 amount);
 
     /// @dev Identifier used when interacting with registry services
     bytes32 public constant MODULE_ID = keccak256("Contest");
@@ -46,6 +48,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         PrizeInfo[] memory _prizes,
         address     _commissionToken,
         uint256     _commissionFee,
+        uint256     _initialGasPool,
         address[] memory /* _judges */, // unused for now
         bytes memory /* _metadata */
     ) {
@@ -53,6 +56,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         creator         = _creator;
         commissionToken = _commissionToken;
         commissionFee   = _commissionFee;
+        gasPool         = _initialGasPool;
         for (uint i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
         }
@@ -81,6 +85,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             winners = _winners;
         }
 
+        uint256 gasStart = gasleft();
+
         uint256 start = processedWinners;
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
@@ -99,6 +105,15 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         }
 
         processedWinners = end;
+
+        uint256 gasUsed = gasStart - gasleft();
+        uint256 refund = gasUsed * tx.gasprice;
+        if (refund > gasPool) refund = gasPool;
+        if (refund > 0) {
+            gasPool -= refund;
+            IERC20(commissionToken).safeTransfer(msg.sender, refund);
+            emit GasRefunded(msg.sender, refund);
+        }
 
         if (processedWinners == prizes.length && !isFinalized) {
             isFinalized = true;
