@@ -17,6 +17,7 @@ error NotAutomation();
 error NotFeatureOwner();
 error NotModule();
 error NotSeller();
+error NotListed();
 error NotGovernor();
 error NotCreator();
 error NotFactoryAdmin();
