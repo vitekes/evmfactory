@@ -9,6 +9,13 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - name: Install Foundry
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+          source ~/.bashrc
+          foundryup
+      - run: forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts@v5.3.0 OpenZeppelin/openzeppelin-contracts-upgradeable@v5.3.0
+      - run: forge test -vv
       - run: npx hardhat test
       - run: npx hardhat coverage
       - name: Check coverage
