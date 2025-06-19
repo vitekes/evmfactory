@@ -1,4 +1,5 @@
 # evmcontest
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/vitekes/evmcontest/actions/workflows/ci.yml)
 
 **A platform for organizing prize contests on EVM networks**
 

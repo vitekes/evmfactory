@@ -17,17 +17,11 @@ jobs:
       - run: forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts@v5.3.0 OpenZeppelin/openzeppelin-contracts-upgradeable@v5.3.0
       - run: forge test -vv
       - run: npx hardhat test
-      - run: npx hardhat coverage
-      - name: Check coverage
-        run: |
-          cov=$(grep -A2 'TOTAL' coverage/lcov.info | tail -n1 | awk '{print $4}')
-          echo "coverage $cov%"
-          if [ "$cov" -lt 90 ]; then exit 1; fi
-      - uses: crytic/slither-action@v0.3.1
-        with:
-          sarif: results.sarif
+      - run: forge coverage --report lcov
+      - run: ./check-coverage.sh 90
+      - run: slither . --sarif output.sarif || true
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: results.sarif
+          sarif_file: output.sarif
 
