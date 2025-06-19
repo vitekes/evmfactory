@@ -5,6 +5,7 @@ import "./AccessControlCenter.sol";
 import "../interfaces/core/IRegistry.sol";
 import "../interfaces/IValidator.sol";
 import "./CoreFeeManager.sol";
+import "../errors/Errors.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -17,8 +18,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
     using SafeERC20 for IERC20;
-    error NotAllowedToken();
-    error InvalidSignature();
 
     AccessControlCenter public access;
     IRegistry public registry;
@@ -39,12 +38,12 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
     );
 
     modifier onlyFeatureOwner() {
-        require(access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender), "not feature owner");
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -136,7 +135,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     /// @dev UUPS upgrade authorization
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

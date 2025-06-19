@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "./AccessControlCenter.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../errors/Errors.sol";
 
 contract TokenRegistry is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
@@ -14,12 +15,12 @@ contract TokenRegistry is Initializable, UUPSUpgradeable {
     event TokenWhitelisted(bytes32 indexed moduleId, address indexed token, bool allowed);
 
     modifier onlyFeatureOwner() {
-        require(access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender), "not feature owner");
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        require(access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -29,7 +30,7 @@ contract TokenRegistry is Initializable, UUPSUpgradeable {
     }
 
     function setTokenAllowed(bytes32 moduleId, address token, bool allowed) external onlyFeatureOwner {
-        require(token != address(0), "zero address");
+        if (token == address(0)) revert ZeroAddress();
         isAllowed[moduleId][token] = allowed;
         emit TokenWhitelisted(moduleId, token, allowed);
     }
@@ -50,7 +51,7 @@ contract TokenRegistry is Initializable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

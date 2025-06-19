@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../errors/Errors.sol";
 
 contract MockPermit2 {
     using SafeERC20 for IERC20;
@@ -31,7 +32,7 @@ contract MockPermit2 {
         address owner,
         bytes calldata
     ) external {
-        require(block.timestamp <= permit.deadline, "expired");
+        if (block.timestamp > permit.deadline) revert Expired();
         nonces[owner] = permit.nonce + 1;
         IERC20(permit.permitted.token).safeTransferFrom(owner, transferDetails.to, transferDetails.requestedAmount);
     }

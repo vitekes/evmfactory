@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../errors/Errors.sol";
 
 contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     // Роли
@@ -40,7 +41,7 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newImplementation != address(0), "invalid implementation");
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     uint256[50] private __gap;

@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "./shared/PrizeInfo.sol";
 import "../../core/AccessControlCenter.sol";
 import "./interfaces/IPrizeManager.sol";
+import "../../errors/Errors.sol";
 
 /// @title PrizeManager
 /// @notice Управляет шаблонами призовых слотов: хранит, возвращает, позволяет администраторам добавлять и обновлять
@@ -29,7 +30,7 @@ contract PrizeManager is IPrizeManager {
         PrizeInfo[] calldata slots,
         string calldata description
     ) external override returns (uint256 templateId) {
-        require(acl.hasRole(TEMPLATE_ADMIN, msg.sender), "Not TEMPLATE_ADMIN");
+        if (!acl.hasRole(TEMPLATE_ADMIN, msg.sender)) revert NotTemplateAdmin();
 
         templateId = nextTemplateId++;
         Template storage t = templates[templateId];
@@ -44,8 +45,8 @@ contract PrizeManager is IPrizeManager {
         PrizeInfo[] calldata slots,
         string calldata description
     ) external override {
-        require(acl.hasRole(TEMPLATE_ADMIN, msg.sender), "Not TEMPLATE_ADMIN");
-        require(templateId > 0 && templateId < nextTemplateId, "Invalid templateId");
+        if (!acl.hasRole(TEMPLATE_ADMIN, msg.sender)) revert NotTemplateAdmin();
+        if (!(templateId > 0 && templateId < nextTemplateId)) revert InvalidTemplateId();
 
         Template storage t = templates[templateId];
         t.description = description;
@@ -61,7 +62,7 @@ contract PrizeManager is IPrizeManager {
         PrizeInfo[] memory slots,
         string memory description
     ) {
-        require(templateId > 0 && templateId < nextTemplateId, "Invalid templateId");
+        if (!(templateId > 0 && templateId < nextTemplateId)) revert InvalidTemplateId();
         Template storage t = templates[templateId];
         return (t.slots, t.description);
     }

@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../../lib/SignatureLib.sol";
+import "../../errors/Errors.sol";
 
 /// @title Marketplace
 /// @notice Minimal marketplace example demonstrating registration of sales and
@@ -16,7 +17,6 @@ import "../../lib/SignatureLib.sol";
 contract Marketplace is AccessManaged {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
-    error InvalidSignature();
     Registry public immutable registry;
     bytes32 public immutable MODULE_ID;
 
@@ -87,7 +87,7 @@ contract Marketplace is AccessManaged {
     /// @param newPrice New price value
     function updateListingPrice(uint256 id, uint256 newPrice) external {
         OnchainListing storage l = listings[id];
-        require(l.seller == msg.sender, "not seller");
+        if (l.seller != msg.sender) revert NotSeller();
         uint256 oldPrice = l.price;
         l.price = newPrice;
         bytes32 hash = keccak256(abi.encodePacked(id, l.seller, l.token));
@@ -97,7 +97,7 @@ contract Marketplace is AccessManaged {
     /// @notice Purchase a listed item, paying through PaymentGateway
     function buy(uint256 id) external {
         OnchainListing storage l = listings[id];
-        require(l.active, "not listed");
+        if (!l.active) revert NotListed();
 
         uint256 netAmount = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
@@ -113,11 +113,8 @@ contract Marketplace is AccessManaged {
     function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external {
         bytes32 listingHash = hashListing(listing);
         if (listingHash.recover(sigSeller) != listing.seller) revert InvalidSignature();
-        require(!consumed[listingHash][msg.sender], "already purchased");
-        require(
-            listing.expiry == 0 || listing.expiry >= block.timestamp,
-            "expired"
-        );
+        if (consumed[listingHash][msg.sender]) revert AlreadyPurchased();
+        if (!(listing.expiry == 0 || listing.expiry >= block.timestamp)) revert Expired();
         bool chainAllowed = false;
         for (uint256 i = 0; i < listing.chainIds.length; i++) {
             if (listing.chainIds[i] == block.chainid) {
@@ -125,7 +122,7 @@ contract Marketplace is AccessManaged {
                 break;
             }
         }
-        require(chainAllowed, "invalid chain");
+        if (!chainAllowed) revert InvalidChain();
 
         uint256 netAmount = IGateway(
             registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))

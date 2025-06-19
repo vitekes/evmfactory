@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../interfaces/core/IRegistry.sol";
 import "../core/AccessControlCenter.sol";
+import "../errors/Errors.sol";
 import "./CloneFactory.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -22,7 +23,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         AccessControlCenter acl = AccessControlCenter(
             registry.getCoreService(keccak256("AccessControlCenter"))
         );
-        require(acl.hasRole(FACTORY_ADMIN, msg.sender), "Not FACTORY_ADMIN");
+        if (!acl.hasRole(FACTORY_ADMIN, msg.sender)) revert NotFactoryAdmin();
         _;
     }
 }

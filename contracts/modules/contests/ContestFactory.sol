@@ -12,6 +12,7 @@ import "./shared/PrizeInfo.sol";
 import "./interfaces/IPrizeManager.sol";
 import "./ContestEscrow.sol";
 import "../../shared/BaseFactory.sol";
+import "../../errors/Errors.sol";
 import "../../interfaces/core/ICoreFeeManager.sol";
 import "../../core/PaymentGateway.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -24,7 +25,6 @@ contract ContestFactory is BaseFactory {
     using SafeERC20 for IERC20;
 
     event ContestCreated(address indexed creator, address contest);
-    error NotAllowedToken();
 
     IPriceFeed public priceFeed;
     uint256 public usdFeeMin;
@@ -89,10 +89,7 @@ contract ContestFactory is BaseFactory {
                 // проверяем, что токен разрешён в этом контексте
                 if (!validator.isAllowed(slots[i].token)) revert NotAllowedToken();
                 // проверяем корректность схемы распределения
-                require(
-                    slots[i].distribution <= 1,
-                    "Invalid distribution"
-                );
+                if (slots[i].distribution > 1) revert InvalidDistribution();
                 totalMonetary += slots[i].amount;
             }
         }
@@ -112,7 +109,7 @@ contract ContestFactory is BaseFactory {
 
         // 3) Сбор комиссии за finalize()
         uint256 tokenUsd = priceFeed.tokenPriceUsd(params.commissionToken);
-        require(tokenUsd > 0, "price zero");
+        if (tokenUsd == 0) revert PriceZero();
         uint256 usdFee = (usdFeeMin + usdFeeMax) / 2;
         uint256 commissionFee = (usdFee * 1e18) / tokenUsd;
         uint256 netCommission = IGateway(
@@ -175,7 +172,7 @@ contract ContestFactory is BaseFactory {
     }
 
     function setUsdFeeBounds(uint256 minFee, uint256 maxFee) external onlyFactoryAdmin {
-        require(minFee <= maxFee, "invalid bounds");
+        if (minFee > maxFee) revert InvalidBounds();
         usdFeeMin = minFee;
         usdFeeMax = maxFee;
     }
