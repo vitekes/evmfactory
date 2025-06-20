@@ -8,11 +8,15 @@ describe("SubscriptionManager permit", function () {
     const Token = await ethers.getContractFactory("TestToken");
     const token = await Token.deploy("Test", "TST");
 
-    const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
     const acl = await ACL.deploy();
+    await acl.initialize(owner.address);
 
     const Registry = await ethers.getContractFactory("MockRegistry");
     const registry = await Registry.deploy();
+    const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+    await acl.grantRole(FACTORY_ADMIN, owner.address);
+    await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), owner.address);
     await registry.setCoreService(ethers.keccak256(Buffer.from("AccessControlCenter")), await acl.getAddress());
 
     const Gateway = await ethers.getContractFactory("MockPaymentGateway");
@@ -77,8 +81,12 @@ describe("SubscriptionManager permit", function () {
     const Token = await ethers.getContractFactory("TestToken");
     const token = await Token.deploy("Test", "TST");
 
-    const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
     const acl = await ACL.deploy();
+    await acl.initialize(owner.address);
+    const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+    await acl.grantRole(FACTORY_ADMIN, owner.address);
+    await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), owner.address);
 
     const Registry = await ethers.getContractFactory("MockRegistry");
     const registry = await Registry.deploy();
@@ -149,8 +157,12 @@ describe("SubscriptionManager unsubscribe", function () {
     const Token = await ethers.getContractFactory("TestToken");
     const token = await Token.deploy("Test", "TST");
 
-    const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
     const acl = await ACL.deploy();
+    await acl.initialize(owner.address);
+    const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+    await acl.grantRole(FACTORY_ADMIN, owner.address);
+    await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), owner.address);
 
     const Registry = await ethers.getContractFactory("MockRegistry");
     const registry = await Registry.deploy();
@@ -199,8 +211,13 @@ describe("SubscriptionManager batch charge", function () {
     const Token = await ethers.getContractFactory("TestToken");
     const token = await Token.deploy("Test", "TST");
 
-    const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
     const acl = await ACL.deploy();
+    await acl.initialize(owner.address);
+    const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+    await acl.grantRole(FACTORY_ADMIN, owner.address);
+    await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), owner.address);
+    await acl.grantRole(await acl.AUTOMATION_ROLE(), owner.address);
 
     const Registry = await ethers.getContractFactory("MockRegistry");
     const registry = await Registry.deploy();
@@ -248,5 +265,52 @@ describe("SubscriptionManager batch charge", function () {
       const after = await manager.subscribers(users[i].address);
       expect(after.nextBilling).to.equal(subsBefore[i].nextBilling + plan.period);
     }
+  });
+
+  it("reverts for caller without automation role", async function () {
+    const [owner, merchant, user] = await ethers.getSigners();
+
+    const Token = await ethers.getContractFactory("TestToken");
+    const token = await Token.deploy("Test", "TST");
+
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
+    const acl = await ACL.deploy();
+    await acl.initialize(owner.address);
+    const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+    await acl.grantRole(FACTORY_ADMIN, owner.address);
+    await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), owner.address);
+
+    const Registry = await ethers.getContractFactory("MockRegistry");
+    const registry = await Registry.deploy();
+    await registry.setCoreService(ethers.keccak256(Buffer.from("AccessControlCenter")), await acl.getAddress());
+
+    const Gateway = await ethers.getContractFactory("MockPaymentGateway");
+    const gateway = await Gateway.deploy();
+
+    const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const Manager = await ethers.getContractFactory("SubscriptionManager");
+    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+
+    const plan = {
+      chainIds: [31337n],
+      price: ethers.parseEther("1"),
+      period: 100n,
+      token: await token.getAddress(),
+      merchant: merchant.address,
+      salt: 1n,
+      expiry: 0n,
+    } as const;
+
+    const planHash = await manager.hashPlan(plan);
+    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+
+    await token.transfer(user.address, ethers.parseEther("10"));
+    await token.connect(user).approve(await gateway.getAddress(), plan.price);
+    await manager.connect(user).subscribe(plan, sigMerchant, "0x");
+
+    await ethers.provider.send("evm_increaseTime", [Number(plan.period)]);
+    await ethers.provider.send("evm_mine", []);
+
+    await expect(manager.chargeBatch([user.address])).to.be.revertedWithCustomError(manager, "NotAutomation");
   });
 });

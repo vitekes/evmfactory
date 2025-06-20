@@ -5,8 +5,12 @@ async function deployCore() {
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("USD Coin", "USDC");
 
-  const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+  const ACL = await ethers.getContractFactory("AccessControlCenter");
   const acl = await ACL.deploy();
+  await acl.initialize((await ethers.getSigners())[0].address);
+  const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+  await acl.grantRole(FACTORY_ADMIN, (await ethers.getSigners())[0].address);
+  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), (await ethers.getSigners())[0].address);
 
   const Registry = await ethers.getContractFactory("MockRegistry");
   const registry = await Registry.deploy();
