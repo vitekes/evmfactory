@@ -52,6 +52,11 @@
    npm run test
    ```
 
+5. Run the showcase script to see a complete contest flow:
+   ```bash
+   npx hardhat run scripts/showcase.ts --network localhost
+   ```
+
 ## Как запустить Foundry
 
 1. Установите инструментарий Foundry:
