@@ -88,6 +88,34 @@ describe("Contest finalize", function () {
     expect(await esc.winners(2)).to.equal(c.address);
   });
 
+  it("reverts on second finalize", async function () {
+    const [creator, a, b, c] = await ethers.getSigners();
+    const { factory, token, priceFeed, registry, gateway } = await deployFactory();
+
+    await allowToken(factory, registry, token);
+
+    await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
+    await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
+
+    const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
+    const prizes = [
+      { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("1"), distribution: 0, uri: "" },
+      { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("1"), distribution: 0, uri: "" },
+      { prizeType: 1, token: ethers.ZeroAddress, amount: 0, distribution: 0, uri: "promo" }
+    ];
+
+    const tx = await factory.createCustomContest(prizes, params);
+    const rc = await tx.wait();
+    const contestAddr = getCreatedContest(rc);
+    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+
+    await esc.finalize([a.address, b.address, c.address]);
+    await expect(esc.finalize([a.address, b.address, c.address])).to.be.revertedWithCustomError(
+      esc,
+      "ContestAlreadyFinalized"
+    );
+  });
+
   it("reverts on wrong winners count", async function () {
     const [creator, a, b, c] = await ethers.getSigners();
     const { factory, token, priceFeed, registry, gateway } = await deployFactory();
