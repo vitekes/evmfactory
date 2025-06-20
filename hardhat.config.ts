@@ -5,6 +5,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ignition";
 import "@typechain/hardhat";
 import "@nomicfoundation/hardhat-network-helpers";
+import "solidity-coverage";
 
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
