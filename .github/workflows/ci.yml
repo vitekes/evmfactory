@@ -32,7 +32,7 @@ jobs:
 
       # 5) Install JS dependencies
       - name: Install NPM dependencies
-        run: npm ci
+        run: npm install
 
       # 6) Run Foundry unit and fuzz tests
       - name: Run Foundry tests
