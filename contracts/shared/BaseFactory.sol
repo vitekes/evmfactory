@@ -5,6 +5,7 @@ import '../interfaces/core/IRegistry.sol';
 import '../core/AccessControlCenter.sol';
 import '../errors/Errors.sol';
 import './CloneFactory.sol';
+import '../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 abstract contract BaseFactory is CloneFactory, ReentrancyGuard {

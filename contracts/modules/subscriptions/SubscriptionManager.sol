@@ -11,6 +11,7 @@ import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '../../interfaces/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
+import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
 
 /// @title Subscription Manager
@@ -97,8 +98,7 @@ contract SubscriptionManager is AccessManaged {
     /// @param plan Plan parameters
     /// @return Hash to be signed by the merchant
     function hashPlan(SignatureLib.Plan calldata plan) public view returns (bytes32) {
-        bytes32 structHash = SignatureLib.hashPlan(plan);
-        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
+        return SignatureLib.hashPlan(plan, DOMAIN_SEPARATOR);
     }
 
     /// @notice Subscribe caller to a plan
@@ -123,7 +123,7 @@ contract SubscriptionManager is AccessManaged {
                 permitSig,
                 (uint256, uint8, bytes32, bytes32)
             );
-            address gateway = registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway')));
+            address gateway = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
             try IERC20Permit(plan.token).permit(msg.sender, gateway, plan.price, deadline, v, r, s) {
                 // ok
             } catch {
@@ -144,7 +144,7 @@ contract SubscriptionManager is AccessManaged {
             }
         }
 
-        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, plan.token, msg.sender, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
@@ -172,7 +172,7 @@ contract SubscriptionManager is AccessManaged {
         if (plan.merchant == address(0)) revert NoPlan();
         if (block.timestamp < s.nextBilling) revert NotDue();
 
-        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);

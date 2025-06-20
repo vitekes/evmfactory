@@ -6,6 +6,8 @@ import '../interfaces/core/IRegistry.sol';
 import '../interfaces/IValidator.sol';
 import './CoreFeeManager.sol';
 import '../errors/Errors.sol';
+import '../lib/SignatureLib.sol';
+import '../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -25,10 +27,6 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     mapping(address => uint256) public nonces;
     bytes32 public DOMAIN_SEPARATOR;
-    bytes32 private constant PROCESS_TYPEHASH =
-        keccak256(
-            'ProcessPayment(address payer,bytes32 moduleId,address token,uint256 amount,uint256 nonce,uint256 chainId)'
-        );
 
     event PaymentProcessed(
         address indexed payer,
@@ -72,7 +70,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         uint256 amount,
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
-        address val = registry.getModuleService(moduleId, keccak256(bytes('Validator')));
+        address val = registry.getModuleService(moduleId, CoreDefs.SERVICE_VALIDATOR);
         if (!IValidator(val).isAllowed(token)) revert NotAllowedToken();
         // Skip signature verification for automation bots and trusted relayers
         if (
@@ -80,14 +78,14 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
             !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) &&
             !access.hasRole(access.RELAYER_ROLE(), msg.sender)
         ) {
-            bytes32 digest = keccak256(
-                abi.encodePacked(
-                    '\x19\x01',
-                    DOMAIN_SEPARATOR,
-                    keccak256(
-                        abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonces[payer]++, block.chainid)
-                    )
-                )
+            bytes32 digest = SignatureLib.hashProcessPayment(
+                DOMAIN_SEPARATOR,
+                payer,
+                moduleId,
+                token,
+                amount,
+                nonces[payer]++,
+                block.chainid
             );
             if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
         }

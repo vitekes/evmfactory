@@ -9,6 +9,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '../../lib/SignatureLib.sol';
+import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
 
 /// @title Marketplace
@@ -91,7 +92,7 @@ contract Marketplace is AccessManaged {
         OnchainListing storage l = listings[id];
         if (!l.active) revert NotListed();
 
-        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, l.token, msg.sender, l.price, '');
 
         IERC20(l.token).safeTransfer(l.seller, netAmount);
@@ -114,7 +115,7 @@ contract Marketplace is AccessManaged {
         }
         if (!chainAllowed) revert InvalidChain();
 
-        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, listing.token, msg.sender, listing.price, '');
 
         IERC20(listing.token).safeTransfer(listing.seller, netAmount);
@@ -124,7 +125,6 @@ contract Marketplace is AccessManaged {
     }
 
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
-        bytes32 structHash = SignatureLib.hashListing(listing);
-        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
+        return SignatureLib.hashListing(listing, DOMAIN_SEPARATOR);
     }
 }

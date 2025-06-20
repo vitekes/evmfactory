@@ -15,6 +15,7 @@ import '../../shared/BaseFactory.sol';
 import '../../errors/Errors.sol';
 import '../../interfaces/core/ICoreFeeManager.sol';
 import '../../core/PaymentGateway.sol';
+import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -42,7 +43,7 @@ contract ContestFactory is BaseFactory {
         address _registry,
         address paymentGateway,
         address validatorLogic
-    ) BaseFactory(_registry, paymentGateway, keccak256('Contest')) {
+    ) BaseFactory(_registry, paymentGateway, CoreDefs.CONTEST_MODULE_ID) {
         AccessControlCenter acl = AccessControlCenter(registry.getCoreService(keccak256('AccessControlCenter')));
         bytes32 salt = keccak256(abi.encodePacked('Validator', MODULE_ID, address(this)));
         address val = _clone(
@@ -74,7 +75,7 @@ contract ContestFactory is BaseFactory {
 
     function _deployContest(PrizeInfo[] memory slots, ContestParams memory params) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
-        IValidator validator = IValidator(registry.getModuleService(MODULE_ID, keccak256(bytes('Validator'))));
+        IValidator validator = IValidator(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_VALIDATOR));
         uint256 totalMonetary;
         bytes32 moduleId = MODULE_ID;
         for (uint i = 0; i < slots.length; i++) {
@@ -89,7 +90,7 @@ contract ContestFactory is BaseFactory {
 
         // 2) Сбор призового пула
         if (totalMonetary > 0) {
-            IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway')))).processPayment(
+            IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY)).processPayment(
                 moduleId,
                 slots[0].token,
                 msg.sender,
@@ -103,14 +104,14 @@ contract ContestFactory is BaseFactory {
         if (tokenUsd == 0) revert PriceZero();
         uint256 usdFee = (usdFeeMin + usdFeeMax) / 2;
         uint256 commissionFee = (usdFee * 1e18) / tokenUsd;
-        uint256 netCommission = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+        uint256 netCommission = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(moduleId, params.commissionToken, msg.sender, commissionFee, '');
 
         uint256 gasShare = (netCommission * 60) / 100;
         uint256 feeShare = netCommission - gasShare;
 
         address feeManagerAddr = address(
-            PaymentGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway')))).feeManager()
+            PaymentGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY)).feeManager()
         );
         IERC20(params.commissionToken).forceApprove(feeManagerAddr, feeShare);
         ICoreFeeManager(feeManagerAddr).depositFee(MODULE_ID, params.commissionToken, feeShare);
