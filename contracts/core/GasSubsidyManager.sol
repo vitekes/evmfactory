@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./AccessControlCenter.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "../errors/Errors.sol";
+import './AccessControlCenter.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '../errors/Errors.sol';
 
 contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
@@ -74,10 +74,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         uint256 gasUsed,
         uint256 priorityCap
     ) external onlyAutomation {
-        uint256 price =
-            tx.gasprice < block.basefee + priorityCap
-                ? tx.gasprice
-                : block.basefee + priorityCap;
+        uint256 price = tx.gasprice < block.basefee + priorityCap ? tx.gasprice : block.basefee + priorityCap;
         if (price == 0) revert PriceZero();
         uint256 limit = gasRefundPerTx[moduleId];
         if (limit == 0) revert RefundDisabled();

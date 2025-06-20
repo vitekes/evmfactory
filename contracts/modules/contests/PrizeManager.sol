@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./shared/PrizeInfo.sol";
-import "../../core/AccessControlCenter.sol";
-import "./interfaces/IPrizeManager.sol";
-import "../../errors/Errors.sol";
+import './shared/PrizeInfo.sol';
+import '../../core/AccessControlCenter.sol';
+import './interfaces/IPrizeManager.sol';
+import '../../errors/Errors.sol';
 
 /// @title PrizeManager
 /// @notice Управляет шаблонами призовых слотов: хранит, возвращает, позволяет администраторам добавлять и обновлять
@@ -20,7 +20,7 @@ contract PrizeManager is IPrizeManager {
     mapping(uint256 => Template) private templates;
 
     // Роль, дающая право управлять шаблонами призов
-    bytes32 public constant TEMPLATE_ADMIN = keccak256("TEMPLATE_ADMIN");
+    bytes32 public constant TEMPLATE_ADMIN = keccak256('TEMPLATE_ADMIN');
 
     constructor(address _acl) {
         acl = AccessControlCenter(_acl);
@@ -58,10 +58,7 @@ contract PrizeManager is IPrizeManager {
 
     function getTemplate(
         uint256 templateId
-    ) external view override returns (
-        PrizeInfo[] memory slots,
-        string memory description
-    ) {
+    ) external view override returns (PrizeInfo[] memory slots, string memory description) {
         if (!(templateId > 0 && templateId < nextTemplateId)) revert InvalidTemplateId();
         Template storage t = templates[templateId];
         return (t.slots, t.description);

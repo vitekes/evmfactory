@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "../errors/Errors.sol";
+import '@openzeppelin/contracts/proxy/Clones.sol';
+import '../errors/Errors.sol';
 
 abstract contract CloneFactory {
-    function _clone(
-        address implementation,
-        bytes32 salt,
-        bytes memory initData
-    ) internal returns (address instance) {
+    function _clone(address implementation, bytes32 salt, bytes memory initData) internal returns (address instance) {
         instance = Clones.predictDeterministicAddress(implementation, salt, address(this));
         if (instance.code.length == 0) {
             instance = Clones.cloneDeterministic(implementation, salt);

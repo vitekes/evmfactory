@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./AccessControlCenter.sol";
-import "../interfaces/core/IRegistry.sol";
-import "../interfaces/IValidator.sol";
-import "./CoreFeeManager.sol";
-import "../errors/Errors.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import './AccessControlCenter.sol';
+import '../interfaces/core/IRegistry.sol';
+import '../interfaces/IValidator.sol';
+import './CoreFeeManager.sol';
+import '../errors/Errors.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
+import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import '@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
@@ -25,8 +25,10 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     mapping(address => uint256) public nonces;
     bytes32 public DOMAIN_SEPARATOR;
-    bytes32 private constant PROCESS_TYPEHASH = keccak256("ProcessPayment(address payer,bytes32 moduleId,address token,uint256 amount,uint256 nonce,uint256 chainId)");
-
+    bytes32 private constant PROCESS_TYPEHASH =
+        keccak256(
+            'ProcessPayment(address payer,bytes32 moduleId,address token,uint256 amount,uint256 nonce,uint256 chainId)'
+        );
 
     event PaymentProcessed(
         address indexed payer,
@@ -47,11 +49,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         _;
     }
 
-    function initialize(
-        address accessControl,
-        address registry_,
-        address feeManager_
-    ) public initializer {
+    function initialize(address accessControl, address registry_, address feeManager_) public initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -60,7 +58,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         feeManager = CoreFeeManager(feeManager_);
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
+                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
                 block.chainid,
                 address(this)
             )
@@ -74,7 +72,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         uint256 amount,
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
-        address val = registry.getModuleService(moduleId, keccak256(bytes("Validator")));
+        address val = registry.getModuleService(moduleId, keccak256(bytes('Validator')));
         if (!IValidator(val).isAllowed(token)) revert NotAllowedToken();
         // Skip signature verification for automation bots and trusted relayers
         if (
@@ -84,18 +82,10 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         ) {
             bytes32 digest = keccak256(
                 abi.encodePacked(
-                    "\x19\x01",
+                    '\x19\x01',
                     DOMAIN_SEPARATOR,
                     keccak256(
-                        abi.encode(
-                            PROCESS_TYPEHASH,
-                            payer,
-                            moduleId,
-                            token,
-                            amount,
-                            nonces[payer]++,
-                            block.chainid
-                        )
+                        abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonces[payer]++, block.chainid)
                     )
                 )
             );
@@ -108,7 +98,6 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         IERC20(token).forceApprove(address(feeManager), 0);
         netAmount = amount - fee;
         IERC20(token).safeTransfer(msg.sender, netAmount);
-
 
         emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId);
     }

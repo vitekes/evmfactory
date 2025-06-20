@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../core/Registry.sol";
-import "../../interfaces/IGateway.sol";
-import "../../core/AccessControlCenter.sol";
-import "../../shared/AccessManaged.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "../../lib/SignatureLib.sol";
-import "../../errors/Errors.sol";
+import '../../core/Registry.sol';
+import '../../interfaces/IGateway.sol';
+import '../../core/AccessControlCenter.sol';
+import '../../shared/AccessManaged.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import '../../lib/SignatureLib.sol';
+import '../../errors/Errors.sol';
 
 /// @title Marketplace
 /// @notice Minimal marketplace example demonstrating registration of sales and
@@ -27,7 +27,6 @@ contract Marketplace is AccessManaged {
         bool active;
     }
 
-
     uint256 public nextId;
     mapping(uint256 => OnchainListing) public listings;
 
@@ -35,34 +34,27 @@ contract Marketplace is AccessManaged {
 
     bytes32 public DOMAIN_SEPARATOR;
 
-    event MarketplaceListingCreated(
-        uint256 indexed id,
-        address indexed seller,
-        address token,
-        uint256 price
-    );
+    event MarketplaceListingCreated(uint256 indexed id, address indexed seller, address token, uint256 price);
     event MarketplaceListingSold(uint256 indexed id, address indexed buyer);
-    event MarketplaceListingPurchased(
-        address indexed buyer,
-        bytes32 listingHash,
-        uint256 chainId
-    );
+    event MarketplaceListingPurchased(address indexed buyer, bytes32 listingHash, uint256 chainId);
     /// @notice Emitted when a listing price is updated
     /// @param hash Listing identifier hash
     /// @param oldPrice Previous price
     /// @param newPrice New price value
     event ListingUpdated(bytes32 indexed hash, uint256 oldPrice, uint256 newPrice);
 
-    constructor(address _registry, address paymentGateway, bytes32 moduleId)
-        AccessManaged(Registry(_registry).getCoreService(keccak256("AccessControlCenter")))
-    {
+    constructor(
+        address _registry,
+        address paymentGateway,
+        bytes32 moduleId
+    ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
-        registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+        registry.setModuleServiceAlias(MODULE_ID, 'PaymentGateway', paymentGateway);
 
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
+                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
                 block.chainid,
                 address(this)
             )
@@ -99,9 +91,8 @@ contract Marketplace is AccessManaged {
         OnchainListing storage l = listings[id];
         if (!l.active) revert NotListed();
 
-        uint256 netAmount = IGateway(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, l.token, msg.sender, l.price, "");
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+            .processPayment(MODULE_ID, l.token, msg.sender, l.price, '');
 
         IERC20(l.token).safeTransfer(l.seller, netAmount);
 
@@ -124,9 +115,8 @@ contract Marketplace is AccessManaged {
         }
         if (!chainAllowed) revert InvalidChain();
 
-        uint256 netAmount = IGateway(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, listing.token, msg.sender, listing.price, "");
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+            .processPayment(MODULE_ID, listing.token, msg.sender, listing.price, '');
 
         IERC20(listing.token).safeTransfer(listing.seller, netAmount);
 
@@ -136,6 +126,6 @@ contract Marketplace is AccessManaged {
 
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
         bytes32 structHash = SignatureLib.hashListing(listing);
-        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
     }
 }
