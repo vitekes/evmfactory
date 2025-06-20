@@ -32,7 +32,8 @@
     "deploy:mocks": "npx hardhat ignition deploy ignition/modules/MockModule.ts --network localhost",
     "prepare": "husky install",
     "lint": "prettier --check \"contracts/**/*.sol\"",
-    "lint:fix": "prettier --write \"contracts/**/*.sol\""
+    "lint:fix": "prettier --write \"contracts/**/*.sol\"",
+    "stress": "ts-node scripts/stress.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
