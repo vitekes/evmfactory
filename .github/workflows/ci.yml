@@ -40,7 +40,7 @@ jobs:
 
       # 7) Run Hardhat JS tests (e2e/integration)
       - name: Run Hardhat tests
-        run: npx hardhat test
+        run: npm test
 
       # 8) Forge coverage report + coverage gate (≥90%)
       - name: Forge coverage
@@ -50,7 +50,7 @@ jobs:
 
       # 9) Hardhat coverage (using solidity-coverage)
       - name: Hardhat coverage
-        run: npm run coverage:hardhat
+        run: npm run coverage
 
       # 10) Static analysis with Slither
       - name: Slither static analysis
