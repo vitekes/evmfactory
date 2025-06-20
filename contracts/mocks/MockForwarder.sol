@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../core/AccessControlCenter.sol";
+import '../core/AccessControlCenter.sol';
 
 contract MockForwarder {
     AccessControlCenter public access;
