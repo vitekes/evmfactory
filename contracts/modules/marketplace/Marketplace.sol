@@ -99,7 +99,6 @@ contract Marketplace is AccessManaged {
         l.active = false;
         emit MarketplaceListingSold(id, msg.sender);
     }
-
     /// @notice Purchase a lazily listed item using EIP-712 signature
     function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external {
         bytes32 listingHash = hashListing(listing);
