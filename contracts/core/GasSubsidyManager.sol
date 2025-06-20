@@ -67,7 +67,15 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         _;
     }
 
-    /// @notice Refund gas to relayer with per-transaction limit check
+    /// @notice Refund execution gas to the relayer.
+    /// @dev Checks the per-transaction refund limit set via {setGasRefundLimit}.
+    ///      Reverts with {RefundDisabled} if refunds are disabled, {GasZero} if
+    ///      `gasUsed` is zero, {ExceedsRefundLimit} if the refund exceeds the
+    ///      module limit, or {InsufficientBalance} when funds are insufficient.
+    /// @param moduleId Identifier of the module requesting the refund.
+    /// @param relayer Address that paid for the transaction gas.
+    /// @param gasUsed Amount of gas to refund.
+    /// @param priorityCap Priority fee cap used to calculate the gas price.
     function refundGas(
         bytes32 moduleId,
         address payable relayer,

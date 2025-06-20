@@ -182,8 +182,11 @@ contract SubscriptionManager is AccessManaged {
         emit SubscriptionCharged(user, s.planHash, plan.price, s.nextBilling);
     }
 
-    /// @notice Charge multiple users in a single transaction
-    /// @param users List of subscriber addresses
+    /// @notice Charge multiple subscribers in a single transaction.
+    /// @dev Processes up to `batchLimit` addresses if the provided array is
+    ///      larger. Reverts with {NoPlan} or {NotDue} for each user that cannot
+    ///      be charged.
+    /// @param users Array of subscriber addresses to charge.
     function chargeBatch(address[] calldata users) external onlyAutomation {
         uint256 limit = users.length;
         if (batchLimit > 0 && limit > batchLimit) {
@@ -202,7 +205,8 @@ contract SubscriptionManager is AccessManaged {
         batchLimit = newLimit;
     }
 
-    /// @notice Cancel caller's subscription
+    /// @notice Cancel the caller's subscription and delete their state.
+    /// @dev Emits {Unsubscribed} and {PlanCancelled}.
     function unsubscribe() external {
         Subscriber memory s = subscribers[msg.sender];
         delete subscribers[msg.sender];
