@@ -140,3 +140,113 @@ describe("SubscriptionManager permit", function () {
     await expect(manager.subscribe(plan, sigMerchant, permitSig)).to.be.reverted;
   });
 });
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+
+describe("SubscriptionManager unsubscribe", function () {
+  it("removes subscriber on unsubscribe", async function () {
+    const [owner, merchant] = await ethers.getSigners();
+
+    const Token = await ethers.getContractFactory("TestToken");
+    const token = await Token.deploy("Test", "TST");
+
+    const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+    const acl = await ACL.deploy();
+
+    const Registry = await ethers.getContractFactory("MockRegistry");
+    const registry = await Registry.deploy();
+    await registry.setCoreService(ethers.keccak256(Buffer.from("AccessControlCenter")), await acl.getAddress());
+
+    const Gateway = await ethers.getContractFactory("MockPaymentGateway");
+    const gateway = await Gateway.deploy();
+
+    const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const Manager = await ethers.getContractFactory("SubscriptionManager");
+    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+
+    const plan = {
+      chainIds: [31337n],
+      price: ethers.parseEther("1"),
+      period: 100n,
+      token: await token.getAddress(),
+      merchant: merchant.address,
+      salt: 1n,
+      expiry: 0n,
+    } as const;
+
+    const planHash = await manager.hashPlan(plan);
+    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+
+    await token.approve(await gateway.getAddress(), plan.price);
+    await manager.subscribe(plan, sigMerchant, "0x");
+
+    const unsubTx = await manager.unsubscribe();
+    await expect(unsubTx).to.emit(manager, "Unsubscribed").withArgs(owner.address, planHash);
+    await expect(unsubTx).to.emit(manager, "PlanCancelled").withArgs(owner.address, planHash, anyValue);
+
+    const sub = await manager.subscribers(owner.address);
+    expect(sub.nextBilling).to.equal(0);
+    expect(sub.planHash).to.equal(ethers.ZeroHash);
+  });
+});
+
+describe("SubscriptionManager batch charge", function () {
+  it("charges multiple subscribers", async function () {
+    const signers = await ethers.getSigners();
+    const owner = signers[0];
+    const merchant = signers[1];
+    const users = signers.slice(2, 12);
+
+    const Token = await ethers.getContractFactory("TestToken");
+    const token = await Token.deploy("Test", "TST");
+
+    const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
+    const acl = await ACL.deploy();
+
+    const Registry = await ethers.getContractFactory("MockRegistry");
+    const registry = await Registry.deploy();
+    await registry.setCoreService(ethers.keccak256(Buffer.from("AccessControlCenter")), await acl.getAddress());
+
+    const Gateway = await ethers.getContractFactory("MockPaymentGateway");
+    const gateway = await Gateway.deploy();
+
+    const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const Manager = await ethers.getContractFactory("SubscriptionManager");
+    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+
+    const plan = {
+      chainIds: [31337n],
+      price: ethers.parseEther("1"),
+      period: 100n,
+      token: await token.getAddress(),
+      merchant: merchant.address,
+      salt: 1n,
+      expiry: 0n,
+    } as const;
+
+    const planHash = await manager.hashPlan(plan);
+    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+
+    for (const u of users) {
+      await token.transfer(u.address, ethers.parseEther("10"));
+      await token.connect(u).approve(await gateway.getAddress(), plan.price);
+      await manager.connect(u).subscribe(plan, sigMerchant, "0x");
+    }
+
+    const subsBefore = await Promise.all(users.map(u => manager.subscribers(u.address)));
+
+    await ethers.provider.send("evm_increaseTime", [Number(plan.period)]);
+    await ethers.provider.send("evm_mine", []);
+
+    const merchantBal0 = await token.balanceOf(merchant.address);
+    const userAddrs = users.map(u => u.address);
+    await manager.chargeBatch(userAddrs);
+    const merchantBal1 = await token.balanceOf(merchant.address);
+
+    expect(merchantBal1 - merchantBal0).to.equal(plan.price * BigInt(users.length));
+
+    for (let i = 0; i < users.length; i++) {
+      const after = await manager.subscribers(users[i].address);
+      expect(after.nextBilling).to.equal(subsBefore[i].nextBilling + plan.period);
+    }
+  });
+});
