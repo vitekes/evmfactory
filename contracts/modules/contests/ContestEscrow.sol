@@ -8,6 +8,7 @@ import '../../shared/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestEscrow.sol';
+import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -38,7 +39,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     event GasRefunded(address indexed to, uint256 amount);
 
     /// @dev Identifier used when interacting with registry services
-    bytes32 public constant MODULE_ID = keccak256('Contest');
+    bytes32 public constant MODULE_ID = CoreDefs.CONTEST_MODULE_ID;
 
     modifier onlyCreator() {
         if (msg.sender != creator) revert NotCreator();
