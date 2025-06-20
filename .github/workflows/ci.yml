@@ -1,28 +1,57 @@
 name: CI
-on: [pull_request]
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
+      # 1) Checkout repository
       - uses: actions/checkout@v3
+
+      # 2) Set up Node.js (for Hardhat / front-end)
       - uses: actions/setup-node@v3
         with:
-          node-version: 20
-      - run: npm install
+          node-version: '20'
+
+      # 3) Install Foundry toolchain
       - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      # 4) Install Solidity library dependencies
+      - name: Forge install libraries
         run: |
-          curl -L https://foundry.paradigm.xyz | bash
-          export PATH="$HOME/.foundry/bin:$PATH"
-          foundryup
-      - run: forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts@v5.3.0 OpenZeppelin/openzeppelin-contracts-upgradeable@v5.3.0
-      - run: forge test -vv
-      - run: npx hardhat test
-      - name: Forge Coverage
+          forge install foundry-rs/forge-std
+          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.3.0
+
+      # 5) Install JS dependencies
+      - name: Install NPM dependencies
+        run: npm ci
+
+      # 6) Run Foundry unit and fuzz tests
+      - name: Run Foundry tests
+        run: forge test -vv
+
+      # 7) Run Hardhat JS tests (e2e/integration)
+      - name: Run Hardhat tests
+        run: npx hardhat test
+
+      # 8) Forge coverage report + coverage gate (≥90%)
+      - name: Forge coverage
         run: |
           forge coverage --report lcov
           bash .github/check-coverage.sh 90
-      - name: Hardhat Coverage
-        run: npm run coverage:hardhat
-      - name: Slither Static Analysis
-        run: slither . --fail-on-issue High
 
+      # 9) Hardhat coverage (using solidity-coverage)
+      - name: Hardhat coverage
+        run: npm run coverage:hardhat
+
+      # 10) Static analysis with Slither
+      - name: Slither static analysis
+        run: slither . --fail-on-issue High
