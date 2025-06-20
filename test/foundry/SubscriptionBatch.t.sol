@@ -4,14 +4,14 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {SubscriptionManager} from "contracts/modules/subscriptions/SubscriptionManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
-import {MockAccessControlCenterAuto} from "contracts/mocks/MockAccessControlCenterAuto.sol";
+import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 
 contract SubscriptionBatchTest is Test {
     MockRegistry registry;
-    MockAccessControlCenterAuto acc;
+    AccessControlCenter acc;
     MockPaymentGateway gateway;
     SubscriptionManager manager;
     TestToken token;
@@ -24,7 +24,10 @@ contract SubscriptionBatchTest is Test {
     function setUp() public {
         merchant = vm.addr(merchantPk);
 
-        acc = new MockAccessControlCenterAuto();
+        acc = new AccessControlCenter();
+        acc.initialize(address(this));
+        acc.grantRole(acc.AUTOMATION_ROLE(), address(this));
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
         gateway = new MockPaymentGateway();

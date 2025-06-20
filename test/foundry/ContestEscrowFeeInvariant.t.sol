@@ -5,18 +5,20 @@ import "forge-std/Test.sol";
 import {ContestEscrow} from "contracts/modules/contests/ContestEscrow.sol";
 import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.sol";
 import {Registry} from "contracts/core/Registry.sol";
-import {MockAccessControlCenter} from "contracts/mocks/MockAccessControlCenter.sol";
+import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 
 contract ContestEscrowFeeInvariantTest is Test {
     Registry registry;
-    MockAccessControlCenter acc;
+    AccessControlCenter acc;
     TestToken token;
 
     bytes32 constant MODULE_ID = keccak256("Contest");
 
     function setUp() public {
-        acc = new MockAccessControlCenter();
+        acc = new AccessControlCenter();
+        acc.initialize(address(this));
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         registry = new Registry();
         registry.initialize(address(acc));
         registry.registerFeature(MODULE_ID, address(1), 0);

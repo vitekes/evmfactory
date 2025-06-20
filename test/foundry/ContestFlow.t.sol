@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {MockAccessControlCenter} from "contracts/mocks/MockAccessControlCenter.sol";
+import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {Registry} from "contracts/core/Registry.sol";
 import {ContestEscrow} from "contracts/modules/contests/ContestEscrow.sol";
 import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.sol";
@@ -26,7 +26,7 @@ contract MockNFTManager {
 
 contract ContestFlowTest is Test {
     Registry registry;
-    MockAccessControlCenter acc;
+    AccessControlCenter acc;
     TestToken token;
     MockRouter router;
     MockNFTManager nft;
@@ -34,7 +34,9 @@ contract ContestFlowTest is Test {
     bytes32 constant MODULE_ID = keccak256("Contest");
 
     function setUp() public {
-        acc = new MockAccessControlCenter();
+        acc = new AccessControlCenter();
+        acc.initialize(address(this));
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         registry = new Registry();
         registry.initialize(address(acc));
         registry.registerFeature(MODULE_ID, address(1), 0);
