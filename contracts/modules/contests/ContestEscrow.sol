@@ -78,6 +78,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     }
 
     function finalize(address[] calldata _winners) external nonReentrant onlyCreator {
+        if (isFinalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
         if (winners.length == 0) {
