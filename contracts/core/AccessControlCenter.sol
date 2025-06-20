@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "../errors/Errors.sol";
+import '@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '../errors/Errors.sol';
 
 contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     // Роли
-    bytes32 public constant FEATURE_OWNER_ROLE = keccak256("FEATURE_OWNER_ROLE");
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
-    bytes32 public constant MODULE_ROLE = keccak256("MODULE_ROLE");
+    bytes32 public constant FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
+    bytes32 public constant OPERATOR_ROLE = keccak256('OPERATOR_ROLE');
+    bytes32 public constant RELAYER_ROLE = keccak256('RELAYER_ROLE');
+    bytes32 public constant MODULE_ROLE = keccak256('MODULE_ROLE');
     /// Role for automated keepers/cron jobs
-    bytes32 public constant AUTOMATION_ROLE = keccak256("AUTOMATION_ROLE");
+    bytes32 public constant AUTOMATION_ROLE = keccak256('AUTOMATION_ROLE');
     /// Role for managing token validators
-    bytes32 public constant GOVERNOR_ROLE = keccak256("GOVERNOR_ROLE");
+    bytes32 public constant GOVERNOR_ROLE = keccak256('GOVERNOR_ROLE');
 
     function initialize(address admin) public initializer {
         __AccessControl_init();

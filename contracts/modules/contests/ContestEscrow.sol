@@ -1,34 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../core/Registry.sol";
-import "../../core/PaymentGateway.sol";
-import "../../core/EventRouter.sol";
-import "../../shared/NFTManager.sol";
-import "../../errors/Errors.sol";
-import "./shared/PrizeInfo.sol";
-import "./interfaces/IContestEscrow.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import '../../core/Registry.sol';
+import '../../core/PaymentGateway.sol';
+import '../../core/EventRouter.sol';
+import '../../shared/NFTManager.sol';
+import '../../errors/Errors.sol';
+import './shared/PrizeInfo.sol';
+import './interfaces/IContestEscrow.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /// @notice Ошибки для экономии газа вместо строковых require
-    error ContestAlreadyFinalized();
-    error WrongWinnersCount();
+error ContestAlreadyFinalized();
+error WrongWinnersCount();
 
 contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    Registry    public immutable registry;
-    address     public immutable creator;
+    Registry public immutable registry;
+    address public immutable creator;
     PrizeInfo[] public prizes;
-    address     public commissionToken;
-    uint256     public commissionFee;
+    address public commissionToken;
+    uint256 public commissionFee;
     /// @notice Pool of commission tokens to refund gas to the creator
-    uint256     public gasPool;
-    bool        public isFinalized;
-    address[]   public winners;
-    uint256     public processedWinners;
-    uint8       public maxWinnersPerTx = 20;
+    uint256 public gasPool;
+    bool public isFinalized;
+    address[] public winners;
+    uint256 public processedWinners;
+    uint8 public maxWinnersPerTx = 20;
 
     event MonetaryPrizePaid(address indexed to, uint256 amount);
     event PromoPrizeIssued(uint8 indexed slot, address indexed to, string uri);
@@ -38,7 +38,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     event GasRefunded(address indexed to, uint256 amount);
 
     /// @dev Identifier used when interacting with registry services
-    bytes32 public constant MODULE_ID = keccak256("Contest");
+    bytes32 public constant MODULE_ID = keccak256('Contest');
 
     modifier onlyCreator() {
         if (msg.sender != creator) revert NotCreator();
@@ -46,20 +46,20 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     }
 
     constructor(
-        Registry    _registry,
-        address     _creator,
+        Registry _registry,
+        address _creator,
         PrizeInfo[] memory _prizes,
-        address     _commissionToken,
-        uint256     _commissionFee,
-        uint256     _initialGasPool,
+        address _commissionToken,
+        uint256 _commissionFee,
+        uint256 _initialGasPool,
         address[] memory /* _judges */, // unused for now
         bytes memory /* _metadata */
     ) {
-        registry        = _registry;
-        creator         = _creator;
+        registry = _registry;
+        creator = _creator;
         commissionToken = _commissionToken;
-        commissionFee   = _commissionFee;
-        gasPool         = _initialGasPool;
+        commissionFee = _commissionFee;
+        gasPool = _initialGasPool;
         for (uint i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
         }
@@ -77,11 +77,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         }
     }
 
-    function finalize(address[] calldata _winners)
-    external
-    nonReentrant
-    onlyCreator
-    {
+    function finalize(address[] calldata _winners) external nonReentrant onlyCreator {
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
         if (winners.length == 0) {
@@ -97,9 +93,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         for (uint8 i = uint8(start); i < end; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.amount > 0) {
-                uint256 amount = p.distribution == 0
-                    ? p.amount
-                    : _computeDescending(p.amount, i);
+                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, i);
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
@@ -123,28 +117,24 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             isFinalized = true;
 
             // уведомляем остальные модули
-            EventRouter(
-                registry.getModuleService(MODULE_ID, keccak256(bytes("EventRouter")))
-            ).route(
+            EventRouter(registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')))).route(
                 EventRouter.EventKind.ContestFinalized,
                 abi.encode(creator, winners, prizes)
             );
 
             // чеканим бейджи
             string[] memory uris = new string[](winners.length);
-            NFTManager(
-                registry.getModuleService(MODULE_ID, keccak256(bytes("NFTManager")))
-            ).mintBatch(winners, uris, false);
+            NFTManager(registry.getModuleService(MODULE_ID, keccak256(bytes('NFTManager')))).mintBatch(
+                winners,
+                uris,
+                false
+            );
 
             emit ContestFinalized(winners);
         }
     }
 
-    function _computeDescending(uint256 amount, uint8 idx)
-    internal
-    view
-    returns (uint256)
-    {
+    function _computeDescending(uint256 amount, uint8 idx) internal view returns (uint256) {
         uint256 n = prizes.length;
         uint256 rankWeight = n - idx;
         uint256 sumWeights = (n * (n + 1)) / 2;

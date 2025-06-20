@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./AccessControlCenter.sol";
-import "../errors/Errors.sol";
+import './AccessControlCenter.sol';
+import '../errors/Errors.sol';
 
 /// @title MultiValidator
 /// @notice Module-specific token whitelist deployed via minimal proxy clones.
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract MultiValidator is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;

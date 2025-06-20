@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../core/Registry.sol";
-import "../../interfaces/IGateway.sol";
-import "../../core/AccessControlCenter.sol";
-import "../../shared/AccessManaged.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "../../interfaces/IPermit2.sol";
-import "../../lib/SignatureLib.sol";
-import "../../errors/Errors.sol";
+import '../../core/Registry.sol';
+import '../../interfaces/IGateway.sol';
+import '../../core/AccessControlCenter.sol';
+import '../../shared/AccessManaged.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
+import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import '../../interfaces/IPermit2.sol';
+import '../../lib/SignatureLib.sol';
+import '../../errors/Errors.sol';
 
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
@@ -24,12 +24,10 @@ contract SubscriptionManager is AccessManaged {
     /// @notice Identifier of the module within the registry
     bytes32 public immutable MODULE_ID;
 
-
-
     /// @notice Subscription data for a user
     struct Subscriber {
         uint256 nextBilling; // timestamp of the next charge
-        bytes32 planHash;    // plan this user is subscribed to
+        bytes32 planHash; // plan this user is subscribed to
     }
 
     /// @notice Registered plans by their hash
@@ -69,16 +67,18 @@ contract SubscriptionManager is AccessManaged {
     /// @param _registry Address of the core Registry contract
     /// @param paymentGateway Payment gateway used to process fees
     /// @param moduleId Unique module identifier
-    constructor(address _registry, address paymentGateway, bytes32 moduleId)
-        AccessManaged(Registry(_registry).getCoreService(keccak256("AccessControlCenter")))
-    {
+    constructor(
+        address _registry,
+        address paymentGateway,
+        bytes32 moduleId
+    ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
-        registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", paymentGateway);
+        registry.setModuleServiceAlias(MODULE_ID, 'PaymentGateway', paymentGateway);
 
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
+                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
                 block.chainid,
                 address(this)
             )
@@ -98,7 +98,7 @@ contract SubscriptionManager is AccessManaged {
     /// @return Hash to be signed by the merchant
     function hashPlan(SignatureLib.Plan calldata plan) public view returns (bytes32) {
         bytes32 structHash = SignatureLib.hashPlan(plan);
-        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
     }
 
     /// @notice Subscribe caller to a plan
@@ -119,45 +119,23 @@ contract SubscriptionManager is AccessManaged {
         if (!chainAllowed) revert InvalidChain();
 
         if (permitSig.length > 0) {
-            (
-                uint256 deadline,
-                uint8 v,
-                bytes32 r,
-                bytes32 s
-            ) = abi.decode(permitSig, (uint256, uint8, bytes32, bytes32));
-            address gateway = registry.getModuleService(
-                MODULE_ID,
-                keccak256(bytes("PaymentGateway"))
+            (uint256 deadline, uint8 v, bytes32 r, bytes32 s) = abi.decode(
+                permitSig,
+                (uint256, uint8, bytes32, bytes32)
             );
-            try IERC20Permit(plan.token).permit(
-                msg.sender,
-                gateway,
-                plan.price,
-                deadline,
-                v,
-                r,
-                s
-            ) {
+            address gateway = registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway')));
+            try IERC20Permit(plan.token).permit(msg.sender, gateway, plan.price, deadline, v, r, s) {
                 // ok
             } catch {
-                address permit2 = registry.getModuleService(
-                    MODULE_ID,
-                    keccak256(bytes("Permit2"))
-                );
+                address permit2 = registry.getModuleService(MODULE_ID, keccak256(bytes('Permit2')));
                 bytes memory data = abi.encodeWithSelector(
                     IPermit2.permitTransferFrom.selector,
                     IPermit2.PermitTransferFrom({
-                        permitted: IPermit2.TokenPermissions({
-                            token: plan.token,
-                            amount: plan.price
-                        }),
+                        permitted: IPermit2.TokenPermissions({token: plan.token, amount: plan.price}),
                         nonce: 0,
                         deadline: deadline
                     }),
-                    IPermit2.SignatureTransferDetails({
-                        to: gateway,
-                        requestedAmount: plan.price
-                    }),
+                    IPermit2.SignatureTransferDetails({to: gateway, requestedAmount: plan.price}),
                     msg.sender,
                     abi.encodePacked(r, s, v)
                 );
@@ -166,25 +144,22 @@ contract SubscriptionManager is AccessManaged {
             }
         }
 
-        uint256 netAmount = IGateway(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, plan.token, msg.sender, plan.price, "");
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+            .processPayment(MODULE_ID, plan.token, msg.sender, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
         if (plans[planHash].merchant == address(0)) {
             plans[planHash] = plan;
         }
-        subscribers[msg.sender] = Subscriber({ nextBilling: block.timestamp + plan.period, planHash: planHash });
+        subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
 
         emit Subscribed(msg.sender, planHash, plan.price, plan.token);
     }
 
     /// @dev Restricts calls to automation addresses configured in ACL
     modifier onlyAutomation() {
-        AccessControlCenter acl = AccessControlCenter(
-            registry.getCoreService(keccak256("AccessControlCenter"))
-        );
+        AccessControlCenter acl = AccessControlCenter(registry.getCoreService(keccak256('AccessControlCenter')));
         if (!acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender)) revert NotAutomation();
         _;
     }
@@ -197,9 +172,8 @@ contract SubscriptionManager is AccessManaged {
         if (plan.merchant == address(0)) revert NoPlan();
         if (block.timestamp < s.nextBilling) revert NotDue();
 
-        uint256 netAmount = IGateway(
-            registry.getModuleService(MODULE_ID, keccak256(bytes("PaymentGateway")))
-        ).processPayment(MODULE_ID, plan.token, user, plan.price, "");
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, keccak256(bytes('PaymentGateway'))))
+            .processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
@@ -236,4 +210,3 @@ contract SubscriptionManager is AccessManaged {
         emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
     }
 }
-

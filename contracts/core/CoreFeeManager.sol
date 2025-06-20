@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./AccessControlCenter.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "../errors/Errors.sol";
+import './AccessControlCenter.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
+import '@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '../errors/Errors.sol';
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
@@ -50,7 +50,12 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         access = AccessControlCenter(accessControl);
     }
 
-    function collect(bytes32 moduleId, address token, address payer, uint256 amount) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 feeAmount) {
+    function collect(
+        bytes32 moduleId,
+        address token,
+        address payer,
+        uint256 amount
+    ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 feeAmount) {
         if (isZeroFeeAddress[moduleId][payer]) return 0;
 
         uint16 pFee = percentFee[moduleId][token];
@@ -68,7 +73,11 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     }
 
     /// @notice Deposit a specific amount of fees for a module without calculation
-    function depositFee(bytes32 moduleId, address token, uint256 amount) external onlyFeatureOwner nonReentrant whenNotPaused {
+    function depositFee(
+        bytes32 moduleId,
+        address token,
+        uint256 amount
+    ) external onlyFeatureOwner nonReentrant whenNotPaused {
         if (amount == 0) revert AmountZero();
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         collectedFees[moduleId][token] += amount;

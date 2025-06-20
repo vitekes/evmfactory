@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./AccessControlCenter.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "../errors/Errors.sol";
+import './AccessControlCenter.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '../errors/Errors.sol';
 
 contract Registry is Initializable, UUPSUpgradeable {
     /// @dev Хранение информации о фичах
@@ -80,7 +80,11 @@ contract Registry is Initializable, UUPSUpgradeable {
         emit ModuleServiceSet(moduleId, serviceId, addr);
     }
 
-    function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external onlyFeatureOwner {
+    function setModuleServiceAlias(
+        bytes32 moduleId,
+        string calldata serviceAlias,
+        address addr
+    ) external onlyFeatureOwner {
         bytes32 serviceId = keccak256(bytes(serviceAlias));
         setModuleService(moduleId, serviceId, addr);
         emit ModuleRegistered(moduleId, serviceAlias, addr);

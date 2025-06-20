@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../core/AccessControlCenter.sol";
-import "../errors/Errors.sol";
+import '../core/AccessControlCenter.sol';
+import '../errors/Errors.sol';
 
 abstract contract AccessManaged {
     address public immutable _ACC;

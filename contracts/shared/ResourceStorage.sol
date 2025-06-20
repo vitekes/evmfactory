@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import '@openzeppelin/contracts/access/Ownable.sol';
 
 contract ResourceStorage is Ownable {
     constructor() Ownable(msg.sender) {}
 
     struct Resource {
-        string key;     // например: "title", "description", "image", "config"
-        string value;   // IPFS-хеш, URL, markdown, JSON и т.д.
+        string key; // например: "title", "description", "image", "config"
+        string value; // IPFS-хеш, URL, markdown, JSON и т.д.
     }
 
     // itemId => хеш ключа => Resource
