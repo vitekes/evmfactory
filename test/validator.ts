@@ -46,6 +46,6 @@ describe("MultiValidator", function () {
 
     await expect(
       val.connect(attacker).addToken("0x2000000000000000000000000000000000000002")
-    ).to.be.revertedWithCustomError(val, "NotGovernor");
+    ).to.be.revertedWithCustomError(val, "Forbidden");
   });
 });

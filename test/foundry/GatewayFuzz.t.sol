@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {PaymentGateway} from "contracts/core/PaymentGateway.sol";
 import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
-import {MockAccessControlCenter} from "contracts/mocks/MockAccessControlCenter.sol";
+import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 
 contract MockValidator {
@@ -16,7 +16,7 @@ contract GatewayFuzzTest is Test {
     PaymentGateway gateway;
     CoreFeeManager fee;
     MockRegistry registry;
-    MockAccessControlCenter acc;
+    AccessControlCenter acc;
     MockValidator validator;
     TestToken token;
 
@@ -25,7 +25,9 @@ contract GatewayFuzzTest is Test {
     uint256 constant SECP256K1N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
     function setUp() public {
-        acc = new MockAccessControlCenter();
+        acc = new AccessControlCenter();
+        acc.initialize(address(this));
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
 
@@ -79,6 +81,7 @@ contract GatewayFuzzTest is Test {
 
         bytes memory sig = _sign(pkPayer, payer, amount);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), relayer);
         vm.prank(relayer);
         gateway.processPayment(MODULE_ID, address(token), payer, amount, sig);
     }
@@ -98,6 +101,7 @@ contract GatewayFuzzTest is Test {
 
         bytes memory sig = _sign(pkSender, payer, amount);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), relayer);
         vm.prank(relayer);
         vm.expectRevert("InvalidSignature()");
         gateway.processPayment(MODULE_ID, address(token), payer, amount, sig);

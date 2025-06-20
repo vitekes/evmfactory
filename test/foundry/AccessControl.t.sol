@@ -41,19 +41,19 @@ contract AccessControlTest is Test {
 
     function testAddTokenNotGovernor() public {
         vm.prank(address(1));
-        vm.expectRevert("NotGovernor()");
+        vm.expectRevert("Forbidden()");
         validator.addToken(address(token));
     }
 
     function testRemoveTokenNotGovernor() public {
         vm.prank(address(1));
-        vm.expectRevert("NotGovernor()");
+        vm.expectRevert("Forbidden()");
         validator.removeToken(address(token));
     }
 
     function testProcessPaymentNotFeatureOwner() public {
         vm.prank(address(1));
-        vm.expectRevert("NotFeatureOwner()");
+        vm.expectRevert("Forbidden()");
         gateway.processPayment(MODULE_ID, address(token), address(1), 1 ether, "");
     }
 }
