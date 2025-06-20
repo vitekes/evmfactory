@@ -16,6 +16,7 @@
     "test:help": "node test/test-runner.js --help",
     "coverage": "npx hardhat coverage",
     "coverage:unit": "npx hardhat coverage --testfiles test/unit",
+    "coverage:hardhat": "hardhat coverage",
     "node": "npx hardhat node",
     "deploy:local": "npx hardhat ignition deploy ignition/modules/LocalDeploy.ts --network localhost",
     "deploy:sepolia": "npx hardhat ignition deploy ignition/modules/PublicDeploy.ts --network sepolia --parameters sepolia.json",
@@ -31,7 +32,8 @@
     "deploy:mocks": "npx hardhat ignition deploy ignition/modules/MockModule.ts --network localhost",
     "prepare": "husky install",
     "lint": "prettier --check \"contracts/**/*.sol\"",
-    "lint:fix": "prettier --write \"contracts/**/*.sol\""
+    "lint:fix": "prettier --write \"contracts/**/*.sol\"",
+    "stress": "ts-node scripts/stress.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
@@ -48,7 +50,8 @@
     "prettier": "^3.5.3",
     "prettier-plugin-solidity": "^1.1.1",
     "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "solidity-coverage": "^0.8.16"
   },
   "dependencies": {
     "@chainlink/contracts": "^1.4.0",
