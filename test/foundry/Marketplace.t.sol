@@ -81,4 +81,67 @@ contract MarketplaceTest is Test {
         vm.expectRevert("InvalidSignature()");
         market.buy(l, sig);
     }
+
+    function testOnchainListingPurchase() public {
+        vm.prank(seller);
+        uint256 id = market.list(address(token), 1 ether);
+
+        uint256 beforeSeller = token.balanceOf(seller);
+        uint256 beforeBuyer = token.balanceOf(buyer);
+
+        vm.prank(buyer);
+        market.buy(id);
+
+        assertEq(token.balanceOf(seller), beforeSeller + 1 ether);
+        assertEq(token.balanceOf(buyer), beforeBuyer - 1 ether);
+        (, , , bool active) = market.listings(id);
+        assertFalse(active);
+    }
+
+    function testUpdateListingNotSeller() public {
+        vm.prank(seller);
+        uint256 id = market.list(address(token), 1 ether);
+
+        vm.prank(buyer);
+        vm.expectRevert("NotSeller()");
+        market.updateListingPrice(id, 2 ether);
+    }
+
+    function testBuyInactiveListing() public {
+        vm.prank(seller);
+        uint256 id = market.list(address(token), 1 ether);
+
+        vm.prank(buyer);
+        market.buy(id);
+
+        vm.prank(buyer);
+        vm.expectRevert("NotListed()");
+        market.buy(id);
+    }
+
+    function testLazyBuyWrongChain() public {
+        SignatureLib.Listing memory l = _listing();
+        l.chainIds[0] = block.chainid + 1;
+        bytes32 hash = market.hashListing(l);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(sellerPk, hash);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        vm.prank(buyer);
+        vm.expectRevert("InvalidChain()");
+        market.buy(l, sig);
+    }
+
+    function testLazyBuyExpired() public {
+        SignatureLib.Listing memory l = _listing();
+        l.expiry = uint64(block.timestamp + 1);
+        bytes32 hash = market.hashListing(l);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(sellerPk, hash);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        vm.warp(block.timestamp + 2);
+
+        vm.prank(buyer);
+        vm.expectRevert("Expired()");
+        market.buy(l, sig);
+    }
 }
