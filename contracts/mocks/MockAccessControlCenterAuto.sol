@@ -27,6 +27,8 @@ contract MockAccessControlCenterAuto {
     function grantRole(bytes32, address) external {}
 
     function hasRole(bytes32 role, address) external pure returns (bool) {
-        return role == keccak256('FEATURE_OWNER_ROLE') || role == keccak256('AUTOMATION_ROLE');
+        return role == keccak256('FEATURE_OWNER_ROLE') ||
+            role == keccak256('AUTOMATION_ROLE') ||
+            role == keccak256('GOVERNOR_ROLE');
     }
 }
