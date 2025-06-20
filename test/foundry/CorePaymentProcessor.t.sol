@@ -6,7 +6,7 @@ import {PaymentGateway} from "contracts/core/PaymentGateway.sol";
 import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {MultiValidator} from "contracts/core/MultiValidator.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
-import {MockAccessControlCenter} from "contracts/mocks/MockAccessControlCenter.sol";
+import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 
 contract CorePaymentProcessorTest is Test {
@@ -14,23 +14,29 @@ contract CorePaymentProcessorTest is Test {
     CoreFeeManager fee;
     MultiValidator validator;
     MockRegistry registry;
-    MockAccessControlCenter acc;
+    AccessControlCenter acc;
     TestToken token;
 
     bytes32 constant MODULE_ID = keccak256("Core");
 
     function setUp() public {
-        acc = new MockAccessControlCenter();
+        acc = new AccessControlCenter();
+        acc.initialize(address(this));
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
 
         fee = new CoreFeeManager();
         fee.initialize(address(acc));
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
+
         gateway = new PaymentGateway();
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
         gateway.initialize(address(acc), address(registry), address(fee));
 
         validator = new MultiValidator();
+        // grant admin role to validator so it can assign governor role on init
+        acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(validator));
         validator.initialize(address(acc));
         registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
