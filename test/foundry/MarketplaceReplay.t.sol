@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {Marketplace} from "contracts/modules/marketplace/Marketplace.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
@@ -10,12 +9,13 @@ import {MultiValidator} from "contracts/core/MultiValidator.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 import {TestHelper} from "./TestHelper.sol";
+import {MarketplaceForTest} from "./MarketplaceForTest.sol";
 
 contract MarketplaceReplayTest is Test {
     MockRegistry registry;
     AccessControlCenter acc;
     MockPaymentGateway gateway;
-    Marketplace market;
+    MarketplaceForTest public market;
     MultiValidator validator;
     TestToken token;
 
@@ -39,7 +39,12 @@ contract MarketplaceReplayTest is Test {
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
-        market = new Marketplace(address(registry), address(gateway), MODULE_ID);
+        MarketplaceForTest market = new MarketplaceForTest(
+            address(registry),
+            address(gateway),
+            MODULE_ID
+        );
+        market = new MarketplaceForTest();
         validator = new MultiValidator();
         acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(validator));
         validator.initialize(address(acc));
