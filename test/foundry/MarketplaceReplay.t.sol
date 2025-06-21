@@ -45,9 +45,12 @@ contract MarketplaceReplayTest is Test {
         validator.initialize(address(acc));
         registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(market));
-        acc.grantRole(acc.MODULE_ROLE(), address(market));
-        acc.grantRole(acc.GOVERNOR_ROLE(), address(validator));
+        TestHelper.grantRolesForModule(
+            acc,
+            address(market),
+            address(validator),
+            address(0)
+        );
 
         address[] memory gov;
         address[] memory fo = new address[](2);

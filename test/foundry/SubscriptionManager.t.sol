@@ -57,10 +57,12 @@ contract SubscriptionManagerTest is Test {
 
         acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(gateway));
         // Additional roles for subscription manager
-        acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(manager));
-        acl.grantRole(acl.MODULE_ROLE(), address(manager));
-        acl.grantRole(acl.AUTOMATION_ROLE(), automationBot);
-        acl.grantRole(acl.GOVERNOR_ROLE(), address(validator));
+        TestHelper.grantRolesForModule(
+            acl,
+            address(manager),
+            address(validator),
+            automationBot
+        );
         acl.grantRole(acl.AUTOMATION_ROLE(), address(manager));
 
         vm.stopPrank();
