@@ -39,6 +39,8 @@ contract MarketplaceReplayTest is Test {
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
+        address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+        acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), predicted);
         market = new Marketplace(address(registry), address(gateway), MODULE_ID);
         validator = new MultiValidator();
         acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(validator));
