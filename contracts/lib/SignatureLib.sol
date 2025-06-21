@@ -69,9 +69,7 @@ library SignatureLib {
         uint256 nonce,
         uint256 chainId
     ) internal pure returns (bytes32) {
-        bytes32 structHash = keccak256(
-            abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonce, chainId)
-        );
+        bytes32 structHash = keccak256(abi.encode(PROCESS_TYPEHASH, payer, moduleId, token, amount, nonce, chainId));
         return _hashTypedDataV4(domainSeparator, structHash);
     }
 }

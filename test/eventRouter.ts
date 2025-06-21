@@ -52,17 +52,24 @@ describe("EventRouter", function () {
     expect(token).to.equal(ethers.ZeroAddress);
     expect(price).to.equal(42n);
 
-    // PlanCancelled
+    // SubscriptionCharged
     const planHash = ethers.keccak256(ethers.toUtf8Bytes("plan"));
-    const payloadPlan = coder.encode(["address", "bytes32", "uint256"], [owner.address, planHash, 7n]);
+    const payloadPlan = coder.encode(
+      ["address", "bytes32", "uint256", "uint256"],
+      [owner.address, planHash, 42n, 7n]
+    );
     tx = await router.route(2, payloadPlan);
     rc = await tx.wait();
     ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "EventRouted");
     expect(ev?.args.kind).to.equal(2);
-    const [user, ph, ts] = coder.decode(["address", "bytes32", "uint256"], ev?.args.payload);
+    const [user, ph, amount, nextBilling] = coder.decode(
+      ["address", "bytes32", "uint256", "uint256"],
+      ev?.args.payload
+    );
     expect(user).to.equal(owner.address);
     expect(ph).to.equal(planHash);
-    expect(ts).to.equal(7n);
+    expect(amount).to.equal(42n);
+    expect(nextBilling).to.equal(7n);
 
     // ContestFinalized
     const winners = [owner.address];

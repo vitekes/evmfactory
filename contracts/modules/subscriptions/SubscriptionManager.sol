@@ -192,9 +192,11 @@ contract SubscriptionManager is AccessManaged {
         if (batchLimit > 0 && limit > batchLimit) {
             limit = batchLimit;
         }
-        unchecked {
-            for (uint256 i = 0; i < limit; i++) {
-                charge(users[i]);
+        uint256 len = limit;
+        for (uint256 i = 0; i < len; ) {
+            charge(users[i]);
+            unchecked {
+                ++i;
             }
         }
     }

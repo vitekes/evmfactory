@@ -14,7 +14,7 @@ import './ContestEscrow.sol';
 import '../../shared/BaseFactory.sol';
 import '../../errors/Errors.sol';
 import '../../interfaces/core/ICoreFeeManager.sol';
-import '../../core/PaymentGateway.sol';
+import '../../interfaces/IPaymentGateway.sol';
 import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -110,9 +110,8 @@ contract ContestFactory is BaseFactory {
         uint256 gasShare = (netCommission * 60) / 100;
         uint256 feeShare = netCommission - gasShare;
 
-        address feeManagerAddr = address(
-            PaymentGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY)).feeManager()
-        );
+        address feeManagerAddr = IPaymentGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
+            .feeManager();
         IERC20(params.commissionToken).forceApprove(feeManagerAddr, feeShare);
         ICoreFeeManager(feeManagerAddr).depositFee(MODULE_ID, params.commissionToken, feeShare);
         IERC20(params.commissionToken).forceApprove(feeManagerAddr, 0);
