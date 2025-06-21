@@ -3,21 +3,17 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
-import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
-import {MultiValidator} from "contracts/core/MultiValidator.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
-import {TestHelper} from "./TestHelper.sol";
-import { MarketplaceForTest } from "./MarketplaceForTest.sol";
+import {Marketplace} from "contracts/modules/marketplace/Marketplace.sol";
+import {MockAccessControlCenter} from "contracts/mocks/MockAccessControlCenter.sol";
 
 
 contract MarketplaceTest is Test {
-    MarketplaceForTest public market;
+    Marketplace public market;
     MockRegistry public registry;
-    AccessControlCenter public acl;
     MockPaymentGateway public gateway;
-    MultiValidator public validator;
     TestToken public token;
 
     uint256 public sellerPk = 1;
@@ -31,40 +27,14 @@ contract MarketplaceTest is Test {
         seller = vm.addr(sellerPk);
         buyer = vm.addr(buyerPk);
 
-        vm.startPrank(address(this));
-        acl = new AccessControlCenter();
-        acl.initialize(address(this));
-
         registry = new MockRegistry();
+        MockAccessControlCenter acl = new MockAccessControlCenter();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acl));
+
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
-        MarketplaceForTest market = new MarketplaceForTest(
-            address(registry),
-            address(gateway),
-            MODULE_ID
-        );
-        validator = new MultiValidator();
-        acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), address(validator));
-        validator.initialize(address(acl));
-        registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
-        acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(gateway));
-        TestHelper.grantRolesForModule(
-            acl,
-            address(market),
-            address(validator),
-            address(0)
-        );
-
-        address[] memory gov;
-        address[] memory fo = new address[](2);
-        fo[0] = address(this);
-        fo[1] = address(market);
-        address[] memory mods = new address[](1);
-        mods[0] = address(market);
-        TestHelper.setupAclAndRoles(acl, gov, fo, mods);
-        vm.stopPrank();
+        market = new Marketplace(address(registry), address(gateway), MODULE_ID);
 
         token = new TestToken("Test", "TST");
         token.transfer(seller, 100 ether);

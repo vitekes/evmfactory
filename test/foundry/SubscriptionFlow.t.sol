@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {SubscriptionManager} from "contracts/modules/subscriptions/SubscriptionManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
+import {MockAccessControlCenterAuto} from "contracts/mocks/MockAccessControlCenterAuto.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {MultiValidator} from "contracts/core/MultiValidator.sol";
@@ -31,8 +32,7 @@ contract SubscriptionFlowTest is Test {
         user = vm.addr(userPk);
         merchant = vm.addr(merchantPk);
 
-        acl = new AccessControlCenter();
-        acl.initialize(address(this));
+        acl = AccessControlCenter(address(new MockAccessControlCenterAuto()));
         vm.startPrank(address(this));
 
         registry = new MockRegistry();
