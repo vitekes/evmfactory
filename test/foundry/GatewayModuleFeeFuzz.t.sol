@@ -34,6 +34,7 @@ contract GatewayModuleFeeFuzzTest is Test {
         fee.initialize(address(acc));
 
         gateway = new PaymentGateway();
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
         gateway.initialize(address(acc), address(registry), address(fee));
 
         validator = new AlwaysValidator();
