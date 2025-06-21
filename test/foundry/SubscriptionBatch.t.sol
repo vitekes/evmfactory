@@ -9,6 +9,7 @@ import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 import {TestHelper} from "./TestHelper.sol";
+import "contracts/errors/Errors.sol" as Errors;
 
 contract SubscriptionBatchTest is Test {
     MockRegistry registry;
@@ -137,6 +138,14 @@ contract SubscriptionBatchTest is Test {
         address[] memory users = _subscribeUsers(2);
         manager.setBatchLimit(5);
         vm.expectRevert("NotDue()");
+        manager.chargeBatch(users);
+    }
+
+    function testChargeBatchNotAutomation() public {
+        address[] memory users = new address[](1);
+        users[0] = address(1);
+        vm.prank(address(1));
+        vm.expectRevert(Errors.NotAutomation.selector);
         manager.chargeBatch(users);
     }
 }
