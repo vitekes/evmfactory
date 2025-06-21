@@ -7,15 +7,18 @@ import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
+import {MultiValidator} from "contracts/core/MultiValidator.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 import {TestHelper} from "./TestHelper.sol";
 
 contract SubscriptionManagerTest is Test {
     MockRegistry registry;
-    AccessControlCenter acc;
+    AccessControlCenter acl;
     MockPaymentGateway gateway;
     SubscriptionManager manager;
+    MultiValidator validator;
     TestToken token;
+    address automationBot = address(this);
 
     uint256 userPk = 1;
     uint256 merchantPk = 2;
@@ -28,12 +31,12 @@ contract SubscriptionManagerTest is Test {
         user = vm.addr(userPk);
         merchant = vm.addr(merchantPk);
 
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        acl = new AccessControlCenter();
+        acl.initialize(address(this));
         vm.startPrank(address(this));
 
         registry = new MockRegistry();
-        registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
+        registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acl));
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
@@ -45,10 +48,20 @@ contract SubscriptionManagerTest is Test {
         fo[1] = address(manager);
         address[] memory mods = new address[](1);
         mods[0] = address(manager);
-        TestHelper.setupAclAndRoles(acc, gov, fo, mods);
+        validator = new MultiValidator();
+        acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), address(validator));
+        validator.initialize(address(acl));
+        registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
 
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
-        acc.grantRole(acc.AUTOMATION_ROLE(), address(manager));
+        TestHelper.setupAclAndRoles(acl, gov, fo, mods);
+
+        acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(gateway));
+        // Additional roles for subscription manager
+        acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(manager));
+        acl.grantRole(acl.MODULE_ROLE(), address(manager));
+        acl.grantRole(acl.AUTOMATION_ROLE(), automationBot);
+        acl.grantRole(acl.GOVERNOR_ROLE(), address(validator));
+        acl.grantRole(acl.AUTOMATION_ROLE(), address(manager));
 
         vm.stopPrank();
 
