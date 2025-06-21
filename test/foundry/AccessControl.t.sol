@@ -8,6 +8,7 @@ import {PaymentGateway} from "contracts/core/PaymentGateway.sol";
 import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
+import "contracts/errors/Errors.sol" as Errors;
 
 contract AccessControlTest is Test {
     AccessControlCenter acc;
@@ -41,7 +42,7 @@ contract AccessControlTest is Test {
 
     function testAddTokenNotGovernor() public {
         vm.prank(address(1));
-        vm.expectRevert("NotGovernor()");
+        vm.expectRevert(Errors.NotGovernor.selector);
         validator.addToken(address(token));
     }
 
@@ -52,8 +53,9 @@ contract AccessControlTest is Test {
     }
 
     function testProcessPaymentNotFeatureOwner() public {
-        vm.prank(address(1));
-        vm.expectRevert("Forbidden()");
-        gateway.processPayment(MODULE_ID, address(token), address(1), 1 ether, "");
+        address randomUser = address(1);
+        vm.prank(randomUser);
+        vm.expectRevert(Errors.NotFeatureOwner.selector);
+        gateway.processPayment(MODULE_ID, address(token), randomUser, 1 ether, "");
     }
 }
