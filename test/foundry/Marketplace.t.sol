@@ -40,7 +40,7 @@ contract MarketplaceTest is Test {
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
-        MarketplaceForTest market = new MarketplaceForTest(
+        market = new MarketplaceForTest(
             address(registry),
             address(gateway),
             MODULE_ID

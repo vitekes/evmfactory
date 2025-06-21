@@ -25,7 +25,8 @@ contract MarketplaceForTest is Marketplace {
         bytes32 moduleId
     ) Marketplace(registry, gateway, moduleId) {
         // Вызов базового конструктора Marketplace
-        // Затем сразу назначаем тестовому контракту DEFAULT_ADMIN_ROLE
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        // Раньше здесь назначалась роль DEFAULT_ADMIN_ROLE для тестового
+        // контракта, но Marketplace больше не наследует AccessControl, поэтому
+        // дополнительных действий не требуется.
     }
 }
