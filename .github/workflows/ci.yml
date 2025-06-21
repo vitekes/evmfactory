@@ -46,12 +46,12 @@ jobs:
       - name: Forge coverage
         run: |
           forge coverage --report lcov
-          bash .github/check-coverage.sh 90
+          bash scripts/check-coverage.sh 90
 
       # 9) Hardhat coverage (using solidity-coverage)
       - name: Hardhat coverage
         run: npm run coverage
 
       # 10) Static analysis with Slither
-      - name: Slither static analysis
+      - name: Slither static
         run: slither . --fail-on-issue High
