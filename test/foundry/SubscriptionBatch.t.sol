@@ -8,6 +8,7 @@ import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
+import {TestHelper} from "./TestHelper.sol";
 
 contract SubscriptionBatchTest is Test {
     MockRegistry registry;
@@ -26,8 +27,8 @@ contract SubscriptionBatchTest is Test {
 
         acc = new AccessControlCenter();
         acc.initialize(address(this));
-        acc.grantRole(acc.AUTOMATION_ROLE(), address(this));
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
+        vm.startPrank(address(this));
+
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
         gateway = new MockPaymentGateway();
@@ -35,8 +36,18 @@ contract SubscriptionBatchTest is Test {
 
         manager = new SubscriptionManager(address(registry), address(gateway), MODULE_ID);
 
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(manager));
-        acc.grantRole(acc.MODULE_ROLE(), address(manager));
+        address[] memory gov;
+        address[] memory fo = new address[](2);
+        fo[0] = address(this);
+        fo[1] = address(manager);
+        address[] memory mods = new address[](1);
+        mods[0] = address(manager);
+        TestHelper.setupAclAndRoles(acc, gov, fo, mods);
+        acc.grantRole(acc.AUTOMATION_ROLE(), address(this));
+
+        vm.stopPrank();
+
+        token = new TestToken("Test", "TST");
 
         token = new TestToken("Test", "TST");
     }

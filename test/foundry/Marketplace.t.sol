@@ -8,6 +8,7 @@ import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
+import {TestHelper} from "./TestHelper.sol";
 
 contract MarketplaceTest is Test {
     MockRegistry registry;
@@ -30,8 +31,6 @@ contract MarketplaceTest is Test {
         vm.startPrank(address(this));
         acc = new AccessControlCenter();
         acc.initialize(address(this));
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
-        vm.stopPrank();
 
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
@@ -39,6 +38,15 @@ contract MarketplaceTest is Test {
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
         market = new Marketplace(address(registry), address(gateway), MODULE_ID);
+
+        address[] memory gov;
+        address[] memory fo = new address[](2);
+        fo[0] = address(this);
+        fo[1] = address(market);
+        address[] memory mods = new address[](1);
+        mods[0] = address(market);
+        TestHelper.setupAclAndRoles(acc, gov, fo, mods);
+        vm.stopPrank();
 
         token = new TestToken("Test", "TST");
         token.transfer(seller, 100 ether);
