@@ -44,6 +44,8 @@ contract SubscriptionBatchTest is Test {
         address[] memory mods = new address[](1);
         mods[0] = address(manager);
         TestHelper.setupAclAndRoles(acc, gov, fo, mods);
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
+        acc.grantRole(acc.AUTOMATION_ROLE(), address(manager));
         acc.grantRole(acc.AUTOMATION_ROLE(), address(this));
 
         vm.stopPrank();

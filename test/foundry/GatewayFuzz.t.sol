@@ -38,6 +38,9 @@ contract GatewayFuzzTest is Test {
         gateway = new PaymentGateway();
         gateway.initialize(address(acc), address(registry), address(fee));
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
+        acc.grantRole(acc.GOVERNOR_ROLE(), address(validator));
+
         validator = new MockValidator();
         registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));

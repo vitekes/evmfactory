@@ -39,6 +39,9 @@ contract SubscriptionFlowTest is Test {
 
         manager = new SubscriptionManager(address(registry), address(gateway), MODULE_ID);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
+        acc.grantRole(acc.AUTOMATION_ROLE(), address(manager));
+
         address[] memory gov;
         address[] memory fo = new address[](2);
         fo[0] = address(this);
