@@ -12,7 +12,7 @@ contract EventRouter is Initializable, UUPSUpgradeable {
     enum EventKind {
         Unknown,
         ListingCreated,
-        PlanCancelled,
+        SubscriptionCharged,
         ContestFinalized
     }
 
@@ -28,10 +28,10 @@ contract EventRouter is Initializable, UUPSUpgradeable {
         access = AccessControlCenter(accessControl);
     }
 
-    function route(EventKind kind, bytes calldata data) external {
+    function route(EventKind kind, bytes calldata payload) external {
         if (!access.hasRole(access.MODULE_ROLE(), msg.sender)) revert NotModule();
         if (kind == EventKind.Unknown) revert InvalidKind();
-        emit EventRouted(kind, data);
+        emit EventRouted(kind, payload);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {

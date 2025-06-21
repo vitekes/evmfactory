@@ -2,12 +2,11 @@
 pragma solidity ^0.8.28;
 
 import '../../core/Registry.sol';
-import '../../core/PaymentGateway.sol';
 import '../../core/EventRouter.sol';
 import '../../shared/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
-import './interfaces/IContestEscrow.sol';
+import '../../interfaces/IContestEscrow.sol';
 import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -92,15 +91,19 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        for (uint8 i = uint8(start); i < end; i++) {
+        uint256 len = end;
+        for (uint256 i = start; i < len; ) {
             PrizeInfo memory p = prizes[i];
             if (p.amount > 0) {
-                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, i);
+                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
-                emit PromoPrizeIssued(i, winners[i], p.uri);
+                emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
                 emit PrizeAssigned(winners[i], p.uri);
+            }
+            unchecked {
+                ++i;
             }
         }
 
