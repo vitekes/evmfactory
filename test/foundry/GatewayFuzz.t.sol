@@ -7,6 +7,7 @@ import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
+import {TestHelper} from "./TestHelper.sol";
 
 contract MockValidator {
     function isAllowed(address) external pure returns (bool) { return true; }
@@ -27,7 +28,7 @@ contract GatewayFuzzTest is Test {
     function setUp() public {
         acc = new AccessControlCenter();
         acc.initialize(address(this));
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
+        vm.startPrank(address(this));
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
 
@@ -40,6 +41,13 @@ contract GatewayFuzzTest is Test {
         validator = new MockValidator();
         registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
+
+        address[] memory gov;
+        address[] memory fo = new address[](1);
+        fo[0] = address(this);
+        address[] memory mods;
+        TestHelper.setupAclAndRoles(acc, gov, fo, mods);
+        vm.stopPrank();
 
         token = new TestToken("Test", "TST");
     }

@@ -7,6 +7,7 @@ import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
+import {TestHelper} from "./TestHelper.sol";
 
 contract AlwaysValidator {
     function isAllowed(address) external pure returns (bool) { return true; }
@@ -26,7 +27,7 @@ contract GatewayModuleFeeFuzzTest is Test {
     function setUp() public {
         acc = new AccessControlCenter();
         acc.initialize(address(this));
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
+        vm.startPrank(address(this));
         registry = new MockRegistry();
         registry.setCoreService(keccak256(bytes("AccessControlCenter")), address(acc));
 
@@ -34,11 +35,17 @@ contract GatewayModuleFeeFuzzTest is Test {
         fee.initialize(address(acc));
 
         gateway = new PaymentGateway();
-        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
         gateway.initialize(address(acc), address(registry), address(fee));
 
         validator = new AlwaysValidator();
+        address[] memory gov;
+        address[] memory fo = new address[](2);
+        fo[0] = address(this);
+        fo[1] = address(gateway);
+        address[] memory mods;
+        TestHelper.setupAclAndRoles(acc, gov, fo, mods);
         token = new TestToken("Test", "TST");
+        vm.stopPrank();
     }
 
     function _sign(uint256 pk, address payer, bytes32 moduleId, uint256 amount) internal view returns (bytes memory) {
