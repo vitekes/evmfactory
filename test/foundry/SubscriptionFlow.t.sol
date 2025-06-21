@@ -37,6 +37,9 @@ contract SubscriptionFlowTest is Test {
 
         manager = new SubscriptionManager(address(registry), address(gateway), MODULE_ID);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(manager));
+        acc.grantRole(acc.MODULE_ROLE(), address(manager));
+
         token = new TestToken("Test", "TST");
         token.transfer(user, 10 ether);
 

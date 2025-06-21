@@ -41,13 +41,13 @@ contract AccessControlTest is Test {
 
     function testAddTokenNotGovernor() public {
         vm.prank(address(1));
-        vm.expectRevert("Forbidden()");
+        vm.expectRevert("NotGovernor()");
         validator.addToken(address(token));
     }
 
     function testRemoveTokenNotGovernor() public {
         vm.prank(address(1));
-        vm.expectRevert("Forbidden()");
+        vm.expectRevert("NotGovernor()");
         validator.removeToken(address(token));
     }
 
