@@ -6,6 +6,7 @@ import {Marketplace} from "contracts/modules/marketplace/Marketplace.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
+import {MultiValidator} from "contracts/core/MultiValidator.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 import {TestHelper} from "./TestHelper.sol";
@@ -15,6 +16,7 @@ contract MarketplaceReplayTest is Test {
     AccessControlCenter acc;
     MockPaymentGateway gateway;
     Marketplace market;
+    MultiValidator validator;
     TestToken token;
 
     uint256 sellerPk = 1;
@@ -38,8 +40,14 @@ contract MarketplaceReplayTest is Test {
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
         market = new Marketplace(address(registry), address(gateway), MODULE_ID);
+        validator = new MultiValidator();
+        acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(validator));
+        validator.initialize(address(acc));
+        registry.setModuleServiceAlias(MODULE_ID, "Validator", address(validator));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(market));
         acc.grantRole(acc.MODULE_ROLE(), address(market));
+        acc.grantRole(acc.GOVERNOR_ROLE(), address(validator));
 
         address[] memory gov;
         address[] memory fo = new address[](2);
