@@ -37,6 +37,9 @@ contract MarketplaceReplayTest is Test {
 
         market = new Marketplace(address(registry), address(gateway), MODULE_ID);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(market));
+        acc.grantRole(acc.MODULE_ROLE(), address(market));
+
         token = new TestToken("Test", "TST");
         token.transfer(seller, 100 ether);
         token.transfer(buyer, 100 ether);
