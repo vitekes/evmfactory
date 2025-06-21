@@ -47,6 +47,9 @@ contract SubscriptionManagerTest is Test {
         mods[0] = address(manager);
         TestHelper.setupAclAndRoles(acc, gov, fo, mods);
 
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gateway));
+        acc.grantRole(acc.AUTOMATION_ROLE(), address(manager));
+
         vm.stopPrank();
 
         token = new TestToken("Test", "TST");
