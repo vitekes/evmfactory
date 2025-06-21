@@ -53,10 +53,12 @@ contract SubscriptionBatchTest is Test {
         TestHelper.setupAclAndRoles(acl, gov, fo, mods);
         acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(gateway));
         // Additional roles for subscription tests
-        acl.grantRole(acl.FEATURE_OWNER_ROLE(), address(manager));
-        acl.grantRole(acl.MODULE_ROLE(), address(manager));
-        acl.grantRole(acl.AUTOMATION_ROLE(), automationBot);
-        acl.grantRole(acl.GOVERNOR_ROLE(), address(validator));
+        TestHelper.grantRolesForModule(
+            acl,
+            address(manager),
+            address(validator),
+            automationBot
+        );
         // Existing automation permissions
         acl.grantRole(acl.AUTOMATION_ROLE(), address(manager));
 

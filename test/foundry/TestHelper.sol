@@ -23,4 +23,18 @@ library TestHelper {
             unchecked { ++i; }
         }
     }
+
+    function grantRolesForModule(
+        AccessControlCenter acl,
+        address moduleAddr,
+        address validatorAddr,
+        address automationBot
+    ) internal {
+        acl.grantRole(acl.FEATURE_OWNER_ROLE(), moduleAddr);
+        acl.grantRole(acl.MODULE_ROLE(), moduleAddr);
+        acl.grantRole(acl.GOVERNOR_ROLE(), validatorAddr);
+        if (automationBot != address(0)) {
+            acl.grantRole(acl.AUTOMATION_ROLE(), automationBot);
+        }
+    }
 }
