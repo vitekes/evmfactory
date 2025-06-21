@@ -40,6 +40,8 @@ contract SubscriptionFlowTest is Test {
         gateway = new MockPaymentGateway();
         registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", address(gateway));
 
+        address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+        acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), predicted);
         manager = new SubscriptionManager(address(registry), address(gateway), MODULE_ID);
         validator = new MultiValidator();
         acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), address(validator));
