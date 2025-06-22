@@ -31,7 +31,7 @@
 
 ## Quick Start
 
-1. Clone the repository and install dependencies:
+1. Ensure you are using **Node.js 20** (for example via `nvm use 20`) and install dependencies:
    ```bash
    git clone https://github.com/vitekes/evmcontest.git
    cd evmcontest
