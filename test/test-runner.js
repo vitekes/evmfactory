@@ -6,10 +6,11 @@ const { spawnSync } = require('child_process');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 // запускаем определённый в package.json скрипт test:hardhat
-const result = spawnSync(
-    npmCmd,
-    ['run', 'test:hardhat'],
-    { stdio: 'inherit' }
-);
+const result = spawnSync(npmCmd, ['run', 'test:hardhat'], { stdio: 'inherit' });
 
-process.exit(result.status);
+if (result.error) {
+    console.error('Failed to run hardhat tests:', result.error);
+    process.exit(1);
+}
+
+process.exit(result.status === null ? 1 : result.status);
