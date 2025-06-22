@@ -3,7 +3,7 @@
   "scripts": {
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
-    "test": "npx hardhat test",
+    "test": "node test/test-runner.js",
     "coverage": "npx hardhat coverage",
     "node": "npx hardhat node",
     "deploy:local": "npx hardhat ignition deploy ignition/modules/LocalDeploy.ts --network localhost",
