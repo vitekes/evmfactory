@@ -2,15 +2,16 @@ import { expect } from "chai";
 import { ethers, network } from "hardhat";
 
 async function deployFactory() {
+  const [deployer] = await ethers.getSigners();
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("USD Coin", "USDC");
 
   const ACL = await ethers.getContractFactory("AccessControlCenter");
   const acl = await ACL.deploy();
-  await acl.initialize((await ethers.getSigners())[0].address);
+  await acl.initialize(deployer.address);
   const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
-  await acl.grantRole(FACTORY_ADMIN, (await ethers.getSigners())[0].address);
-  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), (await ethers.getSigners())[0].address);
+  await acl.grantRole(FACTORY_ADMIN, deployer.address);
+  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), deployer.address);
 
   const Registry = await ethers.getContractFactory("MockRegistry");
   const registry = await Registry.deploy();
@@ -24,6 +25,12 @@ async function deployFactory() {
 
   const Validator = await ethers.getContractFactory("MultiValidator");
   const validatorLogic = await Validator.deploy();
+
+  const predictedFactory = ethers.getCreateAddress({
+    from: deployer.address,
+    nonce: await deployer.getNonce(),
+  });
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedFactory);
 
   const Factory = await ethers.getContractFactory("ContestFactory");
   const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress(), await validatorLogic.getAddress());
