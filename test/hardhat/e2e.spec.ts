@@ -1,6 +1,14 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 
+function predictCloneAddress(impl: string, salt: string, deployer: string) {
+  const prefix = "0x3d602d80600a3d3981f3363d3d373d3d3d363d73";
+  const suffix = "5af43d82803e903d91602b57fd5bf3";
+  const creationCode = prefix + impl.slice(2) + suffix;
+  const initHash = ethers.keccak256(creationCode);
+  return ethers.getCreate2Address(deployer, salt, initHash);
+}
+
 async function deployCore() {
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("USD Coin", "USDC");
@@ -24,6 +32,27 @@ async function deployCore() {
 
   const Validator = await ethers.getContractFactory("MultiValidator");
   const validatorLogic = await Validator.deploy();
+
+  const predictedFactory = ethers.getCreateAddress({
+    from: (await ethers.getSigners())[0].address,
+    nonce: (await (await ethers.getSigners())[0].getNonce()) + 1,
+  });
+  const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
+  const salt = ethers.keccak256(
+    ethers.solidityPacked([
+      "string",
+      "bytes32",
+      "address",
+    ], ["Validator", moduleId, predictedFactory])
+  );
+  const predictedValidator = predictCloneAddress(
+    await validatorLogic.getAddress(),
+    salt,
+    predictedFactory
+  );
+
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedFactory);
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedValidator);
 
   const Factory = await ethers.getContractFactory("ContestFactory");
   const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress(), await validatorLogic.getAddress());
