@@ -1,19 +1,27 @@
 // test/test-runner.js
 
-const { spawn } = require('child_process');
+const { spawnSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 // Путь к локальному бинарнику Hardhat для кросс-платформенности
-const bin = path.resolve(__dirname, '../node_modules/.bin/hardhat');
-const cmd = process.platform === 'win32' ? `${bin}.cmd` : bin;
+const binPath = path.resolve(
+    __dirname,
+    '../node_modules/.bin/hardhat' + (process.platform === 'win32' ? '.cmd' : '')
+);
 
 const args = ['test', ...process.argv.slice(2)];
 
-const child = spawn(cmd, args, { stdio: 'inherit' });
+let result;
+if (fs.existsSync(binPath)) {
+    result = spawnSync(binPath, args, { stdio: 'inherit' });
+} else {
+    const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+    result = spawnSync(npxCmd, ['hardhat', ...args], { stdio: 'inherit' });
+}
 
-child.on('error', err => {
-    console.error('Failed to run hardhat tests:', err);
-    process.exit(1);
-});
+if (result.error) {
+    console.error('Failed to run hardhat tests:', result.error);
+}
 
-child.on('exit', code => process.exit(code ?? 1));
+process.exit(result.status ?? 1);
