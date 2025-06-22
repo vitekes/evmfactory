@@ -4,19 +4,19 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Путь к локальному бинарнику Hardhat для кросс-платформенности
-const binPath = path.resolve(
+// Путь к локальному cli Hardhat для кросс-платформенности
+const cliPath = path.resolve(
     __dirname,
-    '../node_modules/.bin/hardhat' + (process.platform === 'win32' ? '.cmd' : '')
+    '../node_modules/hardhat/internal/cli/cli.js'
 );
 
 const args = ['test', ...process.argv.slice(2)];
 
 let result;
-if (fs.existsSync(binPath)) {
-    result = spawnSync(binPath, args, { stdio: 'inherit' });
+if (fs.existsSync(cliPath)) {
+    result = spawnSync(process.execPath, [cliPath, ...args], { stdio: 'inherit' });
 } else {
-    console.error('Hardhat binary not found. Did you run "npm install"?');
+    console.error('Hardhat CLI not found. Did you run "npm install"?');
     process.exit(1);
 }
 

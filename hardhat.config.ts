@@ -9,6 +9,9 @@ import "solidity-coverage";
 
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
+    paths: {
+        tests: "./test/hardhat",
+    },
     solidity: {
         version: "0.8.28",
         settings: {
