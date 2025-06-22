@@ -31,7 +31,7 @@
 
 ## Quick Start
 
-1. Clone the repository and install dependencies:
+1. Ensure you are using **Node.js 20** (for example via `nvm use 20`) and install dependencies:
    ```bash
    git clone https://github.com/vitekes/evmcontest.git
    cd evmcontest
@@ -49,8 +49,9 @@
    ```
 4. Run tests:
    ```bash
-   npm run test
+   npm test
    ```
+   (Do not use `npx test` — it installs an unrelated package.)
 
 5. Run the showcase script to see a complete contest flow:
    ```bash
