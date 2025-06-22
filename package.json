@@ -3,7 +3,7 @@
   "scripts": {
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
-    "test": "npx hardhat test",
+    "test": "node test/test-runner.js",
     "coverage": "npx hardhat coverage",
     "node": "npx hardhat node",
     "deploy:local": "npx hardhat ignition deploy ignition/modules/LocalDeploy.ts --network localhost",
@@ -29,6 +29,9 @@
     "mocha": "^10.8.2",
     "prettier": "^3.5.3",
     "prettier-plugin-solidity": "^1.1.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "typechain": "^8.3.2",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0",
     "solidity-coverage": "^0.8.16"
@@ -40,6 +43,9 @@
     "dotenv": "^16.5.0",
     "ethers": "^6.12.0",
     "solc": "0.8.30"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "compilerOptions": {
     "target": "ES2022",
