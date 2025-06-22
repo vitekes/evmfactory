@@ -24,7 +24,6 @@ const config: HardhatUserConfig = {
             url: "http://127.0.0.1:8545"
         },
         hardhat: {
-            // Встроенная тестовая сеть с возможностью форка
             gas: 200000000,
             blockGasLimit: 200000000,
             allowUnlimitedContractSize: true,

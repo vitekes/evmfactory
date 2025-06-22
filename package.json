@@ -4,6 +4,7 @@
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
     "test": "node test/test-runner.js",
+    "test:hardhat": "hardhat test",
     "coverage": "npx hardhat coverage",
     "node": "npx hardhat node",
     "deploy:local": "npx hardhat ignition deploy ignition/modules/LocalDeploy.ts --network localhost",

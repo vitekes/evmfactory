@@ -1,12 +1,15 @@
-const { spawn } = require('child_process');
-const path = require('path');
+// test/test-runner.js
 
-// Path to local Hardhat binary for cross-platform support
-const bin = path.resolve(__dirname, '../node_modules/.bin/hardhat');
-const cmd = process.platform === 'win32' ? `${bin}.cmd` : bin;
+const { spawnSync } = require('child_process');
 
-const args = ['test', ...process.argv.slice(2)];
+// на Windows нужно «npm.cmd», на *nix — «npm»
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-const child = spawn(cmd, args, { stdio: 'inherit' });
-child.on('exit', code => process.exit(code ?? 1));
+// запускаем определённый в package.json скрипт test:hardhat
+const result = spawnSync(
+    npmCmd,
+    ['run', 'test:hardhat'],
+    { stdio: 'inherit' }
+);
 
+process.exit(result.status);
