@@ -16,8 +16,8 @@ let result;
 if (fs.existsSync(binPath)) {
     result = spawnSync(binPath, args, { stdio: 'inherit' });
 } else {
-    const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    result = spawnSync(npxCmd, ['hardhat', ...args], { stdio: 'inherit' });
+    console.error('Hardhat binary not found. Did you run "npm install"?');
+    process.exit(1);
 }
 
 if (result.error) {
