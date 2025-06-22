@@ -26,9 +26,10 @@ async function deployFactory() {
   const Validator = await ethers.getContractFactory("MultiValidator");
   const validatorLogic = await Validator.deploy();
 
+  // predict the factory address after the upcoming grantRole tx
   const predictedFactory = ethers.getCreateAddress({
     from: deployer.address,
-    nonce: await deployer.getNonce(),
+    nonce: (await deployer.getNonce()) + 1,
   });
   await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedFactory);
 
