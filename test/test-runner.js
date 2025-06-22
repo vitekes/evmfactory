@@ -13,10 +13,19 @@ const cliPath = path.resolve(
 const args = ['test', ...process.argv.slice(2)];
 
 let result;
+if (!fs.existsSync(cliPath)) {
+    console.log('Hardhat CLI not found. Installing dependencies...');
+    const install = spawnSync('npm', ['install'], { stdio: 'inherit' });
+    if (install.status !== 0) {
+        console.error('Failed to install dependencies.');
+        process.exit(1);
+    }
+}
+
 if (fs.existsSync(cliPath)) {
     result = spawnSync(process.execPath, [cliPath, ...args], { stdio: 'inherit' });
 } else {
-    console.error('Hardhat CLI not found. Did you run "npm install"?');
+    console.error('Hardhat CLI still missing after install.');
     process.exit(1);
 }
 
