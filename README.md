@@ -48,6 +48,8 @@
    npx hardhat node
    npm run deploy:local
    ```
+   Before calling `createCustomContest` the creator must approve the
+   `ContestFactory` contract to transfer the entire prize pool on their behalf.
 4. Run tests:
    ```bash
    npm test
