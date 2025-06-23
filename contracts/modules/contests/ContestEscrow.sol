@@ -62,7 +62,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         gasPool = _initialGasPool;
         for (uint i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
-            if (_prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0) {
+            if (msg.sender == _creator && _prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0) {
                 IERC20 token = IERC20(_prizes[i].token);
                 uint256 balBefore = token.balanceOf(address(this));
                 if (balBefore < _prizes[i].amount) {

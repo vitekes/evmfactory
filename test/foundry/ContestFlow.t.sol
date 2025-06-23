@@ -6,6 +6,7 @@ import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {Registry} from "contracts/core/Registry.sol";
 import {ContestEscrow} from "contracts/modules/contests/ContestEscrow.sol";
 import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.sol";
+import {ContestEscrowDeployer} from "./ContestEscrowDeployer.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 
 contract MockRouter {
@@ -30,6 +31,7 @@ contract ContestFlowTest is Test {
     TestToken token;
     MockRouter router;
     MockNFTManager nft;
+    ContestEscrowDeployer deployer;
 
     bytes32 constant MODULE_ID = keccak256("Contest");
 
@@ -47,6 +49,7 @@ contract ContestFlowTest is Test {
         registry.setModuleServiceAlias(MODULE_ID, "NFTManager", address(nft));
 
         token = new TestToken("T", "T");
+        deployer = new ContestEscrowDeployer();
     }
 
     function _deployEscrow() internal returns (ContestEscrow esc) {
@@ -63,7 +66,7 @@ contract ContestFlowTest is Test {
         prizes[2] =
             PrizeInfo({prizeType: PrizeType.PROMO, token: address(0), amount: 0, distribution: 0, uri: "ipfs://promo"});
 
-        esc = new ContestEscrow(registry, address(this), prizes, address(token), 0, 0, new address[](0), "");
+        esc = deployer.deploy(registry, address(this), prizes, address(token), 0, 0);
         token.transfer(address(esc), 15 ether);
     }
 
