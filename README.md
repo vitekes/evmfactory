@@ -92,6 +92,13 @@ registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", gatewayAddress);
 
 Without this step modules won't be able to discover the gateway service.
 
+## Funding the Escrow
+
+Before creating a contest, the creator **must** approve the `ContestFactory`
+to transfer the entire prize pool. If the escrow contract is deployed without
+the necessary funds, calling `finalize()` will revert with the custom error
+`ContestFundingMissing()`.
+
 ## Как добавить модуль
 
 1. Создайте смарт‑контракты модуля и необходимые сервисы.

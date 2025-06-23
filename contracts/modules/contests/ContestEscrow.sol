@@ -60,20 +60,8 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         commissionToken = _commissionToken;
         commissionFee = _commissionFee;
         gasPool = _initialGasPool;
-        for (uint i = 0; i < _prizes.length; i++) {
+        for (uint256 i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
-            if (msg.sender == _creator && _prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0) {
-                IERC20 token = IERC20(_prizes[i].token);
-                uint256 balBefore = token.balanceOf(address(this));
-                if (balBefore < _prizes[i].amount) {
-                    uint256 missing = _prizes[i].amount - balBefore;
-                    try token.transferFrom(_creator, address(this), missing) {} catch {
-                        revert ContestFundingMissing();
-                    }
-                    uint256 balAfter = token.balanceOf(address(this));
-                    if (balAfter - balBefore == 0) revert ContestFundingMissing();
-                }
-            }
         }
         // store judges & metadata if needed
     }
@@ -106,6 +94,9 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         uint256 len = end;
         for (uint256 i = start; i < len; ) {
             PrizeInfo memory p = prizes[i];
+            if (p.prizeType == PrizeType.MONETARY && IERC20(p.token).balanceOf(address(this)) < p.amount) {
+                revert ContestFundingMissing();
+            }
             if (p.amount > 0) {
                 uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
                 IERC20(p.token).safeTransfer(winners[i], amount);
