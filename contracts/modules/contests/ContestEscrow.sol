@@ -94,12 +94,11 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         uint256 len = end;
         for (uint256 i = start; i < len; ) {
             PrizeInfo memory p = prizes[i];
-            if (p.prizeType == PrizeType.MONETARY && IERC20(p.token).balanceOf(address(this)) < p.amount) {
-                revert ContestFundingMissing();
-            }
             if (p.amount > 0) {
                 uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
-                IERC20(p.token).safeTransfer(winners[i], amount);
+                if (!IERC20(p.token).trySafeTransfer(winners[i], amount)) {
+                    revert ContestFundingMissing();
+                }
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
                 emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
