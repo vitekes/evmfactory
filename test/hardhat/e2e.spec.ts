@@ -24,7 +24,8 @@ describe("fork e2e", function () {
 
     // allow token via validator
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
-    const validatorAddr = await registry.getModuleService(moduleId, "Validator");
+    const serviceId = ethers.keccak256(ethers.toUtf8Bytes("Validator"));
+    const validatorAddr = await registry.getModuleService(moduleId, serviceId);
     await network.provider.send("hardhat_impersonateAccount", [await factory.getAddress()]);
     const factorySigner = await ethers.getSigner(await factory.getAddress());
     const validator = await ethers.getContractAt("MultiValidator", validatorAddr);

@@ -1,6 +1,18 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
+const planTypes = {
+  Plan: [
+    { name: "chainIds", type: "uint256[]" },
+    { name: "price", type: "uint256" },
+    { name: "period", type: "uint256" },
+    { name: "token", type: "address" },
+    { name: "merchant", type: "address" },
+    { name: "salt", type: "uint256" },
+    { name: "expiry", type: "uint64" },
+  ],
+};
+
 describe("SubscriptionManager permit", function () {
   it("allows subscribe with permit", async function () {
     const [owner, merchant] = await ethers.getSigners();
@@ -47,7 +59,11 @@ describe("SubscriptionManager permit", function () {
     } as const;
 
     const planHash = await manager.hashPlan(plan);
-    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+    const sigMerchant = await merchant.signTypedData(
+      { chainId: 31337, verifyingContract: await manager.getAddress() },
+      planTypes,
+      plan
+    );
 
     const nonce = await token.nonces(owner.address);
     const deadline = (await ethers.provider.getBlock("latest")).timestamp + 1000;
@@ -130,7 +146,11 @@ describe("SubscriptionManager permit", function () {
     } as const;
 
     const planHash = await manager.hashPlan(plan);
-    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+    const sigMerchant = await merchant.signTypedData(
+      { chainId: 31337, verifyingContract: await manager.getAddress() },
+      planTypes,
+      plan
+    );
 
     const nonce = await token.nonces(owner.address);
     const deadline = (await ethers.provider.getBlock("latest")).timestamp + 1000;
@@ -216,7 +236,11 @@ describe("SubscriptionManager unsubscribe", function () {
     } as const;
 
     const planHash = await manager.hashPlan(plan);
-    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+    const sigMerchant = await merchant.signTypedData(
+      { chainId: 31337, verifyingContract: await manager.getAddress() },
+      planTypes,
+      plan
+    );
 
     await token.approve(await gateway.getAddress(), plan.price);
     await manager.subscribe(plan, sigMerchant, "0x");
@@ -281,7 +305,11 @@ describe("SubscriptionManager batch charge", function () {
     } as const;
 
     const planHash = await manager.hashPlan(plan);
-    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+    const sigMerchant = await merchant.signTypedData(
+      { chainId: 31337, verifyingContract: await manager.getAddress() },
+      planTypes,
+      plan
+    );
 
     for (const u of users) {
       await token.transfer(u.address, ethers.parseEther("10"));
@@ -352,7 +380,11 @@ describe("SubscriptionManager batch charge", function () {
     } as const;
 
     const planHash = await manager.hashPlan(plan);
-    const sigMerchant = await merchant.signMessage(ethers.getBytes(planHash));
+    const sigMerchant = await merchant.signTypedData(
+      { chainId: 31337, verifyingContract: await manager.getAddress() },
+      planTypes,
+      plan
+    );
 
     await token.transfer(user.address, ethers.parseEther("10"));
     await token.connect(user).approve(await gateway.getAddress(), plan.price);
