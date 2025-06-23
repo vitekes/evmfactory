@@ -48,7 +48,11 @@ describe("Contest finalize", function () {
     const balA0 = await token.balanceOf(a.address);
     const balB0 = await token.balanceOf(b.address);
 
-    const finalizeTx = await esc.finalize([a.address, b.address, c.address]);
+    const finalizeTx = await esc.connect(creator).finalize([
+      a.address,
+      b.address,
+      c.address,
+    ]);
     await expect(finalizeTx).to.emit(esc, "MonetaryPrizePaid").withArgs(a.address, ethers.parseEther("10"));
     await expect(finalizeTx).to.emit(esc, "MonetaryPrizePaid").withArgs(b.address, ethers.parseEther("5"));
     await expect(finalizeTx).to.emit(esc, "PromoPrizeIssued").withArgs(2, c.address, "ipfs://promo");
@@ -83,11 +87,10 @@ describe("Contest finalize", function () {
     const contestAddr = getCreatedContest(rc);
     const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
 
-    await esc.finalize([a.address, b.address, c.address]);
-    await expect(esc.finalize([a.address, b.address, c.address])).to.be.revertedWithCustomError(
-      esc,
-      "ContestAlreadyFinalized"
-    );
+    await esc.connect(creator).finalize([a.address, b.address, c.address]);
+    await expect(
+      esc.connect(creator).finalize([a.address, b.address, c.address])
+    ).to.be.revertedWithCustomError(esc, "ContestAlreadyFinalized");
   });
 
   it("reverts on wrong winners count", async function () {
