@@ -29,6 +29,6 @@ describe("PaymentGateway access", function () {
     const MODULE_ID = ethers.keccak256(ethers.toUtf8Bytes("Core"));
     await expect(
       gateway.connect(user).processPayment(MODULE_ID, await token.getAddress(), user.address, ethers.parseEther("1"), "0x")
-    ).to.be.revertedWithCustomError(gateway, "Forbidden");
+    ).to.be.revertedWithCustomError(gateway, "NotFeatureOwner");
   });
 });
