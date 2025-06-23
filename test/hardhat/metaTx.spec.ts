@@ -23,7 +23,7 @@ describe("meta transaction", function () {
     await (await acc.grantRole(await acc.FEATURE_OWNER_ROLE(), await gateway.getAddress())).wait();
 
     const Validator = await ethers.getContractFactory("MultiValidator");
-    const validator = await Validator.deploy();
+    const validator: any = await Validator.deploy();
     await acc.grantRole(await acc.DEFAULT_ADMIN_ROLE(), await validator.getAddress());
     await validator.initialize(await acc.getAddress());
 

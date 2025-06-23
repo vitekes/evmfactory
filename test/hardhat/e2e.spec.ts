@@ -8,7 +8,7 @@ async function deployCore() {
 
 describe("fork e2e", function () {
   it("deploys contest and finalizes prizes", async function () {
-    if (!network.config.forking?.url) {
+    if (!(network.config as any).forking?.url) {
       console.log("Skipping: not a forked network");
       this.skip();
     }
@@ -28,7 +28,7 @@ describe("fork e2e", function () {
     const validatorAddr = await registry.getModuleService(moduleId, serviceId);
     await network.provider.send("hardhat_impersonateAccount", [await factory.getAddress()]);
     const factorySigner = await ethers.getSigner(await factory.getAddress());
-    const validator = await ethers.getContractAt("MultiValidator", validatorAddr);
+    const validator = (await ethers.getContractAt("MultiValidator", validatorAddr)) as any;
     await validator.connect(factorySigner).addToken(await token.getAddress());
     await network.provider.send("hardhat_stopImpersonatingAccount", [await factory.getAddress()]);
 
@@ -56,7 +56,7 @@ describe("fork e2e", function () {
     const rc = await tx.wait();
     const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
     const contestAddr = ev?.args[1];
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     const fee = await esc.commissionFee();
     expect(fee).to.be.gte(ethers.parseEther("5"));

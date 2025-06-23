@@ -9,7 +9,7 @@ async function allowToken(factory: any, registry: any, token: any) {
   await network.provider.send("hardhat_setBalance", [await factory.getAddress(), "0x21e19e0c9bab2400000"]);
   await network.provider.send("hardhat_impersonateAccount", [await factory.getAddress()]);
   const factorySigner = await ethers.getSigner(await factory.getAddress());
-  const validator = await ethers.getContractAt("MultiValidator", validatorAddr);
+  const validator = (await ethers.getContractAt("MultiValidator", validatorAddr)) as any;
   await validator.connect(factorySigner).addToken(await token.getAddress());
   await network.provider.send("hardhat_stopImpersonatingAccount", [await factory.getAddress()]);
 }
@@ -40,7 +40,7 @@ describe("Contest finalize", function () {
     const tx = await factory.createCustomContest(prizes, params);
     const rc = await tx.wait();
     const contestAddr = getCreatedContest(rc);
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     const expectedBalance =
       ethers.parseEther("15") + (await esc.gasPool());
@@ -87,7 +87,7 @@ describe("Contest finalize", function () {
     const tx = await factory.createCustomContest(prizes, params);
     const rc = await tx.wait();
     const contestAddr = getCreatedContest(rc);
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     await esc.connect(creator).finalize([a.address, b.address, c.address]);
     await expect(
@@ -114,13 +114,13 @@ describe("Contest finalize", function () {
     const tx = await factory.createCustomContest(prizes, params);
     const rc = await tx.wait();
     const contestAddr = getCreatedContest(rc);
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     await expect(esc.finalize([a.address, b.address])).to.be.revertedWithCustomError(esc, "WrongWinnersCount");
   });
 
   it("refunds gas to creator", async function () {
-    if (!network.config.forking?.url) {
+    if (!(network.config as any).forking?.url) {
       console.log("Skipping: not a forked network");
       this.skip();
     }
@@ -143,7 +143,7 @@ describe("Contest finalize", function () {
     const tx = await factory.createCustomContest(prizes, params);
     const rc = await tx.wait();
     const contestAddr = getCreatedContest(rc);
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     const balBefore = await token.balanceOf(creator.address);
     const gasPoolBefore = await esc.gasPool();

@@ -34,7 +34,7 @@ async function allowToken(factory: any, registry: any, token: any) {
   const validatorAddr = await registry.getModuleService(moduleId, "Validator");
   await network.provider.request({ method: "hardhat_impersonateAccount", params: [await factory.getAddress()] });
   const signer = await ethers.getSigner(await factory.getAddress());
-  const validator = await ethers.getContractAt("MultiValidator", validatorAddr);
+  const validator = (await ethers.getContractAt("MultiValidator", validatorAddr)) as any;
   await validator.connect(signer).addToken(await token.getAddress());
   await network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await factory.getAddress()] });
 }
@@ -62,7 +62,7 @@ async function main() {
   const tx = await factory.createCustomContest(prizes, params);
   const rc = await tx.wait();
   const contestAddr = getCreatedContest(rc);
-  const escrow = await ethers.getContractAt("ContestEscrow", contestAddr);
+  const escrow = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   console.log("Contest escrow:", contestAddr);
 
   const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address]);

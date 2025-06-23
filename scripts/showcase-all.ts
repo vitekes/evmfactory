@@ -30,11 +30,11 @@ async function main() {
 
   console.log("Deploying feature modules...");
   const Validator = await ethers.getContractFactory("MultiValidator");
-  const marketValidator = await Validator.deploy();
+  const marketValidator: any = await Validator.deploy();
   await marketValidator.initialize(await acl.getAddress());
   await marketValidator.addToken(await token.getAddress());
 
-  const subValidator = await Validator.deploy();
+  const subValidator: any = await Validator.deploy();
   await subValidator.initialize(await acl.getAddress());
   await subValidator.addToken(await token.getAddress());
 
@@ -89,7 +89,7 @@ async function main() {
   const rc = await tx.wait();
   const created = rc?.logs.find(l => l.fragment && l.fragment.name === "ContestCreated");
   const contestAddr = created?.args[1];
-  const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+  const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   await gateway.connect(winner); // just to silence ts
   await esc.finalize([winner.address, deployer.address]);
   console.log("Contest finalized, winner balance:", (await token.balanceOf(winner.address)).toString());
