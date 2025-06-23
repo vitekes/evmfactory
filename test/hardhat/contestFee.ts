@@ -15,6 +15,7 @@ describe("ContestFactory fee", function () {
 
     // Approve factory to pull tokens via gateway mock
   await token.approve(await gateway.getAddress(), ethers.parseEther("100"));
+  await token.approve(await factory.getAddress(), ethers.parseEther("100"));
 
     // test price 0.95 USD
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("0.95"));
