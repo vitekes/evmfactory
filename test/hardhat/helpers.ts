@@ -30,6 +30,10 @@ export async function deployContestFactory(priceFeedName: string = "MockPriceFee
   const Gateway = await ethers.getContractFactory("MockPaymentGateway");
   const gateway = await Gateway.deploy();
 
+  const FeeManager = await ethers.getContractFactory("MockFeeManager");
+  const feeManager = await FeeManager.deploy();
+  await gateway.setFeeManager(await feeManager.getAddress());
+
   const PriceFeed = await ethers.getContractFactory(priceFeedName);
   const priceFeed = await PriceFeed.deploy();
 
@@ -64,5 +68,5 @@ export async function deployContestFactory(priceFeedName: string = "MockPriceFee
   await factory.setPriceFeed(await priceFeed.getAddress());
   await factory.setUsdFeeBounds(ethers.parseEther("5"), ethers.parseEther("10"));
 
-  return { factory, token, priceFeed, registry, gateway, acl };
+  return { factory, token, priceFeed, registry, gateway, acl, feeManager };
 }

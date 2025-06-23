@@ -8,6 +8,16 @@ import '../interfaces/IGateway.sol';
 contract MockPaymentGateway is IGateway {
     using SafeERC20 for IERC20;
 
+    address public feeManagerAddress;
+
+    function setFeeManager(address manager) external {
+        feeManagerAddress = manager;
+    }
+
+    function feeManager() external view returns (address) {
+        return feeManagerAddress;
+    }
+
     function processPayment(
         bytes32,
         address token,
