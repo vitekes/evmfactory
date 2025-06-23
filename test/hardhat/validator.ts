@@ -10,7 +10,7 @@ describe("MultiValidator", function () {
     await acl.initialize(admin.address);
 
     const Validator = await ethers.getContractFactory("MultiValidator");
-    const val = await Validator.deploy();
+    const val: any = await Validator.deploy();
 
     // allow validator to grant roles during initialize
     await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await val.getAddress());
@@ -39,7 +39,7 @@ describe("MultiValidator", function () {
     await acl.initialize(admin.address);
 
     const Validator = await ethers.getContractFactory("MultiValidator");
-    const val = await Validator.deploy();
+    const val: any = await Validator.deploy();
 
     await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await val.getAddress());
     await val.initialize(await acl.getAddress());

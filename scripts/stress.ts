@@ -49,7 +49,7 @@ async function allowToken(factory: any, registry: any, token: any) {
     params: [await factory.getAddress()],
   });
   const signer = await ethers.getSigner(await factory.getAddress());
-  const validator = await ethers.getContractAt("MultiValidator", validatorAddr);
+  const validator = (await ethers.getContractAt("MultiValidator", validatorAddr)) as any;
   await validator.connect(signer).addToken(await token.getAddress());
   await network.provider.request({
     method: "hardhat_stopImpersonatingAccount",
@@ -97,7 +97,7 @@ async function massFinalize(count = 1000) {
 
   console.log("Finalizing contests...");
   for (const addr of contests) {
-    const esc = await ethers.getContractAt("ContestEscrow", addr);
+    const esc = (await ethers.getContractAt("ContestEscrow", addr)) as any;
     const poolBefore = await esc.gasPool();
     await (await esc.finalize([creator.address])).wait();
     const poolAfter = await esc.gasPool();

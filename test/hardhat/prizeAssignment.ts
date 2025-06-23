@@ -30,7 +30,7 @@ describe("PrizeAssigned event", function () {
     const rc = await tx.wait();
     const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
     const contestAddr = ev?.args[1];
-    const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
+    const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
 
     const EventRouter = await ethers.getContractFactory("MockEventRouter");
     const router = await EventRouter.deploy();
