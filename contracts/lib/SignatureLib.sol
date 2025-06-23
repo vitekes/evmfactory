@@ -42,7 +42,7 @@ library SignatureLib {
     }
 
     function hashListing(Listing calldata l) internal pure returns (bytes32) {
-        bytes32 chainHash = keccak256(abi.encode(l.chainIds.length, l.chainIds));
+        bytes32 chainHash = keccak256(abi.encodePacked(l.chainIds));
         return keccak256(abi.encode(LISTING_TYPEHASH, chainHash, l.token, l.price, l.sku, l.seller, l.salt, l.expiry));
     }
 
@@ -51,7 +51,7 @@ library SignatureLib {
     }
 
     function hashPlan(Plan calldata p) internal pure returns (bytes32) {
-        bytes32 chainHash = keccak256(abi.encode(p.chainIds.length, p.chainIds));
+        bytes32 chainHash = keccak256(abi.encodePacked(p.chainIds));
         return
             keccak256(abi.encode(PLAN_TYPEHASH, chainHash, p.price, p.period, p.token, p.merchant, p.salt, p.expiry));
     }
