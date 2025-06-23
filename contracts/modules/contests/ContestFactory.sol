@@ -76,7 +76,6 @@ contract ContestFactory is BaseFactory {
     function _deployContest(PrizeInfo[] memory slots, ContestParams memory params) internal {
         // 1) Валидация токенов и схемы распределения, подсчёт призового пула
         IValidator validator = IValidator(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_VALIDATOR));
-        uint256 totalMonetary;
         bytes32 moduleId = MODULE_ID;
         for (uint i = 0; i < slots.length; i++) {
             if (slots[i].prizeType == PrizeType.MONETARY) {
@@ -84,21 +83,10 @@ contract ContestFactory is BaseFactory {
                 if (!validator.isAllowed(slots[i].token)) revert NotAllowedToken();
                 // проверяем корректность схемы распределения
                 if (slots[i].distribution > 1) revert InvalidDistribution();
-                totalMonetary += slots[i].amount;
             }
         }
 
-        // 2) Сбор призового пула
-        if (totalMonetary > 0) {
-            IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY)).processPayment(
-                moduleId,
-                slots[0].token,
-                msg.sender,
-                totalMonetary,
-                ''
-            );
-        }
-
+        // 2) Перевод призов сразу в эскроу
         // 3) Сбор комиссии за finalize()
         uint256 tokenUsd = priceFeed.tokenPriceUsd(params.commissionToken);
         if (tokenUsd == 0) revert PriceZero();
@@ -128,8 +116,10 @@ contract ContestFactory is BaseFactory {
             params.metadata
         );
 
-        if (totalMonetary > 0) {
-            IERC20(slots[0].token).safeTransfer(address(esc), totalMonetary);
+        for (uint256 i = 0; i < slots.length; i++) {
+            if (slots[i].prizeType == PrizeType.MONETARY && slots[i].amount > 0) {
+                IERC20(slots[i].token).safeTransferFrom(msg.sender, address(esc), slots[i].amount);
+            }
         }
 
         if (gasShare > 0) {

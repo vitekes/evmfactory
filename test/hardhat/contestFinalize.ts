@@ -27,6 +27,7 @@ describe("Contest finalize", function () {
     await allowToken(factory, registry, token);
 
     await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
+    await token.approve(await factory.getAddress(), ethers.parseEther("1000"));
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
 
     const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
@@ -73,6 +74,7 @@ describe("Contest finalize", function () {
     await allowToken(factory, registry, token);
 
     await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
+    await token.approve(await factory.getAddress(), ethers.parseEther("1000"));
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
 
     const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
@@ -99,6 +101,7 @@ describe("Contest finalize", function () {
     await allowToken(factory, registry, token);
 
     await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
+    await token.approve(await factory.getAddress(), ethers.parseEther("1000"));
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
 
     const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
@@ -129,6 +132,7 @@ describe("Contest finalize", function () {
     await allowToken(factory, registry, token);
 
     await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
+    await token.approve(await factory.getAddress(), ethers.parseEther("1000"));
     await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
 
     const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };

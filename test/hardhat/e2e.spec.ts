@@ -34,6 +34,7 @@ describe("fork e2e", function () {
 
     // approve tokens for gateway
     await token.approve(await gateway.getAddress(), ethers.parseEther("100"));
+    await token.approve(await factory.getAddress(), ethers.parseEther("100"));
 
     const params = {
       judges: [] as string[],

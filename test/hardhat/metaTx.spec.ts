@@ -20,6 +20,7 @@ describe("meta transaction", function () {
     const Gateway = await ethers.getContractFactory("PaymentGateway");
     const gateway = await Gateway.deploy();
     await gateway.initialize(await acc.getAddress(), await registry.getAddress(), await fee.getAddress());
+    await (await acc.grantRole(await acc.FEATURE_OWNER_ROLE(), await gateway.getAddress())).wait();
 
     const Validator = await ethers.getContractFactory("MultiValidator");
     const validator = await Validator.deploy();
@@ -38,9 +39,9 @@ describe("meta transaction", function () {
     const Forwarder = await ethers.getContractFactory("MockForwarder");
     const forwarder = await Forwarder.deploy(await acc.getAddress());
 
-    await acc.grantRole(await acc.FEATURE_OWNER_ROLE(), forwarder.getAddress());
-    await acc.grantRole(await acc.RELAYER_ROLE(), forwarder.getAddress());
-    await acc.grantRole(await acc.RELAYER_ROLE(), relayer.address);
+    await (await acc.grantRole(await acc.FEATURE_OWNER_ROLE(), forwarder.getAddress())).wait();
+    await (await acc.grantRole(await acc.RELAYER_ROLE(), forwarder.getAddress())).wait();
+    await (await acc.grantRole(await acc.RELAYER_ROLE(), relayer.address)).wait();
 
     const data = gateway.interface.encodeFunctionData("processPayment", [
       MODULE_ID,
