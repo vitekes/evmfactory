@@ -23,8 +23,18 @@ describe("SubscriptionManager permit", function () {
     const gateway = await Gateway.deploy();
 
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const nextNonce = await owner.getNonce();
+    const predictedManager = ethers.getCreateAddress({
+      from: owner.address,
+      nonce: nextNonce + 1,
+    });
+    await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedManager);
     const Manager = await ethers.getContractFactory("SubscriptionManager");
-    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+    const manager = await Manager.deploy(
+      await registry.getAddress(),
+      await gateway.getAddress(),
+      moduleId
+    );
 
     const plan = {
       chainIds: [31337n],
@@ -96,8 +106,18 @@ describe("SubscriptionManager permit", function () {
     const gateway = await Gateway.deploy();
 
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const nextNonce = await owner.getNonce();
+    const predictedManager = ethers.getCreateAddress({
+      from: owner.address,
+      nonce: nextNonce + 1,
+    });
+    await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedManager);
     const Manager = await ethers.getContractFactory("SubscriptionManager");
-    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+    const manager = await Manager.deploy(
+      await registry.getAddress(),
+      await gateway.getAddress(),
+      moduleId
+    );
 
     const plan = {
       chainIds: [31337n],
@@ -172,8 +192,18 @@ describe("SubscriptionManager unsubscribe", function () {
     const gateway = await Gateway.deploy();
 
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const nextNonce = await owner.getNonce();
+    const predictedManager = ethers.getCreateAddress({
+      from: owner.address,
+      nonce: nextNonce + 1,
+    });
+    await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedManager);
     const Manager = await ethers.getContractFactory("SubscriptionManager");
-    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+    const manager = await Manager.deploy(
+      await registry.getAddress(),
+      await gateway.getAddress(),
+      moduleId
+    );
 
     const plan = {
       chainIds: [31337n],
@@ -227,8 +257,18 @@ describe("SubscriptionManager batch charge", function () {
     const gateway = await Gateway.deploy();
 
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const nextNonce = await owner.getNonce();
+    const predictedManager = ethers.getCreateAddress({
+      from: owner.address,
+      nonce: nextNonce + 1,
+    });
+    await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedManager);
     const Manager = await ethers.getContractFactory("SubscriptionManager");
-    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+    const manager = await Manager.deploy(
+      await registry.getAddress(),
+      await gateway.getAddress(),
+      moduleId
+    );
 
     const plan = {
       chainIds: [31337n],
@@ -288,8 +328,18 @@ describe("SubscriptionManager batch charge", function () {
     const gateway = await Gateway.deploy();
 
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
+    const nextNonce = await owner.getNonce();
+    const predictedManager = ethers.getCreateAddress({
+      from: owner.address,
+      nonce: nextNonce + 1,
+    });
+    await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedManager);
     const Manager = await ethers.getContractFactory("SubscriptionManager");
-    const manager = await Manager.deploy(await registry.getAddress(), await gateway.getAddress(), moduleId);
+    const manager = await Manager.deploy(
+      await registry.getAddress(),
+      await gateway.getAddress(),
+      moduleId
+    );
 
     const plan = {
       chainIds: [31337n],
