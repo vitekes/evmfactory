@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {Registry} from "contracts/core/Registry.sol";
 import {ContestEscrow} from "contracts/modules/contests/ContestEscrow.sol";
 import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.sol";
+import {ContestEscrowDeployer} from "./ContestEscrowDeployer.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 
@@ -28,6 +29,7 @@ contract ContestInvariantTest is Test {
     TestToken token;
     MockRouter router;
     MockNFTManager nft;
+    ContestEscrowDeployer deployer;
 
     bytes32 constant MODULE_ID = keccak256("Contest");
 
@@ -45,6 +47,7 @@ contract ContestInvariantTest is Test {
         registry.setModuleServiceAlias(MODULE_ID, "NFTManager", address(nft));
 
         token = new TestToken("T", "T");
+        deployer = new ContestEscrowDeployer();
     }
 
     function helper_totalPrizesEqualInput(uint8 count, uint96[5] memory amounts, uint8[5] memory dist, uint256 seed) public {
@@ -65,15 +68,13 @@ contract ContestInvariantTest is Test {
             total += amt;
         }
 
-        ContestEscrow esc = new ContestEscrow(
+        ContestEscrow esc = deployer.deploy(
             registry,
             address(this),
             prizes,
             address(token),
             0,
-            0,
-            new address[](0),
-            ""
+            0
         );
         token.transfer(address(esc), total);
 

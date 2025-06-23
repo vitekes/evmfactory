@@ -43,3 +43,4 @@ error SbtNonTransferable();
 error NotFound();
 error ExceedsRefundLimit();
 error InsufficientBalance();
+error ContestFundingMissing();

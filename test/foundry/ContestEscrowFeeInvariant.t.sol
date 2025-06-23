@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {ContestEscrow} from "contracts/modules/contests/ContestEscrow.sol";
 import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.sol";
+import {ContestEscrowDeployer} from "./ContestEscrowDeployer.sol";
 import {Registry} from "contracts/core/Registry.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
@@ -12,6 +13,7 @@ contract ContestEscrowFeeInvariantTest is Test {
     Registry registry;
     AccessControlCenter acc;
     TestToken token;
+    ContestEscrowDeployer deployer;
 
     bytes32 constant MODULE_ID = keccak256("Contest");
 
@@ -23,6 +25,7 @@ contract ContestEscrowFeeInvariantTest is Test {
         registry.initialize(address(acc));
         registry.registerFeature(MODULE_ID, address(1), 0);
         token = new TestToken("T", "T");
+        deployer = new ContestEscrowDeployer();
     }
 
     function helper_totalPaidEqualsInput(uint8 count, uint96[5] memory amounts, uint8[5] memory dist, uint256 seed) public {
@@ -43,15 +46,13 @@ contract ContestEscrowFeeInvariantTest is Test {
             total += amt;
         }
 
-        ContestEscrow esc = new ContestEscrow(
+        ContestEscrow esc = deployer.deploy(
             registry,
             address(this),
             prizes,
             address(token),
             0,
-            0,
-            new address[](0),
-            ""
+            0
         );
         token.transfer(address(esc), total);
 
