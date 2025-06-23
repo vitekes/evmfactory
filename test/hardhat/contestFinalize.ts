@@ -4,7 +4,9 @@ import { deployContestFactory } from "./helpers";
 
 async function allowToken(factory: any, registry: any, token: any) {
   const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
-  const validatorAddr = await registry.getModuleService(moduleId, "Validator");
+  const serviceId = ethers.keccak256(ethers.toUtf8Bytes("Validator"));
+  const validatorAddr = await registry.getModuleService(moduleId, serviceId);
+  await network.provider.send("hardhat_setBalance", [await factory.getAddress(), "0x21e19e0c9bab2400000"]);
   await network.provider.send("hardhat_impersonateAccount", [await factory.getAddress()]);
   const factorySigner = await ethers.getSigner(await factory.getAddress());
   const validator = await ethers.getContractAt("MultiValidator", validatorAddr);
