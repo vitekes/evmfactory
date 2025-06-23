@@ -41,6 +41,10 @@ describe("Contest finalize", function () {
     const contestAddr = getCreatedContest(rc);
     const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
 
+    const expectedBalance =
+      ethers.parseEther("15") + (await esc.gasPool());
+    expect(await token.balanceOf(contestAddr)).to.equal(expectedBalance);
+
     const balA0 = await token.balanceOf(a.address);
     const balB0 = await token.balanceOf(b.address);
 

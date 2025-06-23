@@ -128,6 +128,10 @@ contract ContestFactory is BaseFactory {
             params.metadata
         );
 
+        if (totalMonetary > 0) {
+            IERC20(slots[0].token).safeTransfer(address(esc), totalMonetary);
+        }
+
         if (gasShare > 0) {
             IERC20(params.commissionToken).safeTransfer(address(esc), gasShare);
         }
