@@ -32,9 +32,14 @@ describe("PrizeAssigned event", function () {
     const contestAddr = ev?.args[1];
     const esc = await ethers.getContractAt("ContestEscrow", contestAddr);
 
+    const EventRouter = await ethers.getContractFactory("MockEventRouter");
+    const router = await EventRouter.deploy();
+    const NFT = await ethers.getContractFactory("MockNFTManager");
+    const nft = await NFT.deploy();
+
     const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
-    await registry.setModuleServiceAlias(moduleId, "EventRouter", winner.address);
-    await registry.setModuleServiceAlias(moduleId, "NFTManager", winner.address);
+    await registry.setModuleServiceAlias(moduleId, "EventRouter", await router.getAddress());
+    await registry.setModuleServiceAlias(moduleId, "NFTManager", await nft.getAddress());
 
     const finalizeTx = await esc.finalize([winner.address]);
     const receipt = await finalizeTx.wait();

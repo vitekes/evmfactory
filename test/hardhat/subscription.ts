@@ -313,7 +313,9 @@ describe("SubscriptionManager batch charge", function () {
 
     for (const u of users) {
       await token.transfer(u.address, ethers.parseEther("10"));
-      await token.connect(u).approve(await gateway.getAddress(), plan.price);
+      await token
+        .connect(u)
+        .approve(await gateway.getAddress(), ethers.MaxUint256);
       await manager.connect(u).subscribe(plan, sigMerchant, "0x");
     }
 
