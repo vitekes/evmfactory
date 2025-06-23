@@ -68,5 +68,12 @@ export async function deployContestFactory(priceFeedName: string = "MockPriceFee
   await factory.setPriceFeed(await priceFeed.getAddress());
   await factory.setUsdFeeBounds(ethers.parseEther("5"), ethers.parseEther("10"));
 
+  const EventRouter = await ethers.getContractFactory("MockEventRouter");
+  const router = await EventRouter.deploy();
+  const NFT = await ethers.getContractFactory("MockNFTManager");
+  const nft = await NFT.deploy();
+  await registry.setModuleServiceAlias(moduleId, "EventRouter", await router.getAddress());
+  await registry.setModuleServiceAlias(moduleId, "NFTManager", await nft.getAddress());
+
   return { factory, token, priceFeed, registry, gateway, acl, feeManager };
 }

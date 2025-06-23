@@ -121,19 +121,18 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         if (processedWinners == prizes.length && !isFinalized) {
             isFinalized = true;
 
-            // уведомляем остальные модули
-            EventRouter(registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')))).route(
-                EventRouter.EventKind.ContestFinalized,
-                abi.encode(creator, winners, prizes)
-            );
+            // уведомляем остальные модули, если зарегистрированы
+            address router = registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')));
+            if (router != address(0)) {
+                EventRouter(router).route(EventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
+            }
 
-            // чеканим бейджи
-            string[] memory uris = new string[](winners.length);
-            NFTManager(registry.getModuleService(MODULE_ID, keccak256(bytes('NFTManager')))).mintBatch(
-                winners,
-                uris,
-                false
-            );
+            // чеканим бейджи, если модуль задан
+            address nft = registry.getModuleService(MODULE_ID, keccak256(bytes('NFTManager')));
+            if (nft != address(0)) {
+                string[] memory uris = new string[](winners.length);
+                NFTManager(nft).mintBatch(winners, uris, false);
+            }
 
             emit ContestFinalized(winners);
         }
