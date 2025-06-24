@@ -13,8 +13,8 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /// @notice Ошибки для экономии газа вместо строковых require
-error ContestAlreadyFinalized();
-error WrongWinnersCount();
+    error ContestAlreadyFinalized();
+    error WrongWinnersCount();
 
 contract ContestEscrow is IContestEscrow, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -89,38 +89,54 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         }
     }
 
+
+    // ─── Обновлённая finalize ─────────────────────────────────────────────
     function finalize(address[] calldata _winners) external nonReentrant onlyCreator {
+        // базовые проверки ― без изменений
         if (isFinalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
+        // сохраняем массив победителей только один раз
         if (winners.length == 0) {
             winners = _winners;
         }
 
         uint256 gasStart = gasleft();
 
+        // рассчитываем диапазон победителей, обрабатываемых за этот вызов
         uint256 start = processedWinners;
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        uint256 len = end;
-        for (uint256 i = start; i < len; ) {
+        // ── основная петля выплаты/эмита ───────────────────────────────
+        for (uint256 i = start; i < end;) {
             PrizeInfo memory p = prizes[i];
+
+            // денежный приз
             if (p.amount > 0) {
-                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
+                uint256 amount =
+                    p.distribution == 0 ? p.amount
+                        : _computeDescending(p.amount, uint8(i));
+
+                // ── проверяем, хватает ли денег в эскроу ───────────────
+                uint256 bal = IERC20(p.token).balanceOf(address(this));
+                if (bal < amount) revert ContestFundingMissing();
+
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
+
+                // неденежный (промо) приз
             } else {
                 emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
                 emit PrizeAssigned(winners[i], p.uri);
             }
-            unchecked {
-                ++i;
-            }
+
+            unchecked {++i;}          // gas-safe инкремент
         }
 
         processedWinners = end;
 
+        // ── возврат газа создателю ────────────────────────────────────
         uint256 gasUsed = gasStart - gasleft();
         uint256 refund = gasUsed * tx.gasprice;
         if (refund > gasPool) refund = gasPool;
@@ -130,19 +146,27 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
             emit GasRefunded(msg.sender, refund);
         }
 
+        // ── финальное закрытие конкурса ───────────────────────────────
         if (processedWinners == prizes.length && !isFinalized) {
-            isFinalized = true;
+            isFinalized = true;         // окончательный флаг
 
-            // уведомляем остальные модули, если зарегистрированы
-            address router = registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')));
+            // уведомляем прочие модули (если зарегистрированы)
+            address router = registry.getModuleService(
+                MODULE_ID, keccak256(bytes("EventRouter"))
+            );
             if (router != address(0)) {
-                EventRouter(router).route(EventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
+                EventRouter(router).route(
+                    EventRouter.EventKind.ContestFinalized,
+                    abi.encode(creator, winners, prizes)
+                );
             }
 
-            // чеканим бейджи, если модуль задан
-            address nft = registry.getModuleService(MODULE_ID, keccak256(bytes('NFTManager')));
+            // чеканим наградные NFT, если модуль подключён
+            address nft = registry.getModuleService(
+                MODULE_ID, keccak256(bytes("NFTManager"))
+            );
             if (nft != address(0)) {
-                string[] memory uris = new string[](winners.length);
+                string[] memory uris = new string[](winners.length); // пустые URI → фронт сам подставит
                 NFTManager(nft).mintBatch(winners, uris, false);
             }
 
