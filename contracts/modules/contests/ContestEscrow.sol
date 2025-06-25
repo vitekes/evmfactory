@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../../core/Registry.sol';
-import '../../../core/EventRouter.sol';
-import '../../../shared/NFTManager.sol';
-import '../../../errors/Errors.sol';
-import '../shared/PrizeInfo.sol';
-import '../../../interfaces/CoreDefs.sol';
+import '../../core/Registry.sol';
+import '../../core/EventRouter.sol';
+import '../../shared/NFTManager.sol';
+import '../../errors/Errors.sol';
+import './shared/PrizeInfo.sol';
+import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-/// @title ContestEscrow.sol
+/// @title ContestEscrow
 contract ContestEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
