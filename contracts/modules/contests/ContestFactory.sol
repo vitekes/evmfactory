@@ -83,6 +83,8 @@ contract ContestFactory is BaseFactory {
                 if (!validator.isAllowed(slots[i].token)) revert NotAllowedToken();
                 // проверяем корректность схемы распределения
                 if (slots[i].distribution > 1) revert InvalidDistribution();
+            } else {
+                if (slots[i].token != address(0)) revert InvalidPrizeData();
             }
         }
 
@@ -116,14 +118,40 @@ contract ContestFactory is BaseFactory {
             params.metadata
         );
 
+        address[] memory tokens = new address[](slots.length);
+        uint256[] memory totals = new uint256[](slots.length);
+        uint256 tcount = 0;
+
         for (uint256 i = 0; i < slots.length; i++) {
             if (slots[i].prizeType == PrizeType.MONETARY && slots[i].amount > 0) {
-                IERC20(slots[i].token).safeTransferFrom(msg.sender, address(esc), slots[i].amount);
+                IERC20 token = IERC20(slots[i].token);
+                uint256 beforeBal = token.balanceOf(address(esc));
+                token.safeTransferFrom(msg.sender, address(esc), slots[i].amount);
+                uint256 afterBal = token.balanceOf(address(esc));
+                if (afterBal - beforeBal != slots[i].amount) revert ContestFundingMissing();
+
+                bool found = false;
+                for (uint256 j = 0; j < tcount; j++) {
+                    if (tokens[j] == slots[i].token) {
+                        totals[j] += slots[i].amount;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    tokens[tcount] = slots[i].token;
+                    totals[tcount] = slots[i].amount;
+                    tcount++;
+                }
             }
         }
 
         if (gasShare > 0) {
             IERC20(params.commissionToken).safeTransfer(address(esc), gasShare);
+        }
+
+        for (uint256 i = 0; i < tcount; i++) {
+            if (IERC20(tokens[i]).balanceOf(address(esc)) != totals[i]) revert ContestFundingMissing();
         }
 
         // Grant module permissions to the new contest contract

@@ -60,18 +60,6 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         gasPool = _initialGasPool;
         for (uint i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
-            if (msg.sender == _creator && _prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0) {
-                IERC20 token = IERC20(_prizes[i].token);
-                uint256 balBefore = token.balanceOf(address(this));
-                if (balBefore < _prizes[i].amount) {
-                    uint256 missing = _prizes[i].amount - balBefore;
-                    try token.transferFrom(_creator, address(this), missing) {} catch {
-                        revert ContestFundingMissing();
-                    }
-                    uint256 balAfter = token.balanceOf(address(this));
-                    if (balAfter - balBefore == 0) revert ContestFundingMissing();
-                }
-            }
         }
         // store judges & metadata if needed
     }
@@ -104,6 +92,11 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         uint256 start = processedWinners;
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
+
+        bool willFinalize = end == prizes.length;
+        if (willFinalize) {
+            isFinalized = true;
+        }
 
         // ── основная петля выплаты/эмита ───────────────────────────────
         for (uint256 i = start; i < end; ) {
@@ -144,8 +137,7 @@ contract ContestEscrow is IContestEscrow, ReentrancyGuard {
         }
 
         // ── финальное закрытие конкурса ───────────────────────────────
-        if (processedWinners == prizes.length && !isFinalized) {
-            isFinalized = true; // окончательный флаг
+        if (processedWinners == prizes.length) {
 
             // уведомляем прочие модули (если зарегистрированы)
             address router = registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')));
