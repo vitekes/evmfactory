@@ -11,8 +11,8 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-/// @title ContestEscrowV2
-contract ContestEscrowV2 is ReentrancyGuard {
+/// @title ContestEscrow.sol
+contract ContestEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     Registry public immutable registry;
