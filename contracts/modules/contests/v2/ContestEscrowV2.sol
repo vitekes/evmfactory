@@ -46,6 +46,8 @@ contract ContestEscrowV2 is ReentrancyGuard {
         uint256 _gasPool,
         address _commissionToken
     ) {
+        // factory should deploy the escrow, not the creator
+        assert(msg.sender != _creator);
         registry = Registry(_registry);
         creator = _creator;
         commissionToken = _commissionToken;
@@ -67,6 +69,11 @@ contract ContestEscrowV2 is ReentrancyGuard {
         uint256 start = processedWinners;
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
+
+        bool willFinalize = end == prizes.length;
+        if (willFinalize) {
+            finalized = true;
+        }
 
         for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
@@ -94,7 +101,6 @@ contract ContestEscrowV2 is ReentrancyGuard {
         }
 
         if (processedWinners == prizes.length) {
-            finalized = true;
             address router = registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')));
             if (router != address(0)) {
                 EventRouter(router).route(EventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
