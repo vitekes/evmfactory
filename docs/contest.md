@@ -1,6 +1,6 @@
-# Contest Module V2
+# Contest Module
 
-This document summarizes the design for version 2 of the contest module.
+This document summarizes the design of the contest module.
 
 ## Overview
 
@@ -72,7 +72,7 @@ error ContestAlreadyFinalized();
 error WrongWinnersCount();
 ```
 
-## Improvements in V2
+## Improvements
 
 - **Fail-fast** — missing token transfers are caught during `createContest`.
 - **Minimal surface** — no `transferFrom` calls after deployment and no external calls before `finalized`.

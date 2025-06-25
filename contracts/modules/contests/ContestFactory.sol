@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../../interfaces/core/IRegistry.sol';
-import '../../../core/AccessControlCenter.sol';
-import '../../../errors/Errors.sol';
-import '../shared/PrizeInfo.sol';
-import './ContestEscrowV2.sol';
+import '../../interfaces/core/IRegistry.sol';
+import '../../core/AccessControlCenter.sol';
+import '../../errors/Errors.sol';
+import './shared/PrizeInfo.sol';
+import './ContestEscrow.sol';
 import './interfaces/IContestValidator.sol';
-import '../../../interfaces/CoreDefs.sol';
+import '../../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-/// @title ContestFactoryV2
+/// @title ContestFactory
 /// @notice Deploys new contest escrows and handles initial funding.
-contract ContestFactoryV2 {
+contract ContestFactory {
     using SafeERC20 for IERC20;
 
     event ContestCreated(address indexed creator, address contest);
@@ -52,7 +52,7 @@ contract ContestFactoryV2 {
         }
 
         // deploy escrow
-        ContestEscrowV2 esc = new ContestEscrowV2(msg.sender, _prizes, address(registry), 0, feeManager);
+        ContestEscrow esc = new ContestEscrow(msg.sender, _prizes, address(registry), 0, feeManager);
         escrow = address(esc);
 
         // transfer tokens to escrow, fail-fast on missing amounts

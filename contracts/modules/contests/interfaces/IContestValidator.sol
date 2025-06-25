@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../shared/PrizeInfo.sol';
+import '../shared/PrizeInfo.sol';
 
-/// @notice Validator plugin for Contest V2
+/// @notice Validator plugin for Contests
 interface IContestValidator {
     /// @dev Validate a single prize slot. Revert on violation.
     function validatePrize(PrizeInfo calldata prize) external view;
