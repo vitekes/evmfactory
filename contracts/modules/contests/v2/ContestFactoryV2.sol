@@ -45,6 +45,12 @@ contract ContestFactoryV2 {
             }
         }
 
+        // basic sanity check for promo slots
+        for (uint256 i = 0; i < _prizes.length; i++) {
+            PrizeInfo calldata p = _prizes[i];
+            if (p.amount == 0 && p.token != address(0)) revert InvalidPrizeData();
+        }
+
         // deploy escrow
         ContestEscrowV2 esc = new ContestEscrowV2(msg.sender, _prizes, address(registry), 0, feeManager);
         escrow = address(esc);
@@ -58,6 +64,32 @@ contract ContestFactoryV2 {
                 uint256 afterBal = IERC20(p.token).balanceOf(escrow);
                 if (afterBal - beforeBal != p.amount) revert ContestFundingMissing();
             }
+        }
+
+        // verify final balances for each token used
+        address[] memory tokens = new address[](_prizes.length);
+        uint256[] memory totals = new uint256[](_prizes.length);
+        uint256 tcount = 0;
+        for (uint256 i = 0; i < _prizes.length; i++) {
+            PrizeInfo calldata p = _prizes[i];
+            if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
+                bool found = false;
+                for (uint256 j = 0; j < tcount; j++) {
+                    if (tokens[j] == p.token) {
+                        totals[j] += p.amount;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    tokens[tcount] = p.token;
+                    totals[tcount] = p.amount;
+                    tcount++;
+                }
+            }
+        }
+        for (uint256 i = 0; i < tcount; i++) {
+            if (IERC20(tokens[i]).balanceOf(escrow) != totals[i]) revert ContestFundingMissing();
         }
 
         emit ContestCreated(msg.sender, escrow);
