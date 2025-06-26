@@ -91,7 +91,7 @@ async function main() {
   const contestAddr = created?.args[1];
   const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   await gateway.connect(winner); // just to silence ts
-  await esc.finalize([winner.address, deployer.address]);
+  await esc.finalize([winner.address, deployer.address], 0n);
   console.log("Contest finalized, winner balance:", (await token.balanceOf(winner.address)).toString());
 }
 

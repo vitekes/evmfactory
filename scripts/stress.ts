@@ -99,7 +99,7 @@ async function massFinalize(count = 1000) {
   for (const addr of contests) {
     const esc = (await ethers.getContractAt("ContestEscrow", addr)) as any;
     const poolBefore = await esc.gasPool();
-    await (await esc.finalize([creator.address])).wait();
+    await (await esc.finalize([creator.address], 0n)).wait();
     const poolAfter = await esc.gasPool();
     console.log(`Finalized ${addr} gasPool ${poolBefore} -> ${poolAfter}`);
   }

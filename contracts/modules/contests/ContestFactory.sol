@@ -36,7 +36,7 @@ contract ContestFactory {
     function createContest(
         PrizeInfo[] calldata _prizes,
         bytes calldata /* metadata */
-    ) external returns (address escrow) {
+    ) external onlyGovernor returns (address escrow) {
         // validate prizes via plugin if available
         address validator = registry.getModuleService(CoreDefs.CONTEST_MODULE_ID, CoreDefs.SERVICE_VALIDATOR);
         if (validator != address(0)) {
