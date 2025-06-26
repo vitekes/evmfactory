@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 interface IRegistry {
     function registerFeature(bytes32 id, address impl, uint8 context) external;
 
+    function upgradeFeature(bytes32 id, address newImpl) external;
+
     function getFeature(bytes32 id) external view returns (address impl, uint8 context);
 
     function getContext(bytes32 id) external view returns (uint8);

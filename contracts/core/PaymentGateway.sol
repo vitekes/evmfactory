@@ -101,14 +101,17 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
     }
 
     function setRegistry(address newRegistry) external onlyAdmin {
+        if (newRegistry == address(0)) revert InvalidAddress();
         registry = IRegistry(newRegistry);
     }
 
     function setFeeManager(address newManager) external onlyAdmin {
+        if (newManager == address(0)) revert InvalidAddress();
         feeManager = CoreFeeManager(newManager);
     }
 
     function setAccessControl(address newAccess) external onlyAdmin {
+        if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
     }
 

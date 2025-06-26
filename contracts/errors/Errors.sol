@@ -11,6 +11,7 @@ error InvalidDistribution();
 error InvalidBounds();
 error InvalidChain();
 error PriceZero();
+error InvalidAddress();
 error ZeroAddress();
 error NotAdmin();
 error NotAutomation();

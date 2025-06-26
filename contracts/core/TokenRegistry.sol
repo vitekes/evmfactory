@@ -63,6 +63,7 @@ contract TokenRegistry is Initializable, UUPSUpgradeable {
     /// @notice Replace the AccessControlCenter contract
     /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyAdmin {
+        if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
     }
 

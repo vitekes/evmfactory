@@ -110,6 +110,7 @@ contract ContestFactory {
     /// @notice Update registry address
     /// @param newRegistry New registry contract
     function setRegistry(address newRegistry) external onlyGovernor {
+        if (newRegistry == address(0)) revert InvalidAddress();
         registry = IRegistry(newRegistry);
         access = AccessControlCenter(IRegistry(newRegistry).getCoreService(keccak256('AccessControlCenter')));
     }
@@ -117,6 +118,7 @@ contract ContestFactory {
     /// @notice Update fee manager address
     /// @param mgr New fee manager
     function setFeeManager(address mgr) external onlyGovernor {
+        if (mgr == address(0)) revert InvalidAddress();
         feeManager = mgr;
     }
 }

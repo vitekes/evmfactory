@@ -111,6 +111,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     }
 
     function setAccessControl(address newAccess) external onlyAdmin {
+        if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
     }
 

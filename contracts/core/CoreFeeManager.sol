@@ -139,6 +139,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @notice Replace the AccessControlCenter contract
     /// @param newAccess Address of the new AccessControlCenter
     function setAccessControl(address newAccess) external onlyAdmin {
+        if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
     }
 

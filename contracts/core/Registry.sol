@@ -27,6 +27,7 @@ contract Registry is Initializable, UUPSUpgradeable {
 
     /// Events
     event FeatureRegistered(bytes32 indexed id, address implementation, uint8 context);
+    event FeatureUpdated(bytes32 indexed featureId, address indexed oldImpl, address indexed newImpl);
     event CoreServiceSet(bytes32 indexed id, address serviceAddress);
     event ModuleServiceSet(bytes32 indexed moduleId, bytes32 indexed serviceId, address serviceAddress);
     event ModuleRegistered(bytes32 indexed moduleId, string serviceAlias, address serviceAddress);
@@ -56,6 +57,15 @@ contract Registry is Initializable, UUPSUpgradeable {
         if (impl == address(0)) revert InvalidImplementation();
         features[id] = Feature(impl, context, true);
         emit FeatureRegistered(id, impl, context);
+    }
+
+    function upgradeFeature(bytes32 id, address newImpl) external onlyFeatureOwner {
+        if (newImpl == address(0)) revert InvalidAddress();
+        Feature storage f = features[id];
+        if (!f.exists) revert NotFound();
+        address oldImpl = f.implementation;
+        f.implementation = newImpl;
+        emit FeatureUpdated(id, oldImpl, newImpl);
     }
 
     /// @notice Get feature implementation and context
@@ -138,6 +148,7 @@ contract Registry is Initializable, UUPSUpgradeable {
     /// @notice Replace the AccessControlCenter if needed
     /// @param newAccess New AccessControlCenter address
     function setAccessControl(address newAccess) external onlyAdmin {
+        if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
     }
 
