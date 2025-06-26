@@ -64,6 +64,10 @@ contract ContestEscrow is ReentrancyGuard {
         }
     }
 
+    /// @notice Finalize contest and distribute prizes
+    /// @param _winners List of winner addresses
+    /// @param priorityCap Priority fee cap for gas refund calculation
+    /// @param nonce Nonce used when committing winners
     function finalize(address[] calldata _winners, uint256 priorityCap, uint256 nonce)
         external
         nonReentrant
@@ -72,7 +76,7 @@ contract ContestEscrow is ReentrancyGuard {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
-        // Проверяем соответствие commitment, если он был задан
+        // Verify commitment if it was previously set
         if (isCommitted) {
             bytes32 computedCommitment = keccak256(abi.encode(_winners, nonce));
             if (computedCommitment != winnerCommitment) revert CommitmentInvalid();
@@ -111,7 +115,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         processedWinners = end;
         uint256 gasUsed = gasStart - gasleft();
-        // Ограничиваем цену газа для предотвращения манипуляций
+        // Cap gas price to prevent manipulation
         uint256 maxGasPrice = block.basefee + priorityCap;
         uint256 actualGasPrice = tx.gasprice > maxGasPrice ? maxGasPrice : tx.gasprice;
         uint256 refund = gasUsed * actualGasPrice;
@@ -138,6 +142,7 @@ contract ContestEscrow is ReentrancyGuard {
         }
     }
 
+    /// @notice Cancel the contest and return all funds to the creator
     function cancel() external onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
         finalized = true;
@@ -153,10 +158,14 @@ contract ContestEscrow is ReentrancyGuard {
         }
     }
 
+    /// @notice Number of prizes configured
+    /// @return Length of the prizes array
     function prizesLength() external view returns (uint256) {
         return prizes.length;
     }
 
+    /// @notice Number of winners processed
+    /// @return Length of the winners array
     function winnersLength() external view returns (uint256) {
         return winners.length;
     }
@@ -168,7 +177,7 @@ contract ContestEscrow is ReentrancyGuard {
         return (amount * rankWeight) / sumWeights;
     }
 
-    /// @notice Экстренный вывод средств в случае если конкурс не был финализирован в срок
+    /// @notice Emergency withdrawal if the contest was not finalized in time
     function emergencyWithdraw() external onlyCreator nonReentrant {
         if (finalized) revert ContestAlreadyFinalized();
         if (block.timestamp <= deadline + GRACE_PERIOD) revert GracePeriodNotExpired();

@@ -14,7 +14,11 @@ contract NFTManager is ERC721URIStorage, Ownable {
 
     constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) Ownable(msg.sender) {}
 
-    /// @notice Выпуск NFT или SBT
+    /// @notice Mint an NFT or SBT
+    /// @param to Recipient address
+    /// @param uri Token metadata URI
+    /// @param soulbound Whether token is soulbound
+    /// @return tokenId Newly minted token id
     function mint(address to, string calldata uri, bool soulbound) external onlyOwner returns (uint256) {
         uint256 tokenId = ++tokenIdCounter;
         _safeMint(to, tokenId);
@@ -25,19 +29,23 @@ contract NFTManager is ERC721URIStorage, Ownable {
         return tokenId;
     }
 
-    /// @notice Soulbound токены нельзя переводить
+    /// @notice Soulbound tokens are non-transferable
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = ERC721.ownerOf(tokenId);
         if (!(from == address(0) || to == address(0) || !isSoulbound[tokenId])) revert SbtNonTransferable();
         return super._update(to, tokenId, auth);
     }
 
-    /// В случае чего админ может сжечь токен
+    /// @notice Admin can burn a token if needed
+    /// @param tokenId Token id to burn
     function burn(uint256 tokenId) external onlyOwner {
         _burn(tokenId);
     }
 
-    /// @notice Массовый выпуск NFT
+    /// @notice Batch mint NFTs
+    /// @param recipients Addresses receiving tokens
+    /// @param uris Metadata URIs
+    /// @param soulbound Whether minted tokens are soulbound
     function mintBatch(address[] calldata recipients, string[] calldata uris, bool soulbound) external onlyOwner {
         if (recipients.length != uris.length) revert LengthMismatch();
         if (recipients.length > MAX_BATCH_MINT) revert BatchTooLarge();
