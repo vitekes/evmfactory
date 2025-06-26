@@ -70,8 +70,8 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        bool willFinalize = end == prizes.length;
-        if (willFinalize) {
+        // mark as finalized before any external calls
+        if (end == prizes.length) {
             finalized = true;
         }
 
