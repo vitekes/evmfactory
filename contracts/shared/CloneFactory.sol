@@ -19,4 +19,10 @@ abstract contract CloneFactory {
     function _predict(address implementation, bytes32 salt) internal view returns (address) {
         return Clones.predictDeterministicAddress(implementation, salt, address(this));
     }
+
+    function _revert(bytes memory returndata) internal pure {
+        assembly {
+            revert(add(returndata, 0x20), mload(returndata))
+        }
+    }
 }
