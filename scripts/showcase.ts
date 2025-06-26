@@ -65,7 +65,7 @@ async function main() {
   const escrow = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   console.log("Contest escrow:", contestAddr);
 
-  const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address]);
+  const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address], 0n);
   const receipt = await finalizeTx.wait();
 
   console.log("Finalize events:");
