@@ -28,36 +28,53 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
         _;
     }
 
+    /// @notice Initialize the validator
+    /// @param acl Address of AccessControlCenter
     function initialize(address acl) public initializer {
         __UUPSUpgradeable_init();
         access = AccessControlCenter(acl);
         access.grantRole(access.GOVERNOR_ROLE(), msg.sender);
     }
 
+    /// @notice Allow or disallow a token
+    /// @param token Token address
+    /// @param status Whether the token is allowed
     function setToken(address token, bool status) public onlyGovernor {
         if (token == address(0)) revert ZeroAddress();
         allowed[token] = status;
         emit TokenAllowed(token, status);
     }
 
+    /// @notice Add a token to the allowed list
+    /// @param token Token address
     function addToken(address token) external onlyGovernor {
         setToken(token, true);
     }
 
+    /// @notice Remove a token from the allowed list
+    /// @param token Token address
     function removeToken(address token) external onlyGovernor {
         setToken(token, false);
     }
 
+    /// @notice Bulk set token allowance
+    /// @param tokens Token addresses
+    /// @param status Allowance flag
     function bulkSetToken(address[] calldata tokens, bool status) external onlyGovernor {
         for (uint i = 0; i < tokens.length; i++) {
             setToken(tokens[i], status);
         }
     }
 
+    /// @notice Check if a token is allowed
+    /// @param token Token address
+    /// @return True if allowed
     function isAllowed(address token) external view returns (bool) {
         return allowed[token];
     }
 
+    /// @notice Replace the AccessControlCenter contract
+    /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }

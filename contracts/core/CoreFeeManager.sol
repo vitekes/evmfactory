@@ -17,16 +17,16 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
     AccessControlCenter public access;
 
-    /// @notice moduleId => token => fee % (в 10000 базисных точках: 100 = 1%)
+    /// @notice moduleId => token => fee % (in basis points: 100 = 1%)
     mapping(bytes32 => mapping(address => uint16)) public percentFee;
 
-    /// @notice moduleId => token => фиксированная плата (в токенах)
+    /// @notice moduleId => token => fixed fee (in tokens)
     mapping(bytes32 => mapping(address => uint256)) public fixedFee;
 
-    /// @notice moduleId => токен => собранная сумма
+    /// @notice moduleId => token => collected amount
     mapping(bytes32 => mapping(address => uint256)) public collectedFees;
 
-    /// @notice moduleId => адрес => без комиссии?
+    /// @notice moduleId => address => fee exempt
     mapping(bytes32 => mapping(address => bool)) public isZeroFeeAddress;
 
     event FeeCollected(bytes32 indexed moduleId, address indexed token, uint256 amount);
@@ -43,6 +43,8 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         _;
     }
 
+    /// @notice Initialize the fee manager
+    /// @param accessControl Address of AccessControlCenter
     function initialize(address accessControl) public initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
@@ -50,6 +52,12 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         access = AccessControlCenter(accessControl);
     }
 
+    /// @notice Calculate and collect fee
+    /// @param moduleId Module identifier
+    /// @param token Fee token
+    /// @param payer Address paying the fee
+    /// @param amount Payment amount
+    /// @return feeAmount Actual fee charged
     function collect(
         bytes32 moduleId,
         address token,
@@ -73,6 +81,10 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     }
 
     /// @notice Deposit a specific amount of fees for a module without calculation
+    /// @notice Deposit a specific amount of fees for a module without calculation
+    /// @param moduleId Module identifier
+    /// @param token Fee token
+    /// @param amount Amount to deposit
     function depositFee(
         bytes32 moduleId,
         address token,
@@ -84,6 +96,10 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         emit FeeCollected(moduleId, token, amount);
     }
 
+    /// @notice Withdraw collected fees for a module
+    /// @param moduleId Module identifier
+    /// @param token Fee token
+    /// @param to Recipient address
     function withdrawFees(bytes32 moduleId, address token, address to) external onlyAdmin nonReentrant whenNotPaused {
         uint256 amount = collectedFees[moduleId][token];
         if (amount == 0) revert NothingToWithdraw();
@@ -95,28 +111,43 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         emit GasTankFunded(to, amount, IERC20(token).balanceOf(to));
     }
 
+    /// @notice Set percentage fee
+    /// @param moduleId Module identifier
+    /// @param token Fee token
+    /// @param feeBps Fee in basis points
     function setPercentFee(bytes32 moduleId, address token, uint16 feeBps) external onlyFeatureOwner {
         if (feeBps > 10_000) revert FeeTooHigh();
         percentFee[moduleId][token] = feeBps;
     }
 
+    /// @notice Set fixed fee
+    /// @param moduleId Module identifier
+    /// @param token Fee token
+    /// @param feeAmount Fixed amount of fee tokens
     function setFixedFee(bytes32 moduleId, address token, uint256 feeAmount) external onlyFeatureOwner {
         fixedFee[moduleId][token] = feeAmount;
     }
 
+    /// @notice Mark address as zero-fee
+    /// @param moduleId Module identifier
+    /// @param user Address to mark
+    /// @param status Whether zero-fee is enabled
     function setZeroFeeAddress(bytes32 moduleId, address user, bool status) external onlyFeatureOwner {
         isZeroFeeAddress[moduleId][user] = status;
     }
 
-    /// Позволяет заменить AccessControl
+    /// @notice Replace the AccessControlCenter contract
+    /// @param newAccess Address of the new AccessControlCenter
     function setAccessControl(address newAccess) external onlyAdmin {
         access = AccessControlCenter(newAccess);
     }
 
+    /// @notice Pause fee collection
     function pause() external onlyAdmin {
         _pause();
     }
 
+    /// @notice Unpause fee collection
     function unpause() external onlyAdmin {
         _unpause();
     }

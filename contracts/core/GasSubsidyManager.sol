@@ -9,14 +9,14 @@ import '../errors/Errors.sol';
 contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     AccessControlCenter public access;
 
-    // moduleId => user => имеет ли право на покрытие газа
+    // moduleId => user => whether gas coverage is allowed
     mapping(bytes32 => mapping(address => bool)) public isEligible;
 
-    // moduleId => адрес контракта => включено ли покрытие газа
+    // moduleId => contract address => gas coverage enabled
     mapping(bytes32 => mapping(address => bool)) public gasCoverageEnabled;
 
     event GasRefundLimitSet(bytes32 moduleId, uint256 limit);
-    // moduleId => максимальный возврат газа за транзакцию
+    // moduleId => max gas refund per transaction
     mapping(bytes32 => uint256) public gasRefundPerTx;
 
     event EligibilitySet(bytes32 moduleId, address user, bool allowed);
@@ -24,7 +24,9 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
     event GasRefunded(bytes32 moduleId, address relayer, uint256 refund);
     event GasTankFunded(address indexed from, uint256 value, uint256 newBalance);
 
-    /// Установить лимит возврата газа на одну транзакцию для модуля
+    /// @notice Set per-transaction gas refund limit for a module
+    /// @param moduleId Module identifier
+    /// @param limit Maximum refund amount
     function setGasRefundLimit(bytes32 moduleId, uint256 limit) external onlyAdmin {
         gasRefundPerTx[moduleId] = limit;
         emit GasRefundLimitSet(moduleId, limit);
@@ -45,19 +47,29 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         access = AccessControlCenter(accessControl);
     }
 
-    /// Пользователь получает право не платить за газ (его покроет система)
+    /// @notice Grant gas payment exemption to a user
+    /// @param moduleId Module identifier
+    /// @param user Address receiving the privilege
+    /// @param status Eligibility flag
     function setEligibility(bytes32 moduleId, address user, bool status) external onlyFeatureOwner {
         isEligible[moduleId][user] = status;
         emit EligibilitySet(moduleId, user, status);
     }
 
-    /// Модуль (feature) регистрирует себя для поддержки покрытия газа
+    /// @notice Enable gas coverage for a contract
+    /// @param moduleId Module identifier
+    /// @param contractAddress Contract address to enable coverage for
+    /// @param enabled Whether coverage is enabled
     function setGasCoverageEnabled(bytes32 moduleId, address contractAddress, bool enabled) external onlyFeatureOwner {
         gasCoverageEnabled[moduleId][contractAddress] = enabled;
         emit GasCoverageEnabled(moduleId, contractAddress, enabled);
     }
 
-    /// Проверка перед выполнением действия (можно вызывать в модуле)
+    /// @notice Check whether gas is subsidized for a call
+    /// @param moduleId Module identifier
+    /// @param user User address
+    /// @param contractAddress Contract being called
+    /// @return True if the user is eligible and coverage is enabled
     function isGasFree(bytes32 moduleId, address user, address contractAddress) external view returns (bool) {
         return gasCoverageEnabled[moduleId][contractAddress] && isEligible[moduleId][user];
     }

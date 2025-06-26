@@ -34,9 +34,9 @@ contract ContestFactory {
         _;
     }
 
-    /// @notice Создает новый конкурс с призами
-    /// @param _prizes Список призов
-    /// @return escrow Адрес созданного эскроу-контракта
+    /// @notice Deploy a new contest with specified prizes
+    /// @param _prizes List of contest prizes
+    /// @return escrow Address of the created escrow contract
     function createContest(
         PrizeInfo[] calldata _prizes,
         bytes calldata /* metadata */
@@ -101,17 +101,21 @@ contract ContestFactory {
         emit ContestCreated(msg.sender, escrow, deadline);
     }
 
-    /// @notice Устанавливает длительность конкурса по умолчанию
-    /// @param duration Длительность в секундах
+    /// @notice Set the default contest duration
+    /// @param duration Duration in seconds
     function setDefaultContestDuration(uint256 duration) external onlyGovernor {
         defaultContestDuration = duration;
     }
 
+    /// @notice Update registry address
+    /// @param newRegistry New registry contract
     function setRegistry(address newRegistry) external onlyGovernor {
         registry = IRegistry(newRegistry);
         access = AccessControlCenter(IRegistry(newRegistry).getCoreService(keccak256('AccessControlCenter')));
     }
 
+    /// @notice Update fee manager address
+    /// @param mgr New fee manager
     function setFeeManager(address mgr) external onlyGovernor {
         feeManager = mgr;
     }

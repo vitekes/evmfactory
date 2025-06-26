@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-/// @notice Тип приза: монетарный (ERC-20) или промо (офлайн-код)
+/// @notice Prize type: monetary (ERC-20) or promo (offline code)
 enum PrizeType {
     MONETARY,
     PROMO
 }
 
-/// @notice Описание одного призового места в конкурсе
+/// @notice Description of a single prize slot
 struct PrizeInfo {
-    PrizeType prizeType; // тип приза
-    address token; // адрес ERC-20-токена (для MONETARY)
-    uint256 amount; // сумма токенов (для MONETARY)
-    uint8 distribution; // схема распределения (0 = равномерно, 1 = нисходяще)
-    string uri; // описание/URI для неденежных призов
+    PrizeType prizeType; // prize type
+    address token; // ERC-20 token address (for MONETARY)
+    uint256 amount; // token amount (for MONETARY)
+    uint8 distribution; // distribution scheme (0 = flat, 1 = descending)
+    string uri; // description/URI for non-monetary prizes
 }
