@@ -36,7 +36,7 @@ contract ContestFactory {
     function createContest(
         PrizeInfo[] calldata _prizes,
         bytes calldata /* metadata */
-    ) external returns (address escrow) {
+    ) external onlyGovernor returns (address escrow) {
         // validate prizes via plugin if available
         address validator = registry.getModuleService(CoreDefs.CONTEST_MODULE_ID, CoreDefs.SERVICE_VALIDATOR);
         if (validator != address(0)) {
@@ -45,10 +45,11 @@ contract ContestFactory {
             }
         }
 
-        // basic sanity check for promo slots
+        // basic sanity check for promo slots and zero-amount prizes
         for (uint256 i = 0; i < _prizes.length; i++) {
             PrizeInfo calldata p = _prizes[i];
             if (p.prizeType == PrizeType.PROMO && p.token != address(0)) revert InvalidPrizeData();
+            if (p.amount == 0 && p.token != address(0)) revert InvalidPrizeData();
         }
 
         // deploy escrow

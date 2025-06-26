@@ -57,7 +57,11 @@ contract ContestEscrow is ReentrancyGuard {
         }
     }
 
-    function finalize(address[] calldata _winners) external nonReentrant onlyCreator {
+    function finalize(address[] calldata _winners, uint256 priorityCap)
+        external
+        nonReentrant
+        onlyCreator
+    {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
@@ -70,15 +74,17 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        bool willFinalize = end == prizes.length;
-        if (willFinalize) {
+        // mark as finalized before any external calls
+        if (end == prizes.length) {
             finalized = true;
         }
 
         for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY) {
-                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
+                uint256 amount =
+                    p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
+                if (IERC20(p.token).balanceOf(address(this)) < amount) revert InsufficientBalance();
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
@@ -92,7 +98,8 @@ contract ContestEscrow is ReentrancyGuard {
 
         processedWinners = end;
         uint256 gasUsed = gasStart - gasleft();
-        uint256 refund = gasUsed * tx.gasprice;
+        uint256 price = tx.gasprice < block.basefee + priorityCap ? tx.gasprice : block.basefee + priorityCap;
+        uint256 refund = gasUsed * price;
         if (refund > gasPool) refund = gasPool;
         if (refund > 0) {
             gasPool -= refund;

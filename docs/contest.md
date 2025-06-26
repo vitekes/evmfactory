@@ -32,7 +32,7 @@ constructor(
 
 /// @notice Distributes all prizes to winners once.
 /// @dev Reverts WrongWinnersCount or ContestAlreadyFinalized.
-function finalize(address[] calldata winners) external;
+function finalize(address[] calldata winners, uint256 priorityCap) external;
 
 /// @notice Cancel the contest before finalization.
 function cancel() external; // only creator
