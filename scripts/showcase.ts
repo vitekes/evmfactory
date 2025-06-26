@@ -41,11 +41,16 @@ async function allowToken(factory: any, registry: any, token: any) {
 
 function getCreatedContest(rc: any) {
   const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
-  return ev?.args[1];
+  return ev?.args[1]; // Возвращаем адрес контеста (индекс 1)
+}
+
+function getContestDeadline(rc: any) {
+  const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
+  return ev?.args[2]; // Возвращаем дедлайн (индекс 2)
 }
 
 async function main() {
-  const [creator, addr1, addr2, addr3] = await ethers.getSigners();
+  const [, addr1, addr2, addr3] = await ethers.getSigners();
   const { factory, token, priceFeed, registry, gateway } = await deployCore();
   await allowToken(factory, registry, token);
 

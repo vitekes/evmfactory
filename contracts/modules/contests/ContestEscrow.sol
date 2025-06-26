@@ -24,6 +24,10 @@ contract ContestEscrow is ReentrancyGuard {
     uint256 public gasPool;
     uint256 public processedWinners;
     bool public finalized;
+    uint256 public deadline;
+    uint256 public constant GRACE_PERIOD = 30 days;
+    bytes32 public winnerCommitment;
+    bool public isCommitted;
 
     uint8 public constant maxWinnersPerTx = 20;
     bytes32 public constant MODULE_ID = CoreDefs.CONTEST_MODULE_ID;
@@ -33,6 +37,7 @@ contract ContestEscrow is ReentrancyGuard {
     event PrizeAssigned(address indexed to, string uri);
     event ContestFinalized(address[] winners);
     event GasRefunded(address indexed to, uint256 amount);
+    event WinnersCommitted(bytes32 commitment);
 
     modifier onlyCreator() {
         if (msg.sender != creator) revert NotCreator();
@@ -44,7 +49,8 @@ contract ContestEscrow is ReentrancyGuard {
         PrizeInfo[] memory _prizes,
         address _registry,
         uint256 _gasPool,
-        address _commissionToken
+        address _commissionToken,
+        uint256 _deadline
     ) {
         // factory should deploy the escrow, not the creator
         assert(msg.sender != _creator);
@@ -52,18 +58,25 @@ contract ContestEscrow is ReentrancyGuard {
         creator = _creator;
         commissionToken = _commissionToken;
         gasPool = _gasPool;
+        deadline = _deadline > 0 ? _deadline : block.timestamp + 180 days;
         for (uint256 i = 0; i < _prizes.length; i++) {
             prizes.push(_prizes[i]);
         }
     }
 
-    function finalize(address[] calldata _winners, uint256 priorityCap)
+    function finalize(address[] calldata _winners, uint256 priorityCap, uint256 nonce)
         external
         nonReentrant
         onlyCreator
     {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
+
+        // Проверяем соответствие commitment, если он был задан
+        if (isCommitted) {
+            bytes32 computedCommitment = keccak256(abi.encode(_winners, nonce));
+            if (computedCommitment != winnerCommitment) revert CommitmentInvalid();
+        }
 
         if (winners.length == 0) {
             winners = _winners;
@@ -98,8 +111,10 @@ contract ContestEscrow is ReentrancyGuard {
 
         processedWinners = end;
         uint256 gasUsed = gasStart - gasleft();
-        uint256 price = tx.gasprice < block.basefee + priorityCap ? tx.gasprice : block.basefee + priorityCap;
-        uint256 refund = gasUsed * price;
+        // Ограничиваем цену газа для предотвращения манипуляций
+        uint256 maxGasPrice = block.basefee + priorityCap;
+        uint256 actualGasPrice = tx.gasprice > maxGasPrice ? maxGasPrice : tx.gasprice;
+        uint256 refund = gasUsed * actualGasPrice;
         if (refund > gasPool) refund = gasPool;
         if (refund > 0) {
             gasPool -= refund;
@@ -151,5 +166,23 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 rankWeight = n - idx;
         uint256 sumWeights = (n * (n + 1)) / 2;
         return (amount * rankWeight) / sumWeights;
+    }
+
+    /// @notice Экстренный вывод средств в случае если конкурс не был финализирован в срок
+    function emergencyWithdraw() external onlyCreator nonReentrant {
+        if (finalized) revert ContestAlreadyFinalized();
+        if (block.timestamp <= deadline + GRACE_PERIOD) revert GracePeriodNotExpired();
+
+        finalized = true;
+        for (uint256 i = 0; i < prizes.length; i++) {
+            PrizeInfo memory p = prizes[i];
+            if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
+                IERC20(p.token).safeTransfer(creator, p.amount);
+            }
+        }
+        if (gasPool > 0) {
+            IERC20(commissionToken).safeTransfer(creator, gasPool);
+            gasPool = 0;
+        }
     }
 }

@@ -16,11 +16,12 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 contract ContestFactory {
     using SafeERC20 for IERC20;
 
-    event ContestCreated(address indexed creator, address contest);
+    event ContestCreated(address indexed creator, address contest, uint256 deadline);
 
     IRegistry public registry;
     address public feeManager;
     AccessControlCenter public access;
+    uint256 public defaultContestDuration = 180 days;
 
     constructor(address _registry, address _feeManager) {
         registry = IRegistry(_registry);
@@ -33,6 +34,9 @@ contract ContestFactory {
         _;
     }
 
+    /// @notice Создает новый конкурс с призами
+    /// @param _prizes Список призов
+    /// @return escrow Адрес созданного эскроу-контракта
     function createContest(
         PrizeInfo[] calldata _prizes,
         bytes calldata /* metadata */
@@ -53,7 +57,8 @@ contract ContestFactory {
         }
 
         // deploy escrow
-        ContestEscrow esc = new ContestEscrow(msg.sender, _prizes, address(registry), 0, feeManager);
+        uint256 deadline = block.timestamp + defaultContestDuration;
+        ContestEscrow esc = new ContestEscrow(msg.sender, _prizes, address(registry), 0, feeManager, deadline);
         escrow = address(esc);
 
         // transfer tokens to escrow, fail-fast on missing amounts
@@ -93,7 +98,13 @@ contract ContestFactory {
             if (IERC20(tokens[i]).balanceOf(escrow) != totals[i]) revert ContestFundingMissing();
         }
 
-        emit ContestCreated(msg.sender, escrow);
+        emit ContestCreated(msg.sender, escrow, deadline);
+    }
+
+    /// @notice Устанавливает длительность конкурса по умолчанию
+    /// @param duration Длительность в секундах
+    function setDefaultContestDuration(uint256 duration) external onlyGovernor {
+        defaultContestDuration = duration;
     }
 
     function setRegistry(address newRegistry) external onlyGovernor {
