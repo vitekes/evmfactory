@@ -31,7 +31,7 @@ contract NFTManager is ERC721URIStorage, Ownable {
 
     /// @notice Soulbound tokens are non-transferable
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        address from = ERC721.ownerOf(tokenId);
+        address from = _ownerOf(tokenId);
         if (!(from == address(0) || to == address(0) || !isSoulbound[tokenId])) revert SbtNonTransferable();
         return super._update(to, tokenId, auth);
     }
