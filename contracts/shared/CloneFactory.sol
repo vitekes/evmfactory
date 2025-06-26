@@ -10,8 +10,8 @@ abstract contract CloneFactory {
         if (instance.code.length == 0) {
             instance = Clones.cloneDeterministic(implementation, salt);
             if (initData.length > 0) {
-                (bool ok, ) = instance.call(initData);
-                if (!ok) revert InitFailed();
+                (bool ok, bytes memory ret) = instance.call(initData);
+                if (!ok) _revert(ret);
             }
         }
     }
