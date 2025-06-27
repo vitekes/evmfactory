@@ -59,7 +59,7 @@ async function main() {
   const nonceForMarket = await deployer.getNonce();
   const predictedMarket = ethers.getCreateAddress({
     from: deployer.address,
-    nonce: nonceForMarket + 4,
+    nonce: nonceForMarket,
   });
   await registry.registerFeature(MARKET_ID, predictedMarket, 0);
   await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedMarket);
@@ -78,7 +78,7 @@ async function main() {
   const nonceForSub = await deployer.getNonce();
   const predictedSub = ethers.getCreateAddress({
     from: deployer.address,
-    nonce: nonceForSub + 4,
+    nonce: nonceForSub,
   });
   await registry.registerFeature(SUB_ID, predictedSub, 0);
   await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedSub);
