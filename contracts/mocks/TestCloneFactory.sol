@@ -2,10 +2,10 @@
 pragma solidity ^0.8.28;
 
 import "../shared/CloneFactory.sol";
+import "../errors/Errors.sol";
 
 contract DummyTemplate {
     uint256 public value;
-    error InitFailed();
 
     function init(uint256 v) external {
         if (v == 0) revert InitFailed();
