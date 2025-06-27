@@ -68,11 +68,11 @@ contract ContestEscrow is ReentrancyGuard {
     /// @param _winners List of winner addresses
     /// @param priorityCap Priority fee cap for gas refund calculation
     /// @param nonce Nonce used when committing winners
-    function finalize(address[] calldata _winners, uint256 priorityCap, uint256 nonce)
-        external
-        nonReentrant
-        onlyCreator
-    {
+    function finalize(
+        address[] calldata _winners,
+        uint256 priorityCap,
+        uint256 nonce
+    ) external nonReentrant onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
@@ -99,8 +99,7 @@ contract ContestEscrow is ReentrancyGuard {
         for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY) {
-                uint256 amount =
-                    p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
+                uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
                 if (IERC20(p.token).balanceOf(address(this)) < amount) revert InsufficientBalance();
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);

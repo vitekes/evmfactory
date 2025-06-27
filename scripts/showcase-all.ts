@@ -131,7 +131,7 @@ async function main() {
   console.log("Subscription charged");
 
   console.log("Running contest demo...");
-  await token.approve(await contestFactory.getAddress(), ethers.parseEther("20"));
+  await token.approve(await gateway.getAddress(), ethers.parseEther("20"));
   const prizes = [
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("10"), distribution: 0, uri: "" },
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("5"), distribution: 0, uri: "" },
@@ -140,6 +140,8 @@ async function main() {
   const rc = await tx.wait();
   const created = rc?.logs.find(l => l.fragment && l.fragment.name === "ContestCreated");
   const contestAddr = created?.args[1];
+  const deadline = created?.args[2];
+  console.log("Contest created with deadline:", new Date(Number(deadline) * 1000).toISOString());
   const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   await gateway.connect(winner); // just to silence ts
   await esc.finalize([winner.address, deployer.address], 0n, 0n);

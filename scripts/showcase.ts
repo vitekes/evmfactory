@@ -20,21 +20,10 @@ async function deployCore() {
   const Factory = await ethers.getContractFactory("ContestFactory");
   const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress());
 
-  await factory.setPriceFeed(await priceFeed.getAddress());
-  await factory.setUsdFeeBounds(ethers.parseEther("5"), ethers.parseEther("10"));
-
   return { factory, token, priceFeed, registry, gateway };
 }
 
-async function allowToken(factory: any, registry: any, token: any) {
-  const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
-  const validatorAddr = await registry.getModuleService(moduleId, "Validator");
-  await network.provider.request({ method: "hardhat_impersonateAccount", params: [await factory.getAddress()] });
-  const signer = await ethers.getSigner(await factory.getAddress());
-  const validator = (await ethers.getContractAt("MultiValidator", validatorAddr)) as any;
-  await validator.connect(signer).addToken(await token.getAddress());
-  await network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await factory.getAddress()] });
-}
+// Функция allowToken удалена, так как токен добавляется напрямую
 
 function getCreatedContest(rc: any) {
   const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
@@ -49,25 +38,48 @@ function getContestDeadline(rc: any) {
 async function main() {
   const [, addr1, addr2, addr3] = await ethers.getSigners();
   const { factory, token, priceFeed, registry, gateway } = await deployCore();
-  await allowToken(factory, registry, token);
+
+  // Регистрация модуля Contest и валидатора
+  const CONTEST_ID = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
+  await registry.registerFeature(CONTEST_ID, await factory.getAddress(), 0);
+
+  // Создание и регистрация валидатора
+  const MultiValidator = await ethers.getContractFactory("MultiValidator");
+  const validator = await MultiValidator.deploy();
+
+  // Получение доступа к AccessControlCenter
+  const aclAddress = await registry.getCoreService(ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter")));
+
+  // Инициализируем валидатор
+  await validator.initialize(aclAddress);
+
+  // Установка валидатора в реестр
+  await registry.setModuleServiceAlias(
+    CONTEST_ID, 
+    "Validator", 
+    await validator.getAddress()
+  );
+
+  // Добавляем токен напрямую в валидатор
+  await validator.addToken(await token.getAddress());
 
   await token.approve(await gateway.getAddress(), ethers.parseEther("1000"));
   await priceFeed.setPrice(await token.getAddress(), ethers.parseEther("1"));
 
-  const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
+  const metadata = "0x";
   const prizes = [
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("10"), distribution: 0, uri: "" },
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("5"), distribution: 0, uri: "" },
     { prizeType: 1, token: ethers.ZeroAddress, amount: 0, distribution: 0, uri: "ipfs://promo" }
   ];
 
-  const tx = await factory.createContest(prizes, params);
+  const tx = await factory.createContest(prizes, metadata);
   const rc = await tx.wait();
   const contestAddr = getCreatedContest(rc);
   const escrow = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   console.log("Contest escrow:", contestAddr);
 
-  const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address], 0n);
+  const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address], 0n, 0n);
   const receipt = await finalizeTx.wait();
 
   console.log("Finalize events:");
