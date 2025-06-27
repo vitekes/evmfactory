@@ -35,8 +35,8 @@ describe("CloneFactory", function () {
   });
 
   it("different salts produce different addresses", async () => {
-    const salt1 = ethers.hexZeroPad("0x01", 32);
-    const salt2 = ethers.hexZeroPad("0x02", 32);
+    const salt1 = ethers.zeroPadValue("0x01", 32);
+    const salt2 = ethers.zeroPadValue("0x02", 32);
     const initData = new ethers.Interface(["function init(uint256)"]).encodeFunctionData("init", [1]);
     const c1 = await factory.clone(await template.getAddress(), salt1, initData);
     const c2 = await factory.clone(await template.getAddress(), salt2, initData);

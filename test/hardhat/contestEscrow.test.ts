@@ -4,10 +4,10 @@ import { ethers } from "hardhat";
 describe("ContestEscrow", function () {
   let token: any;
   let escrow: any;
-  let creator: any, w1: any, w2: any;
+  let deployer: any, creator: any, w1: any, w2: any;
 
   beforeEach(async () => {
-    [creator, w1, w2] = await ethers.getSigners();
+    [deployer, creator, w1, w2] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory("TestToken");
     token = await Token.deploy("T", "T");
@@ -22,7 +22,7 @@ describe("ContestEscrow", function () {
 
     const Escrow = await ethers.getContractFactory("ContestEscrow");
     const deadline = (await ethers.provider.getBlock("latest")).timestamp + 86400;
-    escrow = await Escrow.deploy(creator.address, prizes, await registry.getAddress(), 0, await token.getAddress(), deadline);
+    escrow = await Escrow.connect(deployer).deploy(creator.address, prizes, await registry.getAddress(), 0, await token.getAddress(), deadline);
     await token.transfer(await escrow.getAddress(), ethers.parseEther("150"));
   });
 
