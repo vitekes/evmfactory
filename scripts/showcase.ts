@@ -4,7 +4,7 @@ async function deployCore() {
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("USD Coin", "USDC");
 
-  const ACL = await ethers.getContractFactory("MockAccessControlCenter");
+  const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
   const acl = await ACL.deploy();
 
   const Registry = await ethers.getContractFactory("MockRegistry");
