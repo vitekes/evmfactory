@@ -17,11 +17,8 @@ async function deployCore() {
   const PriceFeed = await ethers.getContractFactory("MockPriceFeed");
   const priceFeed = await PriceFeed.deploy();
 
-  const Validator = await ethers.getContractFactory("MultiValidator");
-  const validatorLogic = await Validator.deploy();
-
   const Factory = await ethers.getContractFactory("ContestFactory");
-  const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress(), await validatorLogic.getAddress());
+  const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress());
 
   await factory.setPriceFeed(await priceFeed.getAddress());
   await factory.setUsdFeeBounds(ethers.parseEther("5"), ethers.parseEther("10"));
@@ -64,7 +61,7 @@ async function main() {
     { prizeType: 1, token: ethers.ZeroAddress, amount: 0, distribution: 0, uri: "ipfs://promo" }
   ];
 
-  const tx = await factory.createCustomContest(prizes, params);
+  const tx = await factory.createContest(prizes, params);
   const rc = await tx.wait();
   const contestAddr = getCreatedContest(rc);
   const escrow = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;

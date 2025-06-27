@@ -43,8 +43,10 @@ async function main() {
   await subValidator.addToken(await token.getAddress());
 
   const ContestFactory = await ethers.getContractFactory("ContestFactory");
-  const validatorLogic = await Validator.deploy();
-  const contestFactory = await ContestFactory.deploy(await registry.getAddress(), await gateway.getAddress(), await validatorLogic.getAddress());
+  const contestFactory = await ContestFactory.deploy(
+    await registry.getAddress(),
+    await gateway.getAddress()
+  );
 
   const Marketplace = await ethers.getContractFactory("Marketplace");
   const MARKET_ID = ethers.keccak256(ethers.toUtf8Bytes("Market"));
@@ -89,7 +91,7 @@ async function main() {
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("10"), distribution: 0, uri: "" },
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("5"), distribution: 0, uri: "" },
   ];
-  const tx = await contestFactory.createCustomContest(prizes, params);
+  const tx = await contestFactory.createContest(prizes, params);
   const rc = await tx.wait();
   const created = rc?.logs.find(l => l.fragment && l.fragment.name === "ContestCreated");
   const contestAddr = created?.args[1];
