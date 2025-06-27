@@ -31,11 +31,15 @@ async function main() {
   console.log("Deploying feature modules...");
   const Validator = await ethers.getContractFactory("MultiValidator");
   const marketValidator: any = await Validator.deploy();
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await marketValidator.getAddress());
   await marketValidator.initialize(await acl.getAddress());
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), await marketValidator.getAddress());
   await marketValidator.addToken(await token.getAddress());
 
   const subValidator: any = await Validator.deploy();
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await subValidator.getAddress());
   await subValidator.initialize(await acl.getAddress());
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), await subValidator.getAddress());
   await subValidator.addToken(await token.getAddress());
 
   const ContestFactory = await ethers.getContractFactory("ContestFactory");
