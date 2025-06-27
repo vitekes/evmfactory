@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../shared/CloneFactory.sol";
-import "../errors/Errors.sol";
+import '../shared/CloneFactory.sol';
+import '../errors/Errors.sol';
 
 contract DummyTemplate {
     uint256 public value;
