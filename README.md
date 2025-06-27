@@ -54,9 +54,9 @@
    ```
    (Do not use `npx test` — it installs an unrelated package.)
 
-5. Run the showcase script to see a complete contest flow:
+5. Run the showcase script to see a complete end-to-end flow:
    ```bash
-   npx hardhat run scripts/showcase.ts --network localhost
+   npx hardhat run scripts/showcase-all.ts --network localhost
    ```
 
 ## Как запустить Foundry

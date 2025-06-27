@@ -10,11 +10,16 @@ async function main() {
   const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
   await acl.grantRole(FACTORY_ADMIN, deployer.address);
   await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), deployer.address);
+  await acl.grantRole(await acl.GOVERNOR_ROLE(), deployer.address);
   await acl.grantRole(await acl.AUTOMATION_ROLE(), keeper.address);
 
   const Registry = await ethers.getContractFactory("Registry");
   const registry = await Registry.deploy();
   await registry.initialize(await acl.getAddress());
+  await registry.setCoreService(
+    ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter")),
+    await acl.getAddress()
+  );
 
   const Fee = await ethers.getContractFactory("CoreFeeManager");
   const fee = await Fee.deploy();
@@ -23,6 +28,7 @@ async function main() {
   const Gateway = await ethers.getContractFactory("PaymentGateway");
   const gateway = await Gateway.deploy();
   await gateway.initialize(await acl.getAddress(), await registry.getAddress(), await fee.getAddress());
+  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), await gateway.getAddress());
 
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("Demo", "DEMO");
@@ -31,25 +37,59 @@ async function main() {
   console.log("Deploying feature modules...");
   const Validator = await ethers.getContractFactory("MultiValidator");
   const marketValidator: any = await Validator.deploy();
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await marketValidator.getAddress());
   await marketValidator.initialize(await acl.getAddress());
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), await marketValidator.getAddress());
   await marketValidator.addToken(await token.getAddress());
 
   const subValidator: any = await Validator.deploy();
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), await subValidator.getAddress());
   await subValidator.initialize(await acl.getAddress());
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), await subValidator.getAddress());
   await subValidator.addToken(await token.getAddress());
 
   const ContestFactory = await ethers.getContractFactory("ContestFactory");
-  const validatorLogic = await Validator.deploy();
-  const contestFactory = await ContestFactory.deploy(await registry.getAddress(), await gateway.getAddress(), await validatorLogic.getAddress());
+  const contestFactory = await ContestFactory.deploy(
+    await registry.getAddress(),
+    await gateway.getAddress()
+  );
 
   const Marketplace = await ethers.getContractFactory("Marketplace");
   const MARKET_ID = ethers.keccak256(ethers.toUtf8Bytes("Market"));
-  const market = await Marketplace.deploy(await registry.getAddress(), await gateway.getAddress(), MARKET_ID);
+  const nonceForMarket = await deployer.getNonce();
+  const predictedMarket = ethers.getCreateAddress({
+    from: deployer.address,
+    nonce: nonceForMarket,
+  });
+  await registry.registerFeature(MARKET_ID, predictedMarket, 0);
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedMarket);
+  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), predictedMarket);
+  await acl.grantRole(await acl.AUTOMATION_ROLE(), predictedMarket);
+  const market = await Marketplace.deploy(
+    await registry.getAddress(),
+    await gateway.getAddress(),
+    MARKET_ID
+  );
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), predictedMarket);
   await registry.setModuleServiceAlias(MARKET_ID, "Validator", await marketValidator.getAddress());
 
   const SubManager = await ethers.getContractFactory("SubscriptionManager");
   const SUB_ID = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
-  const sub = await SubManager.deploy(await registry.getAddress(), await gateway.getAddress(), SUB_ID);
+  const nonceForSub = await deployer.getNonce();
+  const predictedSub = ethers.getCreateAddress({
+    from: deployer.address,
+    nonce: nonceForSub,
+  });
+  await registry.registerFeature(SUB_ID, predictedSub, 0);
+  await acl.grantRole(await acl.DEFAULT_ADMIN_ROLE(), predictedSub);
+  await acl.grantRole(await acl.FEATURE_OWNER_ROLE(), predictedSub);
+  await acl.grantRole(await acl.AUTOMATION_ROLE(), predictedSub);
+  const sub = await SubManager.deploy(
+    await registry.getAddress(),
+    await gateway.getAddress(),
+    SUB_ID
+  );
+  await acl.revokeRole(await acl.DEFAULT_ADMIN_ROLE(), predictedSub);
   await registry.setModuleServiceAlias(SUB_ID, "Validator", await subValidator.getAddress());
 
   console.log("Running marketplace demo...");
@@ -69,29 +109,40 @@ async function main() {
     salt: 1n,
     expiry: 0n,
   } as const;
-  const planHash = await sub.hashPlan(plan);
-  const sigMerchant = await deployer.signMessage(ethers.getBytes(planHash));
+  const domain = { chainId: 31337n, verifyingContract: await sub.getAddress() };
+  const types = {
+    Plan: [
+      { name: "chainIds", type: "uint256[]" },
+      { name: "price", type: "uint256" },
+      { name: "period", type: "uint256" },
+      { name: "token", type: "address" },
+      { name: "merchant", type: "address" },
+      { name: "salt", type: "uint256" },
+      { name: "expiry", type: "uint64" },
+    ],
+  } as const;
+  const sigMerchant = await deployer.signTypedData(domain, types, plan);
   await token.connect(buyer).approve(await gateway.getAddress(), plan.price);
   await sub.connect(buyer).subscribe(plan, sigMerchant, "0x");
   await ethers.provider.send("evm_increaseTime", [61]);
   await ethers.provider.send("evm_mine", []);
+  await token.connect(buyer).approve(await gateway.getAddress(), plan.price);
   await sub.connect(keeper).chargeBatch([buyer.address]);
   console.log("Subscription charged");
 
   console.log("Running contest demo...");
-  const params = { judges: [] as string[], metadata: "0x", commissionToken: await token.getAddress() };
-  await token.approve(await gateway.getAddress(), ethers.parseEther("20"));
+  await token.approve(await contestFactory.getAddress(), ethers.parseEther("20"));
   const prizes = [
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("10"), distribution: 0, uri: "" },
     { prizeType: 0, token: await token.getAddress(), amount: ethers.parseEther("5"), distribution: 0, uri: "" },
   ];
-  const tx = await contestFactory.createCustomContest(prizes, params);
+  const tx = await contestFactory.createContest(prizes, "0x");
   const rc = await tx.wait();
   const created = rc?.logs.find(l => l.fragment && l.fragment.name === "ContestCreated");
   const contestAddr = created?.args[1];
   const esc = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   await gateway.connect(winner); // just to silence ts
-  await esc.finalize([winner.address, deployer.address], 0n);
+  await esc.finalize([winner.address, deployer.address], 0n, 0n);
   console.log("Contest finalized, winner balance:", (await token.balanceOf(winner.address)).toString());
 }
 
