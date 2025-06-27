@@ -38,20 +38,31 @@ jobs:
       - name: Run Foundry tests
         run: forge test -vv
 
-      # 7) Run Hardhat JS tests (e2e/integration)
-      - name: Run Hardhat tests
-        run: npm test
+      # 7) Compile contracts with Hardhat
+      - name: Hardhat compile
+        run: npx hardhat compile
 
-      # 8) Forge coverage report + coverage gate (≥90%)
+      # 8) Run Hardhat JS tests (e2e/integration)
+      - name: Run Hardhat tests
+        run: npx hardhat test
+
+      # 9) Run showcase scripts
+      - name: Run showcase scripts
+        run: |
+          for f in scripts/showcase*.ts; do
+            npx hardhat run "$f" || exit 1
+          done
+
+      # 10) Forge coverage report + coverage gate (≥90%)
       - name: Forge coverage
         run: |
           forge coverage --report lcov
           bash scripts/check-coverage.sh 90
 
-      # 9) Hardhat coverage (using solidity-coverage)
+      # 11) Hardhat coverage (using solidity-coverage)
       - name: Hardhat coverage
         run: npm run coverage
 
-      # 10) Static analysis with Slither
+      # 12) Static analysis with Slither
       - name: Slither static
         run: slither . --fail-on-issue High
