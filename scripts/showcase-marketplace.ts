@@ -1,4 +1,4 @@
-import { ethers, network } from "hardhat";
+import { ethers } from "hardhat";
 
 async function deployCore() {
   console.log("Деплой токена...");
@@ -59,10 +59,39 @@ async function deployCore() {
   console.log("Настройка платежного шлюза...");
   await gateway.setFeeManager(await feeManager.getAddress());
 
-  console.log("Регистрация сервисов для модуля маркетплейса...");
+  console.log("Подготовка модуля маркетплейса...");
   const MARKETPLACE_ID = ethers.keccak256(ethers.toUtf8Bytes("Marketplace"));
+  console.log("Идентификатор модуля маркетплейса вычислен");
+
+  console.log("Создание и настройка валидатора...");
+  // Создание и инициализация валидатора
+  const MultiValidator = await ethers.getContractFactory("MultiValidator");
+  const validator = await MultiValidator.deploy();
+  await validator.waitForDeployment();
+  console.log(`Валидатор задеплоен по адресу: ${await validator.getAddress()}`);
+  // Получаем адрес ACL из переменной acl
+  await validator.initialize(await acl.getAddress());
+
+  // Выдаем роль GOVERNOR_ROLE деплоеру
+  const GOVERNOR_ROLE = await acl.GOVERNOR_ROLE();
+  await acl.grantRole(GOVERNOR_ROLE, deployer.address);
+
+  // Получаем адрес токена для добавления в валидатор
+  const tokenAddress = await token.getAddress();
+  // Добавляем токен в валидатор для проверки
+  await validator.addToken(tokenAddress);
+
+  console.log("Регистрация валидатора в реестре...");
+  // Регистрируем валидатор в реестре
+  await registry.setModuleServiceAlias(
+    MARKETPLACE_ID, 
+    "Validator", 
+    await validator.getAddress()
+  );
+
+  console.log("Регистрация сервисов для модуля маркетплейса...");
   const gatewayAddress = await gateway.getAddress();
-  // Регистрируем платежный шлюз как сервис для модуля маркетплейса до деплоя фабрики
+  // Теперь регистрируем платежный шлюз как сервис для модуля маркетплейса
   await registry.setModuleServiceAlias(
     MARKETPLACE_ID,
     "PaymentGateway",
@@ -72,12 +101,15 @@ async function deployCore() {
   console.log("Деплой фабрики маркетплейса...");
   const MarketplaceFactory = await ethers.getContractFactory("MarketplaceFactory");
   const registryAddress = await registry.getAddress();
-  const marketplaceFactory = await MarketplaceFactory.deploy(registryAddress, gatewayAddress);
+  // Передаем MODULE_ID в конструктор фабрики
+  const marketplaceFactory = await MarketplaceFactory.deploy(registryAddress, gatewayAddress, MARKETPLACE_ID);
   await marketplaceFactory.waitForDeployment();
   console.log(`Фабрика маркетплейса задеплоена по адресу: ${await marketplaceFactory.getAddress()}`);
 
-  // Регистрируем фабрику в системе
+  console.log("Регистрация модуля маркетплейса...");
+  // Регистрируем модуль с адресом фабрики
   await registry.registerFeature(MARKETPLACE_ID, await marketplaceFactory.getAddress(), 0);
+  console.log("Модуль маркетплейса зарегистрирован");
 
   console.log("Создание экземпляра маркетплейса...");
   const createMarketplaceTx = await marketplaceFactory.createMarketplace();
@@ -115,56 +147,21 @@ async function main() {
   const { marketplaceFactory, token, priceFeed, registry, gateway, acl } = await deployCore();
 
   console.log("Настройка прав доступа...");
-  // Выдаем необходимые роли
+  // Выдаем дополнительные роли продавцу (роль деплоера уже настроена в deployCore)
   const GOVERNOR_ROLE = await acl.GOVERNOR_ROLE();
-  await acl.grantRole(GOVERNOR_ROLE, deployer.address);
   await acl.grantRole(GOVERNOR_ROLE, seller.address);
 
-  // Выдаем роль FACTORY_ADMIN продавцу и деплоеру
+  // Выдаем роль FACTORY_ADMIN продавцу (деплоеру уже выдана в deployCore)
   const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
-  await acl.grantRole(FACTORY_ADMIN, deployer.address);
   await acl.grantRole(FACTORY_ADMIN, seller.address);
 
-  console.log("Регистрация модуля маркетплейса...");
-  // Регистрируем модуль маркетплейса
-  const MARKETPLACE_ID = ethers.keccak256(ethers.toUtf8Bytes("Marketplace"));
-
-  console.log("Создание и настройка валидатора...");
-  // Создание и инициализация валидатора
-  const MultiValidator = await ethers.getContractFactory("MultiValidator");
-  const validator = await MultiValidator.deploy();
-  await validator.waitForDeployment();
-  console.log(`Валидатор задеплоен по адресу: ${await validator.getAddress()}`);
-  // Получаем адрес ACL из переменной acl
-  await validator.initialize(await acl.getAddress());
-
-  // Получаем адрес токена для добавления в валидатор
-  const tokenAddress = await token.getAddress();
-  // Добавляем токен в валидатор для проверки
-  await validator.addToken(tokenAddress);
-
-  console.log("Регистрация валидатора в реестре...");
-  // Регистрируем валидатор в реестре
-  const SERVICE_VALIDATOR = ethers.keccak256(ethers.toUtf8Bytes("Validator"));
-  await registry.setModuleServiceAlias(
-    MARKETPLACE_ID, 
-    "Validator", 
-    await validator.getAddress()
-  );
-
-  // Регистрируем сервис платежного шлюза для маркетплейса
-  await registry.setModuleServiceAlias(
-    MARKETPLACE_ID,
-    "PaymentGateway",
-    await gateway.getAddress()
-  );
-
-  // Добавляем токен в валидатор
-  await validator.addToken(token.address);
+  console.log("Модуль маркетплейса уже зарегистрирован в deployCore()...");
+  // Проверим адрес регистра для отладки
+  console.log(`Используемый реестр: ${await registry.getAddress()}`);
 
   console.log("Настройка цен и апрувов...");
   // Получаем адрес токена как строку для корректной работы с getContractAt
-  // Уже объявлено выше: const tokenAddress = await token.getAddress();
+  const tokenAddress = await token.getAddress();
   // Передаем метаданные как строку в дополнительном параметре
   const erc20Interface = new ethers.Interface(["function approve(address spender, uint256 amount) external returns (bool)"]);
   const gatewayAddress = await gateway.getAddress();
@@ -178,41 +175,30 @@ async function main() {
 
   await priceFeed.setPrice(tokenAddress, ethers.parseEther("1"));
 
-  console.log("Создание маркетплейса...");
-  // Создаем маркетплейс с помощью фабрики
-  const marketFactory = await ethers.getContractAt("MarketplaceFactory", await marketplaceFactory.getAddress(), seller);
-  const createTx = await marketFactory.createMarketplace();
-  console.log(`Транзакция создания маркетплейса отправлена: ${createTx.hash}`);
-  const createRc = await createTx.wait();
-  console.log("Транзакция подтверждена");
+  console.log("Используем маркетплейс, созданный в deployCore()...");
 
-  // Получаем адрес созданного маркетплейса из событий
-  for (const log of createRc?.logs || []) {
+  // Получим маркетплейс из логов событий фабрики
+
+  // Запрашиваем список созданных маркетплейсов по событиям
+  const filter = {
+    address: await marketplaceFactory.getAddress(),
+    topics: [ethers.id("MarketplaceCreated(address,address)")]
+  };
+
+  const logs = await ethers.provider.getLogs(filter);
+  if (logs.length > 0) {
+    const iface = new ethers.Interface(["event MarketplaceCreated(address indexed creator, address marketplace)"]);
     try {
-      if (log.fragment && log.fragment.name === "MarketplaceCreated") {
-        marketplaceAddress = log.args.marketplace;
-        break;
+      const parsedLog = iface.parseLog({ topics: logs[0].topics, data: logs[0].data });
+      if (parsedLog && parsedLog.args && parsedLog.args.marketplace) {
+        marketplaceAddress = parsedLog.args.marketplace;
       }
-    } catch (e) {}
-  }
-
-  // Если не нашли через фрагмент, пробуем через темы
-  if (!marketplaceAddress || marketplaceAddress === "") {
-    for (const log of createRc?.logs || []) {
-      if (log.topics && log.topics[0] === ethers.id("MarketplaceCreated(address,address)")) {
-        const iface = new ethers.Interface(["event MarketplaceCreated(address indexed creator, address marketplace)"]);
-        try {
-          const decoded = iface.parseLog({topics: log.topics, data: log.data});
-          marketplaceAddress = decoded?.args?.marketplace;
-          break;
-        } catch (e) {
-          console.error("Ошибка при декодировании лога:", e);
-        }
-      }
+    } catch (e) {
+      console.error("Ошибка при декодировании лога:", e);
     }
   }
 
-  if (!marketplaceAddress || marketplaceAddress === "") {
+  if (!marketplaceAddress) {
     throw new Error("Не удалось получить адрес созданного маркетплейса");
   }
   console.log(`Маркетплейс создан по адресу: ${marketplaceAddress}`);
@@ -228,37 +214,54 @@ async function main() {
 
   // Создаем товар через контракт маркетплейса
   const marketplace = await ethers.getContractAt("Marketplace", marketplaceAddress, seller);
-  const listingTx = await marketplace.list(tokenAddress, ethers.parseEther("25"));
-  console.log(`Транзакция создания товара отправлена: ${listingTx.hash}`);
-  const listingRc = await listingTx.wait();
+  let listingTransaction;
+
+  // Проверяем сигнатуру метода list через интерфейс
+  const marketplaceInterface = marketplace.interface;
+  let hasMetadataParam = false;
+  try {
+    const listFunctions = marketplaceInterface.getFunction('list');
+    if (listFunctions) {
+      hasMetadataParam = Array.isArray(listFunctions) 
+        ? listFunctions.some(func => func.inputs.length > 2)
+        : listFunctions.inputs.length > 2;
+    }
+  } catch (e) {
+    console.log("Ошибка при получении функции list:", e);
+  }
+
+  // Создаем товар с правильными параметрами
+  if (hasMetadataParam) {
+    listingTransaction = await marketplace.list(tokenAddress, ethers.parseEther("25"), metadata);
+  } else {
+    listingTransaction = await marketplace.list(tokenAddress, ethers.parseEther("25"));
+  }
+
+  console.log(`Транзакция создания товара отправлена: ${listingTransaction.hash}`);
+  const listingReceipt = await listingTransaction.wait();
+  // Нет необходимости в этом коде, так как используем listingTransaction
   console.log("Транзакция подтверждена");
 
   // Получаем ID созданного листинга из событий
   let listingId = null;
-  for (const log of listingRc?.logs || []) {
+  const marketplaceCreatedEventSignature = "MarketplaceListingCreated(uint256,address,address,uint256)";
+  for (const log of listingReceipt?.logs || []) {
     try {
-      if (log.fragment && log.fragment.name === "MarketplaceListingCreated") {
-        listingId = log.args.id;
+      // Проверяем тему события по хешу сигнатуры
+      if (log.topics && log.topics[0] === ethers.id(marketplaceCreatedEventSignature)) {
+        // Декодируем аргументы события напрямую по сигнатуре
+        const decodedLog = marketplace.interface.decodeEventLog(
+          "MarketplaceListingCreated(uint256,address,address,uint256)",
+          log.data,
+          log.topics
+        );
+        listingId = decodedLog[0]; // Первый аргумент - id
         break;
       }
     } catch (e) {}
   }
 
-  // Если не нашли через фрагмент, пробуем через темы
-  if (listingId === null) {
-    for (const log of listingRc?.logs || []) {
-      if (log.topics && log.topics[0] === ethers.id("MarketplaceListingCreated(uint256,address,address,uint256)")) {
-        try {
-          const iface = new ethers.Interface(["event MarketplaceListingCreated(uint256 id, address indexed seller, address token, uint256 price)"]);
-          const decoded = iface.parseLog({topics: log.topics, data: log.data});
-          listingId = decoded?.args?.id;
-          break;
-        } catch (e) {
-          console.error("Ошибка при декодировании лога:", e);
-        }
-      }
-    }
-  }
+  // Этот блок удален, так как мы уже обрабатываем это событие выше с более надежным подходом
 
   if (listingId === null) {
     throw new Error("Не удалось получить ID созданного товара");
