@@ -16,6 +16,10 @@ async function deployCore() {
   console.log(`Инициализация ACL с админом: ${deployer.address}`);
   await acl.initialize(deployer.address);
 
+  // Для регистраций сервисов требуется роль FEATURE_OWNER
+  const FEATURE_OWNER_ROLE = await acl.FEATURE_OWNER_ROLE();
+  await acl.grantRole(FEATURE_OWNER_ROLE, deployer.address);
+
   console.log("Деплой реестра сервисов...");
   const Registry = await ethers.getContractFactory("Registry");
   const registry = await Registry.deploy();
