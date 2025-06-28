@@ -4,39 +4,101 @@ async function deployCore() {
   const Token = await ethers.getContractFactory("TestToken");
   const token = await Token.deploy("USD Coin", "USDC");
 
-  const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
+  // Создаем и инициализируем систему контроля доступа
+  const ACL = await ethers.getContractFactory("AccessControlCenter");
   const acl = await ACL.deploy();
+  await acl.initialize(await ethers.provider.getSigner(0).getAddress()); // Инициализируем ACL с первым аккаунтом как админом
 
-  const Registry = await ethers.getContractFactory("MockRegistry");
+  // Создаем реестр сервисов
+  const Registry = await ethers.getContractFactory("Registry");
   const registry = await Registry.deploy();
-  await registry.setCoreService(ethers.keccak256(Buffer.from("AccessControlCenter")), await acl.getAddress());
+  await registry.initialize(await acl.getAddress()); // Инициализируем реестр с ACL
 
+  // Регистрируем ACL в реестре
+  await registry.setCoreService(ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter")), await acl.getAddress());
+
+  // Создаем платежный шлюз
   const Gateway = await ethers.getContractFactory("MockPaymentGateway");
   const gateway = await Gateway.deploy();
 
+  // Создаем ценовой фид
   const PriceFeed = await ethers.getContractFactory("MockPriceFeed");
   const priceFeed = await PriceFeed.deploy();
 
+  // Создаем фабрику контестов
   const Factory = await ethers.getContractFactory("ContestFactory");
   const factory = await Factory.deploy(await registry.getAddress(), await gateway.getAddress());
 
-  return { factory, token, priceFeed, registry, gateway };
+  return { factory, token, priceFeed, registry, gateway, acl };
 }
 
 // Функция allowToken удалена, так как токен добавляется напрямую
 
 function getCreatedContest(rc: any) {
-  const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
-  return ev?.args[1]; // Возвращаем адрес контеста (индекс 1)
+  try {
+    // Сначала ищем событие по имени фрагмента
+    const ev = rc?.logs.find((l: any) => {
+      try {
+        return l.fragment && l.fragment.name === "ContestCreated";
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (ev?.args?.[1]) {
+      return ev.args[1]; // Возвращаем адрес контеста (индекс 1)
+    }
+
+    // Если не нашли через фрагмент, пробуем анализировать topics
+    // ContestCreated имеет сигнатуру: ContestCreated(address indexed creator, address contest, uint256 deadline)
+    for (const log of rc?.logs || []) {
+      if (log.topics && log.topics[0] === ethers.id("ContestCreated(address,address,uint256)")) {
+        const iface = new ethers.Interface(["event ContestCreated(address indexed creator, address contest, uint256 deadline)"]);
+        const decoded = iface.parseLog({topics: log.topics, data: log.data});
+        return decoded?.args?.contest;
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error("Ошибка при извлечении адреса контеста:", e);
+    return null;
+  }
 }
 
 function getContestDeadline(rc: any) {
-  const ev = rc?.logs.find((l: any) => l.fragment && l.fragment.name === "ContestCreated");
-  return ev?.args[2]; // Возвращаем дедлайн (индекс 2)
+  try {
+    // Сначала ищем событие по имени фрагмента
+    const ev = rc?.logs.find((l: any) => {
+      try {
+        return l.fragment && l.fragment.name === "ContestCreated";
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (ev?.args?.[2]) {
+      return ev.args[2]; // Возвращаем дедлайн (индекс 2)
+    }
+
+    // Если не нашли через фрагмент, пробуем анализировать topics
+    for (const log of rc?.logs || []) {
+      if (log.topics && log.topics[0] === ethers.id("ContestCreated(address,address,uint256)")) {
+        const iface = new ethers.Interface(["event ContestCreated(address indexed creator, address contest, uint256 deadline)"]);
+        const decoded = iface.parseLog({topics: log.topics, data: log.data});
+        return decoded?.args?.deadline;
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error("Ошибка при извлечении дедлайна контеста:", e);
+    return null;
+  }
 }
 
 async function main() {
-  const [, addr1, addr2, addr3] = await ethers.getSigners();
+  const [deployer, addr1, addr2, addr3] = await ethers.getSigners();
   const { factory, token, priceFeed, registry, gateway } = await deployCore();
 
   // Регистрация модуля Contest и валидатора
@@ -49,6 +111,10 @@ async function main() {
 
   // Получение доступа к AccessControlCenter
   const aclAddress = await registry.getCoreService(ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter")));
+  const acl = await ethers.getContractAt("AccessControlCenter", aclAddress);
+
+  // Выдаем права создателю скрипта на управление контрактами
+  await acl.grantRole(await acl.GOVERNOR_ROLE(), deployer.address);
 
   // Инициализируем валидатор
   await validator.initialize(aclAddress);
@@ -73,16 +139,28 @@ async function main() {
     { prizeType: 1, token: ethers.ZeroAddress, amount: 0, distribution: 0, uri: "ipfs://promo" }
   ];
 
+  console.log("Создание контеста...");
   const tx = await factory.createContest(prizes, metadata);
+  console.log("Транзакция отправлена:", tx.hash);
   const rc = await tx.wait();
+  console.log("Транзакция подтверждена");
+
   const contestAddr = getCreatedContest(rc);
+  if (!contestAddr) {
+    throw new Error("Не удалось получить адрес созданного контеста");
+  }
+  console.log("Получен адрес контеста:", contestAddr);
+
   const escrow = (await ethers.getContractAt("ContestEscrow", contestAddr)) as any;
   console.log("Contest escrow:", contestAddr);
 
+  console.log("Финализация контеста...");
   const finalizeTx = await escrow.finalize([addr1.address, addr2.address, addr3.address], 0n, 0n);
+  console.log("Транзакция финализации отправлена:", finalizeTx.hash);
   const receipt = await finalizeTx.wait();
+  console.log("Транзакция финализации подтверждена");
 
-  console.log("Finalize events:");
+  console.log("События финализации:")
   for (const log of receipt?.logs ?? []) {
     if (log.fragment) {
       console.log(`  ${log.fragment.name} ->`, log.args);

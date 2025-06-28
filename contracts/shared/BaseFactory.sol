@@ -17,7 +17,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
     constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = IRegistry(_registry);
         MODULE_ID = moduleId;
-        registry.setModuleServiceAlias(MODULE_ID, 'PaymentGateway', paymentGateway);
+        // Регистрация сервиса должна происходить вне конструктора
     }
 
     modifier onlyFactoryAdmin() {
