@@ -46,7 +46,7 @@ contract Marketplace is AccessManaged {
 
     constructor(
         address _registry,
-        address paymentGateway,
+        address /* paymentGateway */,
         bytes32 moduleId
     ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
