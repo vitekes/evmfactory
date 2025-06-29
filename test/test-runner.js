@@ -29,7 +29,7 @@ Tasks:
   integration  Run Hardhat JS tests
   e2e          Alias for integration
   all          Run both Forge and Hardhat tests
-  coverage     Run coverage for Forge and Hardhat
+  coverage     Run coverage for Forge and Hardhat (uses --ir-minimum for Forge)
   quick        Alias for unit
   --help       Show this help
 `);
@@ -52,7 +52,7 @@ function main() {
       code |= hardhat(['test']);
       break;
     case 'coverage':
-      code |= forge(['coverage', '--report', 'lcov']);
+      code |= forge(['coverage', '--report', 'lcov', '--ir-minimum']);
       code |= run('npm', ['run', 'coverage']);
       break;
     default:

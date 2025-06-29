@@ -56,7 +56,7 @@ jobs:
       # 10) Forge coverage report + coverage gate (≥90%)
       - name: Forge coverage
         run: |
-          forge coverage --report lcov
+          forge coverage --report lcov --ir-minimum
           bash scripts/check-coverage.sh 90
 
       # 11) Hardhat coverage (using solidity-coverage)
