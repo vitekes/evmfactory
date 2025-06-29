@@ -7,7 +7,8 @@ async function deployCore() {
   // Создаем и инициализируем систему контроля доступа
   const ACL = await ethers.getContractFactory("AccessControlCenter");
   const acl = await ACL.deploy();
-  await acl.initialize(await ethers.provider.getSigner(0).getAddress()); // Инициализируем ACL с первым аккаунтом как админом
+  const [deployerSigner] = await ethers.getSigners();
+  await acl.initialize(deployerSigner.address); // Инициализируем ACL с первым аккаунтом как админом
 
   // Создаем реестр сервисов
   const Registry = await ethers.getContractFactory("Registry");

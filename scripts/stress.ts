@@ -108,7 +108,7 @@ async function massFinalize(count = 1000) {
 async function batchCharge(users = 10000, chunk = 100) {
   const [owner, merchant] = await ethers.getSigners();
   const Token = await ethers.getContractFactory("TestToken");
-  const token = await Token.deploy("Test", "TST");
+  const token = (await Token.deploy("Test", "TST")) as any;
 
   const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
   const acl = await ACL.deploy();
@@ -125,11 +125,11 @@ async function batchCharge(users = 10000, chunk = 100) {
 
   const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Sub"));
   const Manager = await ethers.getContractFactory("SubscriptionManager");
-  const manager = await Manager.deploy(
+  const manager = (await Manager.deploy(
     await registry.getAddress(),
     await gateway.getAddress(),
     moduleId
-  );
+  )) as any;
 
   const plan = {
     chainIds: [31337n],
@@ -166,7 +166,7 @@ async function batchCharge(users = 10000, chunk = 100) {
 async function parallelBuys(buyers = 500) {
   const [seller] = await ethers.getSigners();
   const Token = await ethers.getContractFactory("TestToken");
-  const token = await Token.deploy("Sale", "SALE");
+  const token = (await Token.deploy("Sale", "SALE")) as any;
 
   const ACL = await ethers.getContractFactory("MockAccessControlCenterAuto");
   const acl = await ACL.deploy();
@@ -183,11 +183,11 @@ async function parallelBuys(buyers = 500) {
 
   const moduleId = ethers.keccak256(ethers.toUtf8Bytes("Market"));
   const Market = await ethers.getContractFactory("Marketplace");
-  const market = await Market.deploy(
+  const market = (await Market.deploy(
     await registry.getAddress(),
     await gateway.getAddress(),
     moduleId
-  );
+  )) as any;
 
   const listingTx = await market.list(await token.getAddress(), ethers.parseEther("1"));
   const rc = await listingTx.wait();
