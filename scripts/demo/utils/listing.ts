@@ -251,10 +251,17 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
             else if (availableMethods.includes('buy') || availableBuySignatures.length > 0) {
                 console.log("Используем метод buy...");
 
-                // Определяем, нужно ли вызывать с двумя параметрами
+                // Определяем точную сигнатуру функции buy
                 if (availableBuySignatures.includes('buy(uint256,uint256)')) {
-                    console.log("Вызываем buy с двумя параметрами");
+                    console.log("Вызываем buy(uint256,uint256)");
                     let buyTx = await marketplace.connect(buyer)["buy(uint256,uint256)"](listingId, 0, {
+                        gasLimit: 1000000
+                    });
+                    console.log("Транзакция отправлена:", buyTx.hash);
+                    await buyTx.wait();
+                } else if (availableBuySignatures.includes('buy(uint256)')) {
+                    console.log("Вызываем buy(uint256)");
+                    let buyTx = await marketplace.connect(buyer)["buy(uint256)"](listingId, {
                         gasLimit: 1000000
                     });
                     console.log("Транзакция отправлена:", buyTx.hash);
