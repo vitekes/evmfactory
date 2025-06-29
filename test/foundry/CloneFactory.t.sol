@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "contracts/shared/CloneFactory.sol";
+import "contracts/errors/Errors.sol";
 
 contract DummyTemplate {
     uint256 public value;
-    error InitFailed();
 
     function init(uint256 v) external {
         if (v == 0) revert InitFailed();
@@ -53,7 +53,7 @@ contract CloneFactoryTest is Test {
     function testInitFailure() public {
         bytes32 salt = keccak256("two");
         bytes memory initData = abi.encodeCall(DummyTemplate.init, (0));
-        vm.expectRevert(DummyTemplate.InitFailed.selector);
+        vm.expectRevert(InitFailed.selector);
         factory.clone(address(template), salt, initData);
     }
 

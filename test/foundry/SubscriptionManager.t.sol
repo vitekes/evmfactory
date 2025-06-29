@@ -47,7 +47,7 @@ contract SubscriptionManagerTest is Test {
         plan.chainIds[0] = block.chainid;
     }
 
-    function _sign(bytes32 digest) internal returns (bytes memory) {
+    function _sign(bytes32 digest) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(merchantPk, digest);
         return abi.encodePacked(r, s, v);
     }
