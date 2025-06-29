@@ -75,7 +75,7 @@ contract SubscriptionManager is AccessManaged {
     ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
-        registry.setModuleServiceAlias(MODULE_ID, 'PaymentGateway', paymentGateway);
+        // Service registration handled externally after deployment
 
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
@@ -85,11 +85,7 @@ contract SubscriptionManager is AccessManaged {
             )
         );
 
-        AccessControlCenter acl = AccessControlCenter(_ACC);
-        bytes32[] memory roles = new bytes32[](2);
-        roles[0] = acl.MODULE_ROLE();
-        roles[1] = acl.FEATURE_OWNER_ROLE();
-        _grantSelfRoles(roles);
+        // Role assignment should be done outside the constructor
 
         batchLimit = 0;
     }
