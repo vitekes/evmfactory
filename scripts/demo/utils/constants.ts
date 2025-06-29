@@ -19,6 +19,8 @@ export const CONSTANTS = {
     MARKETPLACE_ID: ethers.keccak256(ethers.toUtf8Bytes("Marketplace")),
     MARKETPLACE_MODULE_ID: ethers.keccak256(ethers.toUtf8Bytes("Marketplace")), // Дублируем для ясности
     CONTEST_ID: ethers.keccak256(ethers.toUtf8Bytes("Contest")),  // Должен соответствовать CoreDefs.CONTEST_MODULE_ID
+    SUBSCRIPTION_ID: ethers.keccak256(ethers.toUtf8Bytes("Subscription")),
+    SUBSCRIPTION_MODULE_ID: ethers.keccak256(ethers.toUtf8Bytes("Subscription")),
     FACTORY_ADMIN: ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN")), // Должен совпадать с BaseFactory.FACTORY_ADMIN
     // Альтернативный вариант, если оригинальный не сработает - для отладки
     FACTORY_ADMIN_ALT: "0x" + ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN")).substring(2).toLowerCase(),

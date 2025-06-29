@@ -10,6 +10,7 @@
   - `deployer.ts` - функции для деплоя базовых контрактов
 - `contest-demo.ts` - демонстрация работы с конкурсами
 - `marketplace-demo.ts` - демонстрация работы с маркетплейсом
+- `subscription-demo.ts` - демонстрация работы с подписками
 
 ## Запуск демонстраций
 
@@ -25,6 +26,12 @@ npx hardhat run demo/contest-demo.ts --network localhost
 
 ```bash
 npx hardhat run scripts/demo/marketplace-demo.ts --network localhost
+```
+
+### Демонстрация работы с подписками
+
+```bash
+npx hardhat run scripts/demo/subscription-demo.ts --network localhost
 ```
 
 #### Способы создания маркетплейса
