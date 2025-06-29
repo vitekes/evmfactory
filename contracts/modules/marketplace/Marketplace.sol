@@ -51,7 +51,7 @@ contract Marketplace is AccessManaged {
     ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
-        registry.setModuleServiceAlias(MODULE_ID, 'PaymentGateway', paymentGateway);
+        // Service registration moved outside the constructor to avoid role issues
 
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
@@ -61,11 +61,7 @@ contract Marketplace is AccessManaged {
             )
         );
 
-        AccessControlCenter acl = AccessControlCenter(_ACC);
-        bytes32[] memory roles = new bytes32[](2);
-        roles[0] = acl.MODULE_ROLE();
-        roles[1] = acl.FEATURE_OWNER_ROLE();
-        _grantSelfRoles(roles);
+        // Role assignment should be handled externally after deployment
     }
 
     /// @notice Put an item for sale
