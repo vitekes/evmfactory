@@ -87,7 +87,8 @@ async function getModuleServiceByAlias(registry: Contract, moduleId: string, ser
           }
         }
       } catch (methodError) {
-        console.log(`Метод ${method.name} не сработал:`, methodError.message);
+        const err = methodError as Error;
+        console.log(`Метод ${method.name} не сработал:`, err.message);
         // Продолжаем со следующим методом
       }
     }

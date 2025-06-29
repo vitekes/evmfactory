@@ -21,7 +21,8 @@ describe("ContestEscrow", function () {
     ];
 
     const Escrow = await ethers.getContractFactory("ContestEscrow");
-    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 86400;
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const deadline = (latestBlock!).timestamp + 86400;
     escrow = await Escrow.connect(deployer).deploy(creator.address, prizes, await registry.getAddress(), 0, await token.getAddress(), deadline);
     await token.transfer(await escrow.getAddress(), ethers.parseEther("150"));
   });
