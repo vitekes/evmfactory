@@ -3,6 +3,7 @@ import {deployCore, registerModule} from "./utils/deployer";
 import {safeExecute} from "./utils/helpers";
 import {CONSTANTS} from "./utils/constants";
 import {ensureRoles} from "./utils/roles";
+import {createMarketplace} from "./utils/marketplace";
 import {createListing, purchaseListing} from "./utils/listing";
 
 /**
