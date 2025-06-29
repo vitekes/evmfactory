@@ -70,7 +70,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
         uint256 amount,
         bytes calldata signature
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
-        address val = registry.getModuleServiceByAlias(moduleId, "Validator");
+        address val = registry.getModuleServiceByAlias(moduleId, 'Validator');
         if (!IValidator(val).isAllowed(token)) revert NotAllowedToken();
         // Skip signature verification for automation bots and trusted relayers
         if (

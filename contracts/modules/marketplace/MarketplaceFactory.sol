@@ -15,7 +15,7 @@ contract MarketplaceFactory is BaseFactory {
 
     function createMarketplace() external onlyFactoryAdmin nonReentrant returns (address m) {
         // Получаем необходимые сервисы используя строковые алиасы вместо bytes32
-        address gateway = registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway");
+        address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Создаем ID для нового маркетплейса
@@ -25,11 +25,11 @@ contract MarketplaceFactory is BaseFactory {
         registry.registerFeature(instanceId, address(this), 1);
 
         // Копируем сервисы из основного модуля в экземпляр используя строковые алиасы
-        address validator = registry.getModuleServiceByAlias(MODULE_ID, "Validator");
+        address validator = registry.getModuleServiceByAlias(MODULE_ID, 'Validator');
         if (validator != address(0)) {
-            registry.setModuleServiceAlias(instanceId, "Validator", validator);
+            registry.setModuleServiceAlias(instanceId, 'Validator', validator);
         }
-        registry.setModuleServiceAlias(instanceId, "PaymentGateway", gateway);
+        registry.setModuleServiceAlias(instanceId, 'PaymentGateway', gateway);
 
         // Создаем маркетплейс
         m = address(new Marketplace(address(registry), gateway, instanceId));

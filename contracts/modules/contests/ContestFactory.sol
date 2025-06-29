@@ -42,7 +42,7 @@ contract ContestFactory {
         bytes calldata /* metadata */
     ) external onlyGovernor returns (address escrow) {
         // validate prizes via plugin if available
-        address validator = registry.getModuleServiceByAlias(CoreDefs.CONTEST_MODULE_ID, "Validator");
+        address validator = registry.getModuleServiceByAlias(CoreDefs.CONTEST_MODULE_ID, 'Validator');
         if (validator != address(0)) {
             for (uint256 i = 0; i < _prizes.length; i++) {
                 IContestValidator(validator).validatePrize(_prizes[i]);

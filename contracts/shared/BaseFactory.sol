@@ -22,11 +22,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         // Если нет, то сервисы будут привязаны позже вне конструктора
         try IRegistry(_registry).getFeature(moduleId) returns (address, uint8) {
             // Если модуль зарегистрирован, регистрируем платежный шлюз
-            try IRegistry(_registry).setModuleServiceAlias(
-                moduleId, 
-                "PaymentGateway",
-                paymentGateway
-            ) {} catch {}
+            try IRegistry(_registry).setModuleServiceAlias(moduleId, 'PaymentGateway', paymentGateway) {} catch {}
         } catch {}
     }
 
