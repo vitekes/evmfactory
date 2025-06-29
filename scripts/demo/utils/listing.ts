@@ -148,7 +148,7 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         const registryAddress = await marketplace.registry();
         const moduleId = await marketplace.MODULE_ID();
         const registry = await ethers.getContractAt("Registry", registryAddress);
-        const gatewayAddress = await registry.getModuleService(moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
+        const gatewayAddress = await registry["getModuleService(bytes32,string)"](moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
         console.log(`Адрес платежного шлюза: ${gatewayAddress}`);
 
         // Получаем баланс покупателя
@@ -320,7 +320,7 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
             const registryAddress = await marketplace.registry();
             const moduleId = await marketplace.MODULE_ID();
             const registry = await ethers.getContractAt("Registry", registryAddress);
-            const gatewayAddress = await registry.getModuleService(moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
+            const gatewayAddress = await registry["getModuleService(bytes32,string)"](moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
             const buyerAllowance = await token.allowance(buyer.address, gatewayAddress);
             const buyerBalance = await token.balanceOf(buyer.address);
 
