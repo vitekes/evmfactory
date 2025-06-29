@@ -144,6 +144,14 @@ contract Registry is Initializable, UUPSUpgradeable {
         return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
     }
 
+    /// @notice Get service assigned to a module by alias (backward compatible name)
+    /// @param moduleId Module identifier
+    /// @param serviceAlias Alias used during registration
+    /// @return Service address
+    function getModuleServiceByAlias(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
+        return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
+    }
+
     /// @notice Replace the AccessControlCenter if needed
     /// @notice Replace the AccessControlCenter if needed
     /// @param newAccess New AccessControlCenter address

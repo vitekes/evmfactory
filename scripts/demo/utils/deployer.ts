@@ -15,6 +15,7 @@ export async function deployCore(): Promise<{
   priceFeed: Contract;
   feeManager: Contract;
   validator: Contract;
+  contestValidator: Contract;
 }> {
   const [deployer] = await ethers.getSigners();
     console.log(`Разворачиваем базовые контракты от имени ${deployer.address}...`);
@@ -167,7 +168,7 @@ export async function deployCore(): Promise<{
     return gateway;
   });
 
-  // 8. Деплой и настройка валидатора
+  // 8. Деплой и настройка токенного валидатора
   const validator = await safeExecute("деплой валидатора", async () => {
     const MultiValidator = await ethers.getContractFactory("MultiValidator");
     const validator = await MultiValidator.deploy();
@@ -210,6 +211,15 @@ export async function deployCore(): Promise<{
     return validator;
   });
 
+  // 9. Деплой валидатора конкурсов, использующего токенный валидатор
+  const contestValidator = await safeExecute("деплой валидатора конкурсов", async () => {
+    const ContestValidator = await ethers.getContractFactory("ContestValidator");
+    const cv = await ContestValidator.deploy(await acl.getAddress(), await validator.getAddress());
+    await cv.waitForDeployment();
+    console.log(`Валидатор конкурсов: ${await cv.getAddress()}`);
+    return cv;
+  });
+
   // Сохраняем данные о деплое
   const deploymentData = {
     access: await acl.getAddress(),
@@ -217,6 +227,7 @@ export async function deployCore(): Promise<{
     feeManager: await feeManager.getAddress(),
     gateway: await gateway.getAddress(),
     tokenValidator: await validator.getAddress(),
+    contestValidator: await contestValidator.getAddress(),
     token: await token.getAddress(),
     priceFeed: await priceFeed.getAddress()
   };
@@ -230,7 +241,8 @@ export async function deployCore(): Promise<{
     gateway,
     priceFeed,
     feeManager,
-    validator
+    validator,
+    contestValidator
   };
 }
 

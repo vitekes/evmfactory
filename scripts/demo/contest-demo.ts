@@ -13,7 +13,7 @@ async function main() {
   console.log(`Participant2: ${p2.address}`);
   console.log(`Participant3: ${p3.address}\n`);
 
-  const { token, registry, gateway, validator, feeManager, acl } = await deployCore();
+  const { token, registry, gateway, validator, feeManager, acl, contestValidator } = await deployCore();
 
   const contestFactory = await safeExecute("deploy contest factory", async () => {
     const Factory = await ethers.getContractFactory("ContestFactory");
@@ -31,7 +31,7 @@ async function main() {
     // Получаем адреса всех контрактов
     const registryAddress = await registry.getAddress();
     const factoryAddress = await contestFactory.getAddress();
-    const validatorAddress = await validator.getAddress();
+    const validatorAddress = await contestValidator.getAddress();
     const gatewayAddress = await gateway.getAddress();
 
     console.log(`Регистрация фабрики конкурсов в реестре...`);
@@ -110,7 +110,7 @@ async function main() {
   });
 
   await safeExecute("finalize contest", async () => {
-    const winners = [p1.address, p2.address, p3.address];
+    const winners = [p1.address];
     await finalizeContest(contestAddress, winners);
   });
 

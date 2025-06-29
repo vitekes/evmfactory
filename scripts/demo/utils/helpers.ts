@@ -13,6 +13,7 @@ export interface SystemContracts {
   feeManager: Contract;
   gateway: Contract;
   tokenValidator: Contract;
+  contestValidator?: Contract;
   marketplaceFactory?: Contract;
   contestFactory?: Contract;
 }
@@ -44,6 +45,7 @@ export interface DeploymentData {
     feeManager: string;
     gateway: string;
     tokenValidator: string;
+    contestValidator?: string;
     marketplaceFactory?: string;
     contestFactory?: string;
   };
@@ -113,6 +115,7 @@ export async function getSystemContracts(network: string = "localhost"): Promise
     feeManager: await loadContract("CoreFeeManager", contracts.feeManager),
     gateway: await loadContract("PaymentGateway", contracts.gateway),
     tokenValidator: await loadContract("MultiValidator", contracts.tokenValidator),
+    contestValidator: contracts.contestValidator ? await loadContract("ContestValidator", contracts.contestValidator) : undefined,
     marketplaceFactory: contracts.marketplaceFactory ? await loadContract("MarketplaceFactory", contracts.marketplaceFactory) : undefined,
     contestFactory: contracts.contestFactory ? await loadContract("ContestFactory", contracts.contestFactory) : undefined
   };
