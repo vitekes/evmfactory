@@ -33,7 +33,8 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     function initialize(address acl) public initializer {
         __UUPSUpgradeable_init();
         access = AccessControlCenter(acl);
-        access.grantRole(access.GOVERNOR_ROLE(), msg.sender);
+        // Удаляем автоматическую выдачу роли, так как у контракта нет прав на это
+        // Роль должна выдаваться извне администратором
     }
 
     /// @notice Allow or disallow a token

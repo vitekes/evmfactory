@@ -14,9 +14,29 @@ contract MarketplaceFactory is BaseFactory {
     ) BaseFactory(registry, paymentGateway, keccak256('Marketplace')) {}
 
     function createMarketplace() external onlyFactoryAdmin nonReentrant returns (address m) {
-        address gateway = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
-        m = address(new Marketplace(address(registry), gateway, MODULE_ID));
-        registry.registerFeature(keccak256(abi.encodePacked('Marketplace:', m)), m, 1);
+        // Получаем необходимые сервисы используя строковые алиасы вместо bytes32
+        address gateway = registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway");
+        if (gateway == address(0)) revert PaymentGatewayNotRegistered();
+
+        // Создаем ID для нового маркетплейса
+        bytes32 instanceId = keccak256(abi.encodePacked('Marketplace:', address(this), block.timestamp));
+
+        // Сначала регистрируем новый экземпляр (чтобы он существовал в реестре)
+        registry.registerFeature(instanceId, address(this), 1);
+
+        // Копируем сервисы из основного модуля в экземпляр используя строковые алиасы
+        address validator = registry.getModuleServiceByAlias(MODULE_ID, "Validator");
+        if (validator != address(0)) {
+            registry.setModuleServiceAlias(instanceId, "Validator", validator);
+        }
+        registry.setModuleServiceAlias(instanceId, "PaymentGateway", gateway);
+
+        // Создаем маркетплейс
+        m = address(new Marketplace(address(registry), gateway, instanceId));
+
+        // Обновляем адрес экземпляра в реестре
+        registry.upgradeFeature(instanceId, m);
+
         emit MarketplaceCreated(msg.sender, m);
     }
 }

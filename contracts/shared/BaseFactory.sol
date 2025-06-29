@@ -17,11 +17,24 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
     constructor(address _registry, address paymentGateway, bytes32 moduleId) {
         registry = IRegistry(_registry);
         MODULE_ID = moduleId;
-        // Регистрация сервиса должна происходить вне конструктора
+
+        // Проверяем, что модуль зарегистрирован в реестре
+        // Если нет, то сервисы будут привязаны позже вне конструктора
+        try IRegistry(_registry).getFeature(moduleId) returns (address, uint8) {
+            // Если модуль зарегистрирован, регистрируем платежный шлюз
+            try IRegistry(_registry).setModuleServiceAlias(
+                moduleId, 
+                "PaymentGateway",
+                paymentGateway
+            ) {} catch {}
+        } catch {}
     }
 
+    // Константа для идентификатора сервиса ACL
+    bytes32 private constant ACL_SERVICE = keccak256('AccessControlCenter');
+
     modifier onlyFactoryAdmin() {
-        AccessControlCenter acl = AccessControlCenter(registry.getCoreService(keccak256('AccessControlCenter')));
+        AccessControlCenter acl = AccessControlCenter(registry.getCoreService(ACL_SERVICE));
         if (!acl.hasRole(FACTORY_ADMIN, msg.sender)) revert NotFactoryAdmin();
         _;
     }

@@ -30,7 +30,49 @@ const PublicDeploy = buildModule("PublicDeploy", (m) => {
   m.call(tokenValidator, "addToken", [weth]);
   m.call(tokenValidator, "addToken", [usdc]);
   m.call(tokenValidator, "addToken", [usdt]);
+import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { ethers } from "ethers";
+import CoreModule from "./CoreModule";
 
+/**
+ * Модуль для развертывания в публичной сети
+ */
+const PublicDeploy = buildModule("PublicDeploy", (m) => {
+  // Импортируем базовые контракты из CoreModule
+  const core = m.useModule(CoreModule);
+
+  // Получаем константы ролей
+  const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+  const FEATURE_OWNER_ROLE = m.staticCall(core.access, "FEATURE_OWNER_ROLE");
+  const GOVERNOR_ROLE = m.staticCall(core.access, "GOVERNOR_ROLE");
+  const DEFAULT_ADMIN_ROLE = m.staticCall(core.access, "DEFAULT_ADMIN_ROLE");
+
+  // Получаем адрес развертывателя
+  const deployer = m.getAccount(0);
+
+  // Назначаем роли
+  m.call(core.access, "grantRole", [DEFAULT_ADMIN_ROLE, deployer]);
+  m.call(core.access, "grantRole", [FACTORY_ADMIN, deployer]);
+  m.call(core.access, "grantRole", [FEATURE_OWNER_ROLE, deployer]);
+  m.call(core.access, "grantRole", [GOVERNOR_ROLE, deployer]);
+
+  // Разворачиваем дополнительные модули для публичной сети
+  const CONTEST_ID = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
+  const contestValidator = m.contract("ContestValidator", [core.access, core.tokenValidator]);
+  const contestFactory = m.contract("ContestFactory", [core.registry, core.feeManager]);
+
+  // Регистрируем модуль конкурсов
+  m.call(core.registry, "registerFeature", [CONTEST_ID, contestFactory, 0]);
+  m.call(core.registry, "setModuleServiceAlias", [CONTEST_ID, "Validator", contestValidator]);
+
+  return {
+    ...core,
+    contestFactory,
+    contestValidator
+  };
+});
+
+export default PublicDeploy;
   return { access, registry, feeManager, gateway, contestFactory };
 });
 

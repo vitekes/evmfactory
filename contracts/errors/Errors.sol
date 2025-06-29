@@ -52,3 +52,4 @@ error TokenDuplicated();
 error InvalidPrizeData();
 error ContestAlreadyFinalized();
 error WrongWinnersCount();
+error PaymentGatewayNotRegistered();

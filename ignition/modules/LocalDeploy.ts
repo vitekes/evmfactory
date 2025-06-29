@@ -2,24 +2,46 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { ethers } from "ethers";
 import CoreModule from "./CoreModule";
 
+/**
+ * Модуль для локального развертывания с тестовыми токенами
+ */
 const LocalDeploy = buildModule("LocalDeploy", (m) => {
-  const { access, registry, feeManager, gateway, tokenValidator } = m.useModule(CoreModule);
+  // Импортируем базовые контракты
+  const core = m.useModule(CoreModule);
 
-  const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+  // Назначаем все необходимые роли развертывателю
   const deployer = m.getAccount(0);
-  m.call(access, "grantRole", [FACTORY_ADMIN, deployer]);
-  m.call(access, "grantRole", [m.staticCall(access, "FEATURE_OWNER_ROLE"), deployer]);
-  m.call(access, "grantRole", [m.staticCall(access, "GOVERNOR_ROLE"), deployer]);
+  const FACTORY_ADMIN = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ADMIN"));
+  const FEATURE_OWNER_ROLE = m.staticCall(core.access, "FEATURE_OWNER_ROLE");
+  const GOVERNOR_ROLE = m.staticCall(core.access, "GOVERNOR_ROLE");
+  const DEFAULT_ADMIN_ROLE = m.staticCall(core.access, "DEFAULT_ADMIN_ROLE");
 
+  m.call(core.access, "grantRole", [DEFAULT_ADMIN_ROLE, deployer]);
+  m.call(core.access, "grantRole", [FACTORY_ADMIN, deployer]);
+  m.call(core.access, "grantRole", [FEATURE_OWNER_ROLE, deployer]);
+  m.call(core.access, "grantRole", [GOVERNOR_ROLE, deployer]);
+
+  // Создаем тестовый токен
   const token = m.contract("TestToken", ["Demo", "DEMO"]);
 
-  const contestValidator = m.contract("ContestValidator", [access, tokenValidator]);
-  const contestFactory = m.contract("ContestFactory", [registry, feeManager]);
+  // Разворачиваем модуль конкурсов
   const CONTEST_ID = ethers.keccak256(ethers.toUtf8Bytes("Contest"));
-  m.call(registry, "registerFeature", [CONTEST_ID, contestFactory, 0]);
-  m.call(registry, "setModuleServiceAlias", [CONTEST_ID, "Validator", contestValidator]);
+  const contestValidator = m.contract("ContestValidator", [core.access, core.tokenValidator]);
+  const contestFactory = m.contract("ContestFactory", [core.registry, core.feeManager]);
 
-  return { access, registry, feeManager, gateway, token, contestFactory };
+  // Регистрируем модуль конкурсов
+  m.call(core.registry, "registerFeature", [CONTEST_ID, contestFactory, 0]);
+  m.call(core.registry, "setModuleServiceAlias", [CONTEST_ID, "Validator", contestValidator]);
+
+  // Добавляем тестовый токен в валидатор
+  m.call(core.tokenValidator, "addToken", [token]);
+
+  return {
+    ...core,
+    token,
+    contestFactory,
+    contestValidator
+  };
 });
 
 export default LocalDeploy;
