@@ -67,27 +67,27 @@ async function main() {
       { name: "salt", type: "uint256" },
       { name: "expiry", type: "uint64" }
     ]
-  } as const;
+  };
   const signature = await merchant.signTypedData(domain, types, plan);
 
-  await token.connect(user).approve(await gateway.getAddress(), ethers.parseEther("5"));
+  await (token.connect(user) as unknown as typeof manager).approve(await gateway.getAddress(), ethers.parseEther("5"));
 
   await safeExecute("subscribe", async () => {
-    await manager.connect(user).subscribe(plan, signature, "0x");
+    await (manager.connect(user) as unknown as typeof manager).subscribe(plan, signature, "0x");
   });
 
   await network.provider.send("evm_increaseTime", [ Number(plan.period) + 5 ]);
   await network.provider.send("evm_mine", []);
 
   await safeExecute("charge", async () => {
-    await manager.connect(keeper).charge(user.address);
+    await (manager.connect(keeper) as unknown as typeof manager).charge(user.address);
   });
 
   const merchantBal = await token.balanceOf(merchant.address);
   console.log(`Merchant balance: ${ethers.formatEther(merchantBal)} tokens`);
 
   await safeExecute("unsubscribe", async () => {
-    await manager.connect(user).unsubscribe();
+    await (manager.connect(user) as unknown as typeof manager).unsubscribe();
   });
 
   console.log("\n✅ Demo finished");
