@@ -23,6 +23,8 @@ contract MarketplaceProxy {
         implementation = _implementation;
     }
 
+    receive() external payable {}
+
     fallback() external payable {
         address impl = implementation;
         assembly {

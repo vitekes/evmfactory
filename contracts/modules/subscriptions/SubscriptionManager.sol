@@ -66,11 +66,10 @@ contract SubscriptionManager is AccessManaged {
 
     /// @notice Initializes the subscription manager and registers services
     /// @param _registry Address of the core Registry contract
-    /// @param paymentGateway Payment gateway used to process fees
     /// @param moduleId Unique module identifier
     constructor(
         address _registry,
-        address paymentGateway,
+        address /* paymentGateway */,
         bytes32 moduleId
     ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
