@@ -17,6 +17,7 @@ export async function deployCore(): Promise<{
   validator: Contract;
 }> {
   const [deployer] = await ethers.getSigners();
+    console.log(`Разворачиваем базовые контракты от имени ${deployer.address}...`);
   console.log(`Деплоер: ${deployer.address}`);
 
   // 1. Деплой токена
@@ -24,7 +25,22 @@ export async function deployCore(): Promise<{
     const Token = await ethers.getContractFactory("TestToken");
     const token = await Token.deploy("USD Coin", "USDC");
     await token.waitForDeployment();
-    console.log(`Токен: ${await token.getAddress()}`);
+    const tokenAddress = await token.getAddress();
+    console.log(`Токен: ${tokenAddress}`);
+
+    // Минтим токены для деплойера
+    if ('mint' in token && typeof token.mint === 'function') {
+      console.log(`Минтим токены для деплойера...`);
+      try {
+        const mintTx = await token.mint(deployer.address, ethers.parseEther("1000"));
+        await mintTx.wait();
+        const balance = await token.balanceOf(deployer.address);
+        console.log(`Токены успешно заминчены. Баланс деплойера: ${ethers.formatEther(balance)}`);
+      } catch (error) {
+        console.log(`Ошибка при минтинге токенов: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
+    }
+
     return token;
   });
 
