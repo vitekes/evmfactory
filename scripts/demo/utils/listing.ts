@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { CONSTANTS } from "./constants";
 
 /**
  * Создает листинг на маркетплейсе
@@ -143,6 +144,13 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         const marketplaceAddress = await marketplace.getAddress();
         console.log(`Адрес маркетплейса: ${marketplaceAddress}`);
 
+        // Вычисляем адрес платежного шлюза, которому требуется разрешение
+        const registryAddress = await marketplace.registry();
+        const moduleId = await marketplace.MODULE_ID();
+        const registry = await ethers.getContractAt("Registry", registryAddress);
+        const gatewayAddress = await registry["getModuleService(bytes32,string)"](moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
+        console.log(`Адрес платежного шлюза: ${gatewayAddress}`);
+
         // Получаем баланс покупателя
         const buyerBalance = await token.balanceOf(buyer.address);
         console.log(`Баланс покупателя: ${ethers.formatEther(buyerBalance)} токенов`);
@@ -161,7 +169,7 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
 
         // Сбрасываем все существующие одобрения
         console.log(`Сбрасываем все одобрения для токена`);
-        await token.connect(buyer).approve(marketplaceAddress, 0);
+        await token.connect(buyer).approve(gatewayAddress, 0);
 
         // Проверяем интерфейс токена
         const tokenName = await token.name();
@@ -171,15 +179,15 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         // Делаем новое одобрение с очень большим запасом
         // Увеличиваем одобрение в 10 раз от требуемой цены
         const approvalAmount = price * 10n;
-        console.log(`Устанавливаем одобрение: ${ethers.formatEther(approvalAmount)} токенов для ${marketplaceAddress}`);
+        console.log(`Устанавливаем одобрение: ${ethers.formatEther(approvalAmount)} токенов для ${gatewayAddress}`);
 
         // Отправляем транзакцию одобрения и ждем её подтверждения
-        const approveTx = await token.connect(buyer).approve(marketplaceAddress, approvalAmount);
+        const approveTx = await token.connect(buyer).approve(gatewayAddress, approvalAmount);
         console.log(`Транзакция одобрения отправлена: ${approveTx.hash}`);
         await approveTx.wait();
 
         // Проверяем, что одобрение действительно установлено
-        const newAllowance = await token.allowance(buyer.address, marketplaceAddress);
+        const newAllowance = await token.allowance(buyer.address, gatewayAddress);
         console.log(`Новое одобрение: ${ethers.formatEther(newAllowance)} токенов`);
 
         if (newAllowance < price) {
@@ -309,12 +317,17 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         // Дополнительная диагностика при ошибке
         try {
             const marketplaceAddress = await marketplace.getAddress();
-            const buyerAllowance = await token.allowance(buyer.address, marketplaceAddress);
+            const registryAddress = await marketplace.registry();
+            const moduleId = await marketplace.MODULE_ID();
+            const registry = await ethers.getContractAt("Registry", registryAddress);
+            const gatewayAddress = await registry["getModuleService(bytes32,string)"](moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS);
+            const buyerAllowance = await token.allowance(buyer.address, gatewayAddress);
             const buyerBalance = await token.balanceOf(buyer.address);
 
             console.error("Диагностическая информация:")
             console.error(` - Адрес маркетплейса: ${marketplaceAddress}`);
-            console.error(` - Разрешение для маркетплейса: ${ethers.formatEther(buyerAllowance)} токенов`);
+            console.error(` - Адрес платежного шлюза: ${gatewayAddress}`);
+            console.error(` - Разрешение для шлюза: ${ethers.formatEther(buyerAllowance)} токенов`);
             console.error(` - Баланс покупателя: ${ethers.formatEther(buyerBalance)} токенов`);
         } catch (diagError) {
             console.error("Ошибка при получении диагностической информации:", 
