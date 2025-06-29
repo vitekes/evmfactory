@@ -17,9 +17,14 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
     /// Role for managing token validators
     bytes32 public constant GOVERNOR_ROLE = keccak256('GOVERNOR_ROLE');
 
+    /// @notice Address holding the DEFAULT_ADMIN_ROLE
+    address public adminAddr;
+
     function initialize(address admin) public initializer {
+        if (admin == address(0)) revert InvalidAddress();
         __AccessControl_init();
         __UUPSUpgradeable_init();
+        adminAddr = admin;
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 
@@ -49,5 +54,5 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
         if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 }
