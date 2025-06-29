@@ -417,12 +417,17 @@ async function setupDemoEnvironment(): Promise<{
     console.log("Маркетплейс развернут");
 
     // Обновляем реестр
-    const newMarketplaceAddress = await marketplace.getAddress();
-    await registry.upgradeFeature(instanceId, newMarketplaceAddress);
-    console.log(`Маркетплейс обновлен в реестре: ${newMarketplaceAddress}`);
+  const newMarketplaceAddress = await marketplace.getAddress();
+  await registry.upgradeFeature(instanceId, newMarketplaceAddress);
+  console.log(`Маркетплейс обновлен в реестре: ${newMarketplaceAddress}`);
 
-    // Обновляем глобальную переменную
-    marketplaceAddress = newMarketplaceAddress;
+  // Выдаем роли новому маркетплейсу
+  const moduleRole = await acl.MODULE_ROLE();
+  const featureOwnerRole = await acl.FEATURE_OWNER_ROLE();
+  await acl.grantMultipleRoles(newMarketplaceAddress, [moduleRole, featureOwnerRole]);
+
+  // Обновляем глобальную переменную
+  marketplaceAddress = newMarketplaceAddress;
 
     return newMarketplaceAddress;
   });
