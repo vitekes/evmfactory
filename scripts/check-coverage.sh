@@ -1,9 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 THRESHOLD=${1:-90}
-FILE="coverage/lcov.info"
-if [ ! -f "$FILE" ]; then
-  echo "$FILE not found" >&2
+FILE=""
+if [ -f coverage/lcov.info ]; then
+  FILE="coverage/lcov.info"
+elif [ -f lcov.info ]; then
+  FILE="lcov.info"
+else
+  echo "lcov.info not found" >&2
   exit 1
 fi
 LF=$(grep -h "^LF:" "$FILE" | awk -F':' '{sum+=$2} END {print sum}')
