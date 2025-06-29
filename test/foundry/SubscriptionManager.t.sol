@@ -29,6 +29,7 @@ contract SubscriptionManagerTest is Test {
         registry.setCoreService(keccak256("AccessControlCenter"), address(acc));
         gateway = new MockPaymentGateway();
         bytes32 moduleId = keccak256("Sub");
+        registry.setModuleServiceAlias(moduleId, "PaymentGateway", address(gateway));
         sub = new SubscriptionManager(address(registry), address(gateway), moduleId);
         token.transfer(user, 10 ether);
     }

@@ -11,6 +11,10 @@ contract MockRegistry {
         moduleServices[moduleId][keccak256(bytes(serviceAlias))] = addr;
     }
 
+    function getModuleServiceByAlias(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
+        return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
+    }
+
     function getModuleService(bytes32 moduleId, bytes32 serviceId) external view returns (address) {
         return moduleServices[moduleId][serviceId];
     }

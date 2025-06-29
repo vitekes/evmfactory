@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract AccessControlCenterTest is Test {
@@ -17,6 +18,7 @@ contract AccessControlCenterTest is Test {
         bytes memory data = abi.encodeCall(AccessControlCenter.initialize, admin);
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
         acc = AccessControlCenter(address(proxy));
+        assertEq(acc.adminAddr(), admin);
     }
 
     function testGrantAndRevokeRole() public {
@@ -51,6 +53,11 @@ contract AccessControlCenterTest is Test {
         vm.prank(admin);
         vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
         impl.upgradeToAndCall(address(newImpl), bytes(""));
+    }
+
+    function testReinitializeReverts() public {
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        acc.initialize(admin);
     }
 }
 

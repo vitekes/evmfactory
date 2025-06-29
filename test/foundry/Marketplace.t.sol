@@ -25,6 +25,7 @@ contract MarketplaceTest is Test {
         registry.setCoreService(keccak256("AccessControlCenter"), address(acc));
         gateway = new MockPaymentGateway();
         bytes32 moduleId = keccak256("Market");
+        registry.setModuleServiceAlias(moduleId, "PaymentGateway", address(gateway));
         market = new Marketplace(address(registry), address(gateway), moduleId);
         token.transfer(buyer, 100 ether);
     }

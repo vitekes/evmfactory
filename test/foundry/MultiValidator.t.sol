@@ -14,12 +14,11 @@ contract MultiValidatorTest is Test {
 
     function setUp() public {
         acc = new AccessControlCenter();
-        vm.prank(admin);
-        acc.initialize(admin);
-        val = new MultiValidator();
-        bytes32 role = acc.DEFAULT_ADMIN_ROLE();
         vm.startPrank(admin);
-        acc.grantRole(role, address(val));
+        acc.initialize(admin);
+        acc.grantRole(acc.GOVERNOR_ROLE(), admin);
+        val = new MultiValidator();
+        acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(val));
         val.initialize(address(acc));
         vm.stopPrank();
     }
