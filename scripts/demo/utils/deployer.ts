@@ -1,0 +1,294 @@
+import { ethers } from "hardhat";
+import { CONSTANTS, ROLES } from "./constants";
+import { safeExecute, saveDeployment } from "./helpers";
+import type { Contract } from "ethers";
+
+
+/**
+ * Развертывает базовые контракты системы и возвращает их
+ */
+export async function deployCore(): Promise<{
+  token: Contract;
+  acl: Contract;
+  registry: Contract;
+  gateway: Contract;
+  priceFeed: Contract;
+  feeManager: Contract;
+  validator: Contract;
+}> {
+  const [deployer] = await ethers.getSigners();
+  console.log(`Деплоер: ${deployer.address}`);
+
+  // 1. Деплой токена
+  const token = await safeExecute("деплой токена", async () => {
+    const Token = await ethers.getContractFactory("TestToken");
+    const token = await Token.deploy("USD Coin", "USDC");
+    await token.waitForDeployment();
+    console.log(`Токен: ${await token.getAddress()}`);
+    return token;
+  });
+
+  // 2. Деплой системы контроля доступа
+  const acl = await safeExecute("деплой ACL", async () => {
+    const ACL = await ethers.getContractFactory("AccessControlCenter");
+    const acl = await ACL.deploy();
+    await acl.waitForDeployment();
+    console.log(`ACL: ${await acl.getAddress()}`);
+    await acl.initialize(deployer.address);
+    return acl;
+  });
+
+  // 3. Выдача ролей деплоеру
+  await safeExecute("настройка ролей", async () => {
+    const roleNames = {
+      [ROLES.FEATURE_OWNER]: await acl.FEATURE_OWNER_ROLE(),
+      [ROLES.GOVERNOR]: await acl.GOVERNOR_ROLE(),
+      [ROLES.DEFAULT_ADMIN]: await acl.DEFAULT_ADMIN_ROLE(),
+      [ROLES.MODULE]: await acl.MODULE_ROLE(),
+      [ROLES.FACTORY_ADMIN]: CONSTANTS.FACTORY_ADMIN
+    };
+
+    // Выдаем основные роли
+    for (const [roleName, roleId] of Object.entries(roleNames)) {
+      if (!await acl.hasRole(roleId, deployer.address)) {
+        await acl.grantRole(roleId, deployer.address);
+        console.log(`Роль ${roleName} выдана: ${await acl.hasRole(roleId, deployer.address)}`);
+      } else {
+        console.log(`Роль ${roleName} уже выдана`);
+      }
+    }
+  });
+
+  // 4. Деплой реестра
+  const registry = await safeExecute("деплой реестра", async () => {
+    const Registry = await ethers.getContractFactory("Registry");
+    const registry = await Registry.deploy();
+    await registry.waitForDeployment();
+    const aclAddress = await acl.getAddress();
+    await registry.initialize(aclAddress);
+    await registry.setCoreService(CONSTANTS.ACCESS_SERVICE, aclAddress);
+    console.log(`Реестр: ${await registry.getAddress()}`);
+    return registry;
+  });
+
+  // 5. Деплой менеджера комиссий
+  const feeManager = await safeExecute("деплой менеджера комиссий", async () => {
+    const FeeManager = await ethers.getContractFactory("CoreFeeManager");
+    const feeManager = await FeeManager.deploy();
+    await feeManager.waitForDeployment();
+    const address = await feeManager.getAddress();
+    try {
+      await feeManager.initialize(await acl.getAddress());
+      console.log(`Менеджер комиссий инициализирован: ${address}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already initialized')) {
+        console.log(`Менеджер комиссий уже инициализирован: ${address}`);
+      } else {
+        throw error;
+      }
+    }
+    return feeManager;
+  });
+
+  // 6. Деплой ценового фида
+  const priceFeed = await safeExecute("деплой ценового фида", async () => {
+    const PriceFeed = await ethers.getContractFactory("MockPriceFeed");
+    const priceFeed = await PriceFeed.deploy();
+    await priceFeed.waitForDeployment();
+    console.log(`Ценовой фид: ${await priceFeed.getAddress()}`);
+    return priceFeed;
+  });
+
+  // 7. Деплой платежного шлюза
+  const gateway = await safeExecute("деплой платежного шлюза", async () => {
+    // Пробуем сначала мок, затем реальный шлюз
+    let Gateway;
+    try {
+      Gateway = await ethers.getContractFactory("MockPaymentGateway");
+    } catch (error) {
+      console.log('MockPaymentGateway не найден, пробуем PaymentGateway...');
+      Gateway = await ethers.getContractFactory("PaymentGateway");
+    }
+
+    const gateway = await Gateway.deploy();
+    await gateway.waitForDeployment();
+    const gatewayAddress = await gateway.getAddress();
+    console.log(`Платежный шлюз: ${gatewayAddress}`);
+
+    // Проверяем, нужно ли инициализировать
+    if ('initialize' in gateway && typeof gateway.initialize === 'function') {
+      try {
+        const aclAddress = await acl.getAddress();
+        const registryAddress = await registry.getAddress();
+        const feeManagerAddress = await feeManager.getAddress();
+
+        console.log(`Инициализация платежного шлюза с параметрами:`);
+        console.log(`- ACL: ${aclAddress}`);
+        console.log(`- Registry: ${registryAddress}`);
+        console.log(`- FeeManager: ${feeManagerAddress}`);
+
+        await gateway.initialize(aclAddress, registryAddress, feeManagerAddress);
+        console.log('Платежный шлюз успешно инициализирован');
+      } catch (initError) {
+        if (initError instanceof Error && initError.message.includes('already initialized')) {
+          console.log('Платежный шлюз уже инициализирован');
+        } else {
+          console.log('Ошибка при инициализации платежного шлюза:', initError);
+        }
+      }
+    }
+
+    // Настраиваем платежный шлюз
+    if ('setFeeManager' in gateway && typeof gateway.setFeeManager === 'function') {
+      try {
+        await gateway.setFeeManager(await feeManager.getAddress());
+        console.log('FeeManager установлен в платежном шлюзе');
+      } catch (error) {
+        console.log('Ошибка при установке FeeManager:', error);
+      }
+    }
+
+    return gateway;
+  });
+
+  // 8. Деплой и настройка валидатора
+  const validator = await safeExecute("деплой валидатора", async () => {
+    const MultiValidator = await ethers.getContractFactory("MultiValidator");
+    const validator = await MultiValidator.deploy();
+    await validator.waitForDeployment();
+    const validatorAddress = await validator.getAddress();
+    console.log(`Валидатор: ${validatorAddress}`);
+
+    try {
+      await validator.initialize(await acl.getAddress());
+      console.log("Валидатор инициализирован");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already initialized')) {
+        console.log("Валидатор уже инициализирован");
+      } else {
+        throw error;
+      }
+    }
+
+    // Добавляем токен в валидатор
+    try {
+      const tokenAddress = await token.getAddress();
+      // Проверяем метод, так как в разных версиях валидатора может быть allowed или isAllowed
+      let isTokenAllowed = false;
+      if ('allowed' in validator && typeof validator.allowed === 'function') {
+        isTokenAllowed = await validator.allowed(tokenAddress);
+      } else if ('isAllowed' in validator && typeof validator.isAllowed === 'function') {
+        isTokenAllowed = await validator.isAllowed(tokenAddress);
+      }
+
+      if (!isTokenAllowed) {
+        await validator.addToken(tokenAddress);
+        console.log(`Токен ${tokenAddress} добавлен в валидатор`);
+      } else {
+        console.log(`Токен ${tokenAddress} уже разрешен в валидаторе`);
+      }
+    } catch (error) {
+      console.log('Ошибка при добавлении токена в валидатор:', error);
+    }
+
+    return validator;
+  });
+
+  // Сохраняем данные о деплое
+  const deploymentData = {
+    access: await acl.getAddress(),
+    registry: await registry.getAddress(),
+    feeManager: await feeManager.getAddress(),
+    gateway: await gateway.getAddress(),
+    tokenValidator: await validator.getAddress(),
+    token: await token.getAddress(),
+    priceFeed: await priceFeed.getAddress()
+  };
+
+  saveDeployment(deploymentData);
+
+  return {
+    token,
+    acl,
+    registry,
+    gateway,
+    priceFeed,
+    feeManager,
+    validator
+  };
+}
+
+/**
+ * Регистрирует модуль в реестре
+ * @param registry Контракт реестра
+ * @param moduleId ID модуля
+ * @param factoryAddress Адрес фабрики модуля
+ * @param validatorAddress Адрес валидатора токенов
+ * @param gatewayAddress Адрес платежного шлюза
+ */
+export async function registerModule(
+  registry: Contract,
+  moduleId: string,
+  factoryAddress: string,
+  validatorAddress: string,
+  gatewayAddress: string
+): Promise<void> {
+  await safeExecute(`регистрация модуля ${moduleId}`, async () => {
+    // Проверяем, зарегистрирован ли модуль
+    let isRegistered = false;
+    let currentAddress = ethers.ZeroAddress;
+
+    try {
+      const [moduleAddress] = await registry.getFeature(moduleId);
+      currentAddress = moduleAddress;
+      isRegistered = moduleAddress !== ethers.ZeroAddress;
+      console.log(`Статус модуля ${moduleId}: ${isRegistered ? 'зарегистрирован' : 'не зарегистрирован'}`);
+      if (isRegistered) {
+        console.log(`Текущий адрес модуля: ${currentAddress}`);
+      }
+    } catch (error) {
+      // Проверяем, если ошибка содержит 'NotFound' - это нормально, просто модуль не зарегистрирован
+      if (error instanceof Error && error.message.includes('NotFound')) {
+        console.log(`Модуль ${moduleId} не найден в реестре, будет зарегистрирован`);
+        isRegistered = false;
+      } else {
+        console.log('Ошибка при проверке регистрации модуля:', error);
+      }
+    }
+
+    // Если не зарегистрирован - регистрируем
+    if (!isRegistered) {
+      try {
+        console.log(`Регистрация модуля ${moduleId} с адресом фабрики: ${factoryAddress}`);
+        await registry.registerFeature(moduleId, factoryAddress, 0);
+        console.log(`Модуль ${moduleId} успешно зарегистрирован`);
+      } catch (error) {
+        console.error(`Ошибка при регистрации модуля ${moduleId}:`, error);
+        throw error; // Пробрасываем ошибку дальше для правильной обработки
+      }
+    } else if (currentAddress.toLowerCase() !== factoryAddress.toLowerCase()) {
+      // Обновляем адрес модуля если он изменился
+      console.log(`Обновление адреса модуля с ${currentAddress} на ${factoryAddress}`);
+      await registry.upgradeFeature(moduleId, factoryAddress);
+      console.log(`Адрес модуля ${moduleId} обновлен`);
+    } else {
+      console.log(`Модуль ${moduleId} уже зарегистрирован с правильным адресом`);
+    }
+
+    // Регистрируем сервисы для модуля
+    console.log(`Регистрация сервисов для модуля ${moduleId}...`);
+
+    try {
+      // Регистрация валидатора
+      await registry.setModuleServiceAlias(moduleId, CONSTANTS.VALIDATOR_ALIAS, validatorAddress);
+      console.log(`Валидатор (${validatorAddress}) зарегистрирован для модуля ${moduleId}`);
+
+      // Регистрация платежного шлюза
+      await registry.setModuleServiceAlias(moduleId, CONSTANTS.PAYMENT_GATEWAY_ALIAS, gatewayAddress);
+      console.log(`Платежный шлюз (${gatewayAddress}) зарегистрирован для модуля ${moduleId}`);
+    } catch (error) {
+      console.error(`Ошибка при регистрации сервисов для модуля ${moduleId}:`, error);
+      throw error; // Пробрасываем ошибку для корректной обработки выше
+    }
+  });
+}
