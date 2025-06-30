@@ -59,6 +59,27 @@
    npx hardhat run scripts/showcase-all.ts --network localhost
    ```
 
+## Deployment order
+
+The Ignition modules deploy contracts in the following sequence:
+
+1. **CoreModule** – deploys `AccessControlCenter`, `Registry`, `CoreFeeManager`,
+   `PaymentGateway`, `MultiValidator`, `MarketplaceFactory` and a `MockPriceFeed`.
+   The marketplace module is registered along with validator and gateway services.
+2. **LocalDeploy** – in addition to the core contracts it deploys a test ERC-20
+   token and the contest module (`ContestFactory` with its validator) for local
+   development.
+3. **PublicDeploy** – similar to `LocalDeploy` but omits the test token and is
+   intended for testnets or mainnet.
+
+Use the provided npm scripts to deploy:
+
+```bash
+npm run deploy:local     # local Hardhat network
+npm run deploy:sepolia   # Sepolia testnet
+npm run deploy:mainnet   # Ethereum mainnet
+```
+
 ## Как запустить Foundry
 
 1. Установите инструментарий Foundry:

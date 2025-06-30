@@ -11,6 +11,9 @@ const CoreModule = buildModule("CoreModule", (m) => {
   const PAYMENT_GATEWAY_SERVICE = ethers.keccak256(
     ethers.toUtf8Bytes("PaymentGateway")
   );
+  const FEE_MANAGER_SERVICE = ethers.keccak256(
+    ethers.toUtf8Bytes("CoreFeeManager")
+  );
   const VALIDATOR_SERVICE = ethers.keccak256(
     ethers.toUtf8Bytes("SERVICE_VALIDATOR")
   );
@@ -22,10 +25,11 @@ const CoreModule = buildModule("CoreModule", (m) => {
   m.call(feeManager, "initialize", [access]);
 
   m.call(registry, "setCoreService", [ACCESS_SERVICE, access]);
-  m.call(registry, "setCoreService", [PAYMENT_GATEWAY_SERVICE, feeManager]);
+  m.call(registry, "setCoreService", [FEE_MANAGER_SERVICE, feeManager]);
 
   const gateway = m.contract("PaymentGateway", []);
   m.call(gateway, "initialize", [access, registry, feeManager]);
+  m.call(registry, "setCoreService", [PAYMENT_GATEWAY_SERVICE, gateway]);
 
   const tokenValidator = m.contract("MultiValidator", []);
   m.call(tokenValidator, "initialize", [access]);
@@ -33,6 +37,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
   const marketplaceFactory = m.contract("MarketplaceFactory", [registry, gateway]);
   m.call(registry, "registerFeature", [MARKETPLACE_ID, marketplaceFactory, 0]);
   m.call(registry, "setModuleService", [MARKETPLACE_ID, VALIDATOR_SERVICE, tokenValidator]);
+  m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "PaymentGateway", gateway]);
 
   const priceFeed = m.contract("MockPriceFeed", []);
 
