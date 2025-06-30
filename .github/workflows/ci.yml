@@ -37,7 +37,7 @@ jobs:
       # 6) Install Slither for static analysis
       - name: Install Slither
         run: |
-          pip install --user slither-analyzer
+          python3 -m pip install --user slither-analyzer
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       # 7) Run Foundry tests with coverage enforcement
@@ -63,4 +63,4 @@ jobs:
 
       # 11) Static analysis with Slither
       - name: Slither static
-        run: slither . --fail-high
+        run: ~/.local/bin/slither . --fail-high
