@@ -42,4 +42,14 @@ describe("CloneFactory", function () {
     const c2 = await factory.clone(await template.getAddress(), salt2, initData);
     expect(c1).to.not.equal(c2);
   });
+
+  it("returns existing clone on subsequent calls", async () => {
+    const salt = ethers.keccak256(ethers.toUtf8Bytes("repeat"));
+    const initData = new ethers.Interface(["function init(uint256)"]).encodeFunctionData("init", [123]);
+    const predicted = await factory.predict(await template.getAddress(), salt);
+    await factory.clone(await template.getAddress(), salt, initData);
+    await factory.clone(await template.getAddress(), salt, "0x");
+    const clone = await ethers.getContractAt("DummyTemplate", predicted);
+    expect(await clone.value()).to.equal(123n);
+  });
 });
