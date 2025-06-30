@@ -107,4 +107,32 @@ contract ContestEscrowTest is Test {
         assertEq(token.balanceOf(w1), 30 ether);
         assertEq(token.balanceOf(w2), 20 ether);
     }
+
+    function testFinalizePromoPrize() public {
+        PrizeInfo[] memory prizes = new PrizeInfo[](1);
+        prizes[0] = PrizeInfo({prizeType: PrizeType.PROMO, token: address(0), amount: 0, distribution: 0, uri: "promo"});
+        MockRegistry reg = new MockRegistry();
+        ContestEscrow esc = new ContestEscrow(creator, prizes, address(reg), 0, address(token), block.timestamp + 1 days);
+        address[] memory winners = new address[](1);
+        winners[0] = w1;
+        vm.prank(creator);
+        esc.finalize(winners, 0, 0);
+        assertTrue(esc.finalized());
+    }
+
+    function testFinalizeMixedPrizes() public {
+        PrizeInfo[] memory prizes = new PrizeInfo[](2);
+        prizes[0] = PrizeInfo({prizeType: PrizeType.MONETARY, token: address(token), amount: 1 ether, distribution: 0, uri: ""});
+        prizes[1] = PrizeInfo({prizeType: PrizeType.PROMO, token: address(0), amount: 0, distribution: 0, uri: "promo"});
+        MockRegistry reg = new MockRegistry();
+        ContestEscrow esc = new ContestEscrow(creator, prizes, address(reg), 0, address(token), block.timestamp + 1 days);
+        token.transfer(address(esc), 1 ether);
+        address[] memory winners = new address[](2);
+        winners[0] = w1;
+        winners[1] = w2;
+        vm.prank(creator);
+        esc.finalize(winners, 0, 0);
+        assertEq(token.balanceOf(w1), 1 ether);
+        assertTrue(esc.finalized());
+    }
 }

@@ -6,7 +6,9 @@ import {SubscriptionManager} from "contracts/modules/subscriptions/SubscriptionM
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {MockAccessControlCenterAuto} from "contracts/mocks/MockAccessControlCenterAuto.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
+import {MockPermit2} from "contracts/mocks/MockPermit2.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
+import {InvalidChain} from "contracts/errors/Errors.sol";
 import {SignatureLib} from "contracts/lib/SignatureLib.sol";
 
 contract SubscriptionManagerTest is Test {
@@ -18,17 +20,19 @@ contract SubscriptionManagerTest is Test {
 
     address internal merchant;
     uint256 internal merchantPk = 1;
-    address internal user = address(0xBEEF);
+    uint256 internal userPk = 0xBEEF;
+    address internal user;
     address internal keeper = address(0xCAFE);
+    bytes32 internal moduleId = keccak256("Sub");
 
     function setUp() public {
         merchant = vm.addr(merchantPk);
+        user = vm.addr(userPk);
         token = new TestToken("T", "T");
         registry = new MockRegistry();
         acc = new MockAccessControlCenterAuto();
         registry.setCoreService(keccak256("AccessControlCenter"), address(acc));
         gateway = new MockPaymentGateway();
-        bytes32 moduleId = keccak256("Sub");
         registry.setModuleServiceAlias(moduleId, "PaymentGateway", address(gateway));
         sub = new SubscriptionManager(address(registry), address(gateway), moduleId);
         token.transfer(user, 10 ether);
@@ -127,6 +131,40 @@ contract SubscriptionManagerTest is Test {
         vm.prank(address(this));
         sub.setBatchLimit(5);
         assertEq(sub.batchLimit(), 5);
+    }
+
+    function testSubscribeWithPermit() public {
+        SignatureLib.Plan memory plan = _defaultPlan();
+        bytes32 planHash = sub.hashPlan(plan);
+        bytes memory sig = _sign(planHash);
+        uint256 deadline = block.timestamp + 1 days;
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                user,
+                address(gateway),
+                plan.price,
+                token.nonces(user),
+                deadline
+            )
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPk, digest);
+        bytes memory permitSig = abi.encode(deadline, v, r, s);
+        vm.prank(user);
+        sub.subscribe(plan, sig, permitSig);
+        assertEq(token.balanceOf(merchant), plan.price);
+    }
+
+
+    function testSubscribeInvalidChain() public {
+        SignatureLib.Plan memory plan = _defaultPlan();
+        plan.chainIds[0] = block.chainid + 1;
+        bytes32 planHash = sub.hashPlan(plan);
+        bytes memory sig = _sign(planHash);
+        vm.prank(user);
+        vm.expectRevert(InvalidChain.selector);
+        sub.subscribe(plan, sig, "");
     }
 }
 

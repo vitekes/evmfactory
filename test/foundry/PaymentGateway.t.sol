@@ -22,6 +22,7 @@ contract PaymentGatewayTest is Test {
     address internal payer = address(0xBEEF);
     uint256 internal payerKey = 0xBEEF;
     address internal relayer = address(0xCAFE);
+    address internal keeper = address(0xDEAD);
 
     bytes32 internal moduleId = keccak256("Mod");
 
@@ -30,6 +31,8 @@ contract PaymentGatewayTest is Test {
         acc = new AccessControlCenter();
         acc.initialize(address(this));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), payer);
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), keeper);
+        acc.grantRole(acc.AUTOMATION_ROLE(), keeper);
 
         fee = new CoreFeeManager();
         fee.initialize(address(acc));
@@ -93,5 +96,39 @@ contract PaymentGatewayTest is Test {
         vm.prank(address(this));
         gate.unpause();
         assertFalse(gate.paused());
+    }
+
+    function testProcessPaymentWithSignature() public {
+        uint256 amount = 1 ether;
+        acc.grantRole(acc.FEATURE_OWNER_ROLE(), relayer);
+        acc.grantRole(acc.RELAYER_ROLE(), relayer);
+        vm.prank(payer);
+        token.approve(address(gate), amount);
+        bytes32 digest = SignatureLib.hashProcessPayment(
+            gate.DOMAIN_SEPARATOR(),
+            payer,
+            moduleId,
+            address(token),
+            amount,
+            gate.nonces(payer),
+            block.chainid
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(payerKey, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
+        vm.prank(relayer);
+        uint256 net = gate.processPayment(moduleId, address(token), payer, amount, sig);
+        assertEq(net, 0.95 ether);
+        assertEq(token.balanceOf(relayer), 0.95 ether);
+        assertEq(token.balanceOf(address(fee)), 0.05 ether);
+    }
+
+    function testAutomationSkipsSignature() public {
+        uint256 amount = 1 ether;
+        vm.prank(payer);
+        token.approve(address(gate), amount);
+        vm.prank(keeper);
+        uint256 net = gate.processPayment(moduleId, address(token), payer, amount, "");
+        assertEq(net, 0.95 ether);
+        assertEq(token.balanceOf(keeper), 0.95 ether);
     }
 }
