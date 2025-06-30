@@ -74,4 +74,24 @@ contract PaymentGatewayTest is Test {
         vm.expectRevert(NotAllowedToken.selector);
         gate.processPayment(moduleId, address(token), payer, 1 ether, "");
     }
+
+    function testAdminFunctions() public {
+        CoreFeeManager newFee = new CoreFeeManager();
+        newFee.initialize(address(acc));
+        vm.prank(address(this));
+        gate.setFeeManager(address(newFee));
+        assertEq(address(gate.feeManager()), address(newFee));
+
+        vm.prank(address(this));
+        gate.setRegistry(address(reg));
+        assertEq(address(gate.registry()), address(reg));
+
+        vm.prank(address(this));
+        gate.pause();
+        assertTrue(gate.paused());
+
+        vm.prank(address(this));
+        gate.unpause();
+        assertFalse(gate.paused());
+    }
 }
