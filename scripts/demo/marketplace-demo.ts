@@ -14,7 +14,7 @@ async function main() {
   console.log(`Seller:   ${seller.address}`);
   console.log(`Buyer:    ${buyer.address}\n`);
 
-  const { token, registry, gateway, validator, acl } = await deployCore();
+  const { token, registry, gateway, validator, feeManager, acl } = await deployCore();
 
   // Fund participants
   await safeExecute("transfer demo tokens", async () => {
@@ -46,6 +46,14 @@ async function main() {
     await validator.getAddress(),
     await gateway.getAddress()
   );
+
+  await safeExecute("configure commission", async () => {
+    await feeManager.setPercentFee(
+      CONSTANTS.MARKETPLACE_ID,
+      await token.getAddress(),
+      500n
+    );
+  });
 
   // Grant required roles
   await ensureRoles(acl, deployer.address);
@@ -85,6 +93,20 @@ async function main() {
   ]);
   console.log(`Seller balance: ${ethers.formatEther(sellerBal)} tokens`);
   console.log(`Buyer balance:  ${ethers.formatEther(buyerBal)} tokens`);
+
+  const fees = await feeManager.collectedFees(
+    CONSTANTS.MARKETPLACE_ID,
+    await token.getAddress()
+  );
+  console.log(`Collected fees: ${ethers.formatEther(fees)} tokens`);
+  if (fees > 0n) {
+    await feeManager.withdrawFees(
+      CONSTANTS.MARKETPLACE_ID,
+      await token.getAddress(),
+      deployer.address
+    );
+    console.log("Fees withdrawn to deployer");
+  }
 
   console.log("\n✅ Demo finished");
 }
