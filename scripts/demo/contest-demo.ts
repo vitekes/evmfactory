@@ -78,6 +78,20 @@ async function main() {
     }
   });
 
+  await safeExecute("configure commission", async () => {
+    await feeManager.setFixedFee(
+      CONSTANTS.CONTEST_ID,
+      await token.getAddress(),
+      ethers.parseEther("1")
+    );
+    await token.approve(await feeManager.getAddress(), ethers.parseEther("1"));
+    await feeManager.depositFee(
+      CONSTANTS.CONTEST_ID,
+      await token.getAddress(),
+      ethers.parseEther("1")
+    );
+  });
+
   await safeExecute("prepare tokens for contest", async () => {
     // Проверяем баланс токенов у создателя
     const deployerBalance = await token.balanceOf(deployer.address);
@@ -122,6 +136,20 @@ async function main() {
   console.log(`Winner1 balance: ${ethers.formatEther(bal1)} tokens`);
   console.log(`Winner2 balance: ${ethers.formatEther(bal2)} tokens`);
   console.log(`Winner3 balance: ${ethers.formatEther(bal3)} tokens`);
+
+  const fees = await feeManager.collectedFees(
+    CONSTANTS.CONTEST_ID,
+    await token.getAddress()
+  );
+  console.log(`Collected fees: ${ethers.formatEther(fees)} tokens`);
+  if (fees > 0n) {
+    await feeManager.withdrawFees(
+      CONSTANTS.CONTEST_ID,
+      await token.getAddress(),
+      deployer.address
+    );
+    console.log("Fees withdrawn to deployer");
+  }
 
   console.log("\n✅ Demo finished");
 }

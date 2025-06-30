@@ -11,7 +11,7 @@ async function main() {
   console.log(`Merchant: ${merchant.address}`);
   console.log(`User:     ${user.address}\n`);
 
-  const { token, registry, gateway, validator, acl } = await deployCore();
+  const { token, registry, gateway, validator, feeManager, acl } = await deployCore();
 
   const manager = await safeExecute("deploy subscription manager", async () => {
     const Factory = await ethers.getContractFactory("SubscriptionManager");
@@ -32,6 +32,14 @@ async function main() {
     await validator.getAddress(),
     await gateway.getAddress()
   );
+
+  await safeExecute("configure commission", async () => {
+    await feeManager.setPercentFee(
+      CONSTANTS.SUBSCRIPTION_ID,
+      await token.getAddress(),
+      500n
+    );
+  });
 
   await safeExecute("grant roles", async () => {
     const featureRole = await acl.FEATURE_OWNER_ROLE();
@@ -85,6 +93,20 @@ async function main() {
 
   const merchantBal = await token.balanceOf(merchant.address);
   console.log(`Merchant balance: ${ethers.formatEther(merchantBal)} tokens`);
+
+  const fees = await feeManager.collectedFees(
+    CONSTANTS.SUBSCRIPTION_ID,
+    await token.getAddress()
+  );
+  console.log(`Collected fees: ${ethers.formatEther(fees)} tokens`);
+  if (fees > 0n) {
+    await feeManager.withdrawFees(
+      CONSTANTS.SUBSCRIPTION_ID,
+      await token.getAddress(),
+      deployer.address
+    );
+    console.log("Fees withdrawn to deployer");
+  }
 
   await safeExecute("unsubscribe", async () => {
     await (manager.connect(user) as unknown as typeof manager).unsubscribe();
