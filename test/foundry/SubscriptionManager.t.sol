@@ -95,5 +95,38 @@ contract SubscriptionManagerTest is Test {
         (, storedHash) = sub.subscribers(user);
         assertEq(storedHash, bytes32(0));
     }
+
+    function testChargeBatchHonorsLimit() public {
+        SignatureLib.Plan memory plan = _defaultPlan();
+        bytes32 planHash = sub.hashPlan(plan);
+        bytes memory sig = _sign(planHash);
+        address[] memory users = new address[](3);
+        for (uint256 i; i < 3; i++) {
+            address u = address(uint160(i + 10));
+            users[i] = u;
+            token.transfer(u, plan.price * 2);
+            vm.startPrank(u);
+            token.approve(address(gateway), plan.price * 2);
+            sub.subscribe(plan, sig, "");
+            vm.stopPrank();
+        }
+        vm.prank(address(this));
+        sub.setBatchLimit(2);
+
+        (uint256 ts, ) = sub.subscribers(users[0]);
+        vm.warp(ts + 1);
+        vm.prank(keeper);
+        sub.chargeBatch(users);
+
+        assertEq(token.balanceOf(merchant), plan.price * 5);
+        (, bytes32 stored) = sub.subscribers(users[2]);
+        assertEq(stored, planHash); // not charged yet
+    }
+
+    function testSetBatchLimitRole() public {
+        vm.prank(address(this));
+        sub.setBatchLimit(5);
+        assertEq(sub.batchLimit(), 5);
+    }
 }
 
