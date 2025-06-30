@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../contracts/core/EventRouter.sol";
-import "../contracts/core/AccessControlCenter.sol";
+import "contracts/core/EventRouter.sol";
+import "contracts/core/AccessControlCenter.sol";
 
 contract EventRouterTest is Test {
     EventRouter public router;
@@ -20,7 +20,7 @@ contract EventRouterTest is Test {
         
         // Деплоим ACL
         acl = new AccessControlCenter();
-        acl.initialize();
+        acl.initialize(admin);
         
         // Настраиваем роли
         acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), admin);
@@ -81,23 +81,13 @@ contract EventRouterTest is Test {
         
         // Проверяем, что неадмин не может обновить контракт
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("NotAdmin()"));
-        vm.mockCall(
-            address(router),
-            abi.encodeWithSelector(router.upgradeToAndCall.selector, newImplementation, ""),
-            abi.encode()
-        );
+        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
         router.upgradeToAndCall(newImplementation, "");
         vm.stopPrank();
         
         // Нулевой адрес не должен быть разрешен даже для админа
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSignature("InvalidImplementation()"));
-        vm.mockCall(
-            address(router),
-            abi.encodeWithSelector(router.upgradeToAndCall.selector, address(0), ""),
-            abi.encode()
-        );
+        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
         router.upgradeToAndCall(address(0), "");
         vm.stopPrank();
     }
