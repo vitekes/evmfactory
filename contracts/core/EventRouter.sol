@@ -7,6 +7,10 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 
 contract EventRouter is Initializable, UUPSUpgradeable {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     AccessControlCenter public access;
 
     enum EventKind {

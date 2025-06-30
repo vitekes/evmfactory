@@ -29,7 +29,7 @@ describe("ContestEscrow", function () {
   });
 
   it("finalize distributes prizes", async () => {
-    await escrow.connect(creator).finalize([w1.address, w2.address], 0, 0);
+    await escrow.connect(creator).finalize([w1.address, w2.address], 0);
     expect(await token.balanceOf(w1.address)).to.equal(ethers.parseEther("100"));
     expect(await token.balanceOf(w2.address)).to.equal(ethers.parseEther("50"));
     expect(await escrow.finalized()).to.equal(true);
@@ -37,7 +37,7 @@ describe("ContestEscrow", function () {
 
   it("reverts with wrong winners count", async () => {
     await expect(
-      escrow.connect(creator).finalize([w1.address], 0, 0)
+      escrow.connect(creator).finalize([w1.address], 0)
     ).to.be.revertedWithCustomError(escrow, "WrongWinnersCount");
   });
 

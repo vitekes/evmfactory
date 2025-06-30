@@ -12,6 +12,10 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     using Address for address payable;
     using SafeERC20 for IERC20;
 
@@ -55,15 +59,14 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @notice Calculate and collect fee
     /// @param moduleId Module identifier
     /// @param token Fee token
-    /// @param payer Address paying the fee
     /// @param amount Payment amount
     /// @return feeAmount Actual fee charged
     function collect(
         bytes32 moduleId,
         address token,
-        address payer,
         uint256 amount
     ) external onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 feeAmount) {
+        address payer = msg.sender;
         if (isZeroFeeAddress[moduleId][payer]) return 0;
 
         uint16 pFee = percentFee[moduleId][token];

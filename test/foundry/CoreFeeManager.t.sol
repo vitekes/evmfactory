@@ -31,7 +31,7 @@ contract CoreFeeManagerTest is Test {
         fee.setFixedFee(bytes32("M1"), address(t1), 1 ether);
         vm.prank(payer);
         t1.approve(address(fee), 100 ether);
-        uint256 f = fee.collect(bytes32("M1"), address(t1), payer, 20 ether);
+        uint256 f = fee.collect(bytes32("M1"), address(t1), 20 ether);
         assertEq(f, 2 ether); // 1 ether fixed + 5% of 20 = 2
         assertEq(t1.balanceOf(address(fee)), 2 ether);
     }
