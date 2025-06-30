@@ -81,4 +81,21 @@ contract ContestFactoryTest is Test {
         vm.expectRevert(InvalidPrizeData.selector);
         factory.createContest(prizes, "");
     }
+
+    function testCreateContestPromo() public {
+        PrizeInfo[] memory prizes = new PrizeInfo[](1);
+        prizes[0] = PrizeInfo({prizeType: PrizeType.PROMO, token: address(0), amount: 0, distribution: 0, uri: "promo"});
+        address esc = factory.createContest(prizes, "");
+        assertEq(ContestEscrow(esc).prizesLength(), 1);
+    }
+
+    function testCreateContestMixed() public {
+        PrizeInfo[] memory prizes = new PrizeInfo[](2);
+        prizes[0] = PrizeInfo({prizeType: PrizeType.MONETARY, token: address(token), amount: 10 ether, distribution: 0, uri: ""});
+        prizes[1] = PrizeInfo({prizeType: PrizeType.PROMO, token: address(0), amount: 0, distribution: 0, uri: "promo"});
+        token.approve(address(factory), 10 ether);
+        address esc = factory.createContest(prizes, "");
+        assertEq(token.balanceOf(esc), 10 ether);
+        assertEq(ContestEscrow(esc).prizesLength(), 2);
+    }
 }
