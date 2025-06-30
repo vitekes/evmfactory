@@ -83,7 +83,7 @@ async function main() {
   console.log(`Listing created with id ${listingId}`);
 
   // Buyer approves tokens and purchases the listing
-  await token.connect(buyer).approve(marketplaceAddress, price);
+  await (token.connect(buyer) as unknown as typeof token).approve(marketplaceAddress, price);
   await purchaseListing(marketplace, token, buyer, listingId, price);
 
   // Final balances
