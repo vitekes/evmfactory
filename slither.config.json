@@ -1,0 +1,7 @@
+{
+  "detectors_to_exclude": ["pragma", "solc-version", "different-pragma"],
+  "exclude_informational": true,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false
+}
