@@ -11,11 +11,12 @@ import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '../../lib/SignatureLib.sol';
 import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title Marketplace
 /// @notice Minimal marketplace example demonstrating registration of sales and
 /// payment processing via the PaymentGateway core service.
-contract Marketplace is AccessManaged {
+contract Marketplace is AccessManaged, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
     Registry public immutable registry;
@@ -84,7 +85,7 @@ contract Marketplace is AccessManaged {
     }
 
     /// @notice Purchase a listed item, paying through PaymentGateway
-    function buy(uint256 id) external {
+    function buy(uint256 id) external nonReentrant {
         OnchainListing storage l = listings[id];
         if (!l.active) revert NotListed();
 
@@ -97,7 +98,7 @@ contract Marketplace is AccessManaged {
         emit MarketplaceListingSold(id, msg.sender);
     }
     /// @notice Purchase a lazily listed item using EIP-712 signature
-    function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external {
+    function buy(SignatureLib.Listing calldata listing, bytes calldata sigSeller) external nonReentrant {
         bytes32 listingHash = hashListing(listing);
         if (listingHash.recover(sigSeller) != listing.seller) revert InvalidSignature();
         if (consumed[listingHash][msg.sender]) revert AlreadyPurchased();
