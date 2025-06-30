@@ -246,9 +246,12 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         // функцию `buy(uint256)` для ончейн-листинга, поэтому используем её
         // напрямую, не пытаясь определить сложные сигнатуры.
         try {
-            let tx = await marketplace.connect(buyer).buy(listingId, {
-                gasLimit: 1000000
-            });
+            // Указываем полную сигнатуру функции, чтобы исключить неоднозначность
+            let tx = await marketplace
+                .connect(buyer)
+                ["buy(uint256)"](listingId, {
+                    gasLimit: 1000000
+                });
             console.log("Транзакция отправлена:", tx.hash);
             await tx.wait();
 

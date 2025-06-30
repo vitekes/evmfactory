@@ -714,7 +714,8 @@ async function setupDemoEnvironment(): Promise<{
       const marketplaceForBuyer = await ethers.getContractAt("Marketplace", marketplaceAddress, buyer);
 
       // Покупаем товар
-      const tx = await marketplaceForBuyer.buy(listingId);
+      // Указываем явную сигнатуру, чтобы избежать неоднозначности в ethers.js
+      const tx = await marketplaceForBuyer["buy(uint256)"](listingId);
       console.log(`Транзакция покупки отправлена: ${tx.hash}`);
       const receipt = await tx.wait();
       console.log("Транзакция покупки подтверждена");
