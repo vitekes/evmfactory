@@ -13,13 +13,17 @@
     "verify:mainnet": "npx hardhat ignition verify mainnet-deployment",
     "lint": "prettier --check \"contracts/**/*.sol\"",
     "lint:fix": "prettier --write \"contracts/**/*.sol\"",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "gasreport": "REPORT_GAS=true npx hardhat test"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.9",
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.0",
@@ -29,6 +33,7 @@
     "ethers": "^6.14.4",
     "glob": "^11.0.3",
     "hardhat": "^2.25.0",
+    "hardhat-gas-reporter": "^1.0.9",
     "husky": "^8.0.0",
     "mocha": "^10.8.2",
     "prettier": "^3.5.3",

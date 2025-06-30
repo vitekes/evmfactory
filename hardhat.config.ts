@@ -6,6 +6,7 @@ import "@nomicfoundation/hardhat-ignition";
 import "@typechain/hardhat";
 import "@nomicfoundation/hardhat-network-helpers";
 import "solidity-coverage";
+import "hardhat-gas-reporter";
 
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
@@ -47,6 +48,11 @@ const config: HardhatUserConfig = {
     mocha: {
         timeout: 120000,
         reporter: 'spec'
+    },
+    gasReporter: {
+        enabled: process.env.REPORT_GAS === 'true',
+        currency: 'USD',
+        coinmarketcap: process.env.COINMARKETCAP_API_KEY || '',
     },
     typechain: {
         outDir: "typechain-types",
