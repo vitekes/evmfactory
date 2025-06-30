@@ -8,6 +8,7 @@ import {PrizeInfo, PrizeType} from "contracts/modules/contests/shared/PrizeInfo.
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {MockFeeManager} from "contracts/mocks/MockFeeManager.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
 import {InvalidPrizeData, NotGovernor} from "contracts/errors/Errors.sol";
 import {CoreDefs} from "contracts/interfaces/CoreDefs.sol";
@@ -33,8 +34,10 @@ contract ContestFactoryTest is Test {
         token = new TestToken("T", "T");
         registry = new MockRegistry();
         fee = new MockFeeManager();
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.GOVERNOR_ROLE(), address(this));
         registry.setCoreService(keccak256("AccessControlCenter"), address(acc));
         validator = new DummyValidator();

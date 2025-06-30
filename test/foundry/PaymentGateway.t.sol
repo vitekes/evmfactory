@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {CoreFeeManager} from "contracts/core/CoreFeeManager.sol";
 import {PaymentGateway} from "contracts/core/PaymentGateway.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {MockValidator} from "contracts/mocks/MockValidator.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
@@ -28,14 +29,18 @@ contract PaymentGatewayTest is Test {
 
     function setUp() public {
         token = new TestToken("T", "T");
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), payer);
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), keeper);
         acc.grantRole(acc.AUTOMATION_ROLE(), keeper);
 
-        fee = new CoreFeeManager();
-        fee.initialize(address(acc));
+        CoreFeeManager feeImpl = new CoreFeeManager();
+        bytes memory feeData = abi.encodeCall(CoreFeeManager.initialize, address(acc));
+        ERC1967Proxy feeProxy = new ERC1967Proxy(address(feeImpl), feeData);
+        fee = CoreFeeManager(address(feeProxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         fee.setPercentFee(moduleId, address(token), 500); // 5%
 
@@ -44,8 +49,10 @@ contract PaymentGatewayTest is Test {
         val.setToken(address(token), true);
         reg.setModuleServiceAlias(moduleId, "Validator", address(val));
 
-        gate = new PaymentGateway();
-        gate.initialize(address(acc), address(reg), address(fee));
+        PaymentGateway gateImpl = new PaymentGateway();
+        bytes memory gateData = abi.encodeCall(PaymentGateway.initialize, (address(acc), address(reg), address(fee)));
+        ERC1967Proxy gateProxy = new ERC1967Proxy(address(gateImpl), gateData);
+        gate = PaymentGateway(address(gateProxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(gate));
 
         token.transfer(payer, 10 ether);
@@ -79,8 +86,10 @@ contract PaymentGatewayTest is Test {
     }
 
     function testAdminFunctions() public {
-        CoreFeeManager newFee = new CoreFeeManager();
-        newFee.initialize(address(acc));
+        CoreFeeManager feeImpl2 = new CoreFeeManager();
+        bytes memory feeData2 = abi.encodeCall(CoreFeeManager.initialize, address(acc));
+        ERC1967Proxy feeProxy2 = new ERC1967Proxy(address(feeImpl2), feeData2);
+        CoreFeeManager newFee = CoreFeeManager(address(feeProxy2));
         vm.prank(address(this));
         gate.setFeeManager(address(newFee));
         assertEq(address(gate.feeManager()), address(newFee));

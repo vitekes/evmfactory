@@ -4,9 +4,15 @@ pragma solidity ^0.8.28;
 import './AccessControlCenter.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
 import '../errors/Errors.sol';
 
 contract GasSubsidyManager is Initializable, UUPSUpgradeable {
+    using Address for address payable;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     AccessControlCenter public access;
 
     // moduleId => user => whether gas coverage is allowed
@@ -102,7 +108,7 @@ contract GasSubsidyManager is Initializable, UUPSUpgradeable {
         if (gasUsed > limit / price) revert ExceedsRefundLimit();
         uint256 refund = price * gasUsed;
         if (address(this).balance < refund) revert InsufficientBalance();
-        relayer.transfer(refund);
+        relayer.sendValue(refund);
         emit GasRefunded(moduleId, relayer, refund);
     }
 

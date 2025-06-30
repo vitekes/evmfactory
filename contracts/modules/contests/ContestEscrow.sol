@@ -26,8 +26,6 @@ contract ContestEscrow is ReentrancyGuard {
     bool public finalized;
     uint256 public deadline;
     uint256 public constant GRACE_PERIOD = 30 days;
-    bytes32 public winnerCommitment;
-    bool public isCommitted;
 
     uint8 public constant maxWinnersPerTx = 20;
     bytes32 public constant MODULE_ID = CoreDefs.CONTEST_MODULE_ID;
@@ -37,7 +35,6 @@ contract ContestEscrow is ReentrancyGuard {
     event PrizeAssigned(address indexed to, string uri);
     event ContestFinalized(address[] winners);
     event GasRefunded(address indexed to, uint256 amount);
-    event WinnersCommitted(bytes32 commitment);
 
     modifier onlyCreator() {
         if (msg.sender != creator) revert NotCreator();
@@ -67,20 +64,12 @@ contract ContestEscrow is ReentrancyGuard {
     /// @notice Finalize contest and distribute prizes
     /// @param _winners List of winner addresses
     /// @param priorityCap Priority fee cap for gas refund calculation
-    /// @param nonce Nonce used when committing winners
     function finalize(
         address[] calldata _winners,
-        uint256 priorityCap,
-        uint256 nonce
+        uint256 priorityCap
     ) external nonReentrant onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
-
-        // Verify commitment if it was previously set
-        if (isCommitted) {
-            bytes32 computedCommitment = keccak256(abi.encode(_winners, nonce));
-            if (computedCommitment != winnerCommitment) revert CommitmentInvalid();
-        }
 
         if (winners.length == 0) {
             winners = _winners;

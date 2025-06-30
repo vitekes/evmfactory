@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {MultiValidator} from "contracts/core/MultiValidator.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ZeroAddress, NotGovernor, NotAdmin} from "contracts/errors/Errors.sol";
 
 contract MultiValidatorTest is Test {
@@ -13,13 +14,16 @@ contract MultiValidatorTest is Test {
     address internal other = address(0xBEEF);
 
     function setUp() public {
-        acc = new AccessControlCenter();
         vm.startPrank(admin);
-        acc.initialize(admin);
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, admin);
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.GOVERNOR_ROLE(), admin);
-        val = new MultiValidator();
-        acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(val));
-        val.initialize(address(acc));
+        MultiValidator valImpl = new MultiValidator();
+        bytes memory valData = abi.encodeCall(MultiValidator.initialize, address(acc));
+        ERC1967Proxy valProxy = new ERC1967Proxy(address(valImpl), valData);
+        val = MultiValidator(address(valProxy));
         vm.stopPrank();
     }
 
@@ -58,8 +62,10 @@ contract MultiValidatorTest is Test {
     }
 
     function testSetAccessControlOnlyAdmin() public {
-        AccessControlCenter newAcc = new AccessControlCenter();
-        newAcc.initialize(address(0xCAFE));
+        AccessControlCenter newImpl = new AccessControlCenter();
+        bytes memory data = abi.encodeCall(AccessControlCenter.initialize, address(0xCAFE));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), data);
+        AccessControlCenter newAcc = AccessControlCenter(address(proxy));
         vm.prank(other);
         vm.expectRevert(NotAdmin.selector);
         val.setAccessControl(address(newAcc));

@@ -6,6 +6,7 @@ import {MarketplaceFactory} from "contracts/modules/marketplace/MarketplaceFacto
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {MockPaymentGateway} from "contracts/mocks/MockPaymentGateway.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PaymentGatewayNotRegistered, NotFactoryAdmin} from "contracts/errors/Errors.sol";
 
 contract MarketplaceFactoryTest is Test {
@@ -20,8 +21,10 @@ contract MarketplaceFactoryTest is Test {
     function setUp() public {
         registry = new MockRegistry();
         gateway = new MockPaymentGateway();
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(FACTORY_ADMIN, address(this));
         registry.setCoreService(keccak256("AccessControlCenter"), address(acc));
         factory = new MarketplaceFactory(address(registry), address(gateway));

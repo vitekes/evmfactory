@@ -18,6 +18,10 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     using Address for address payable;
     using SafeERC20 for IERC20;
 
@@ -92,7 +96,7 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
 
         IERC20(token).safeTransferFrom(payer, address(this), amount);
         IERC20(token).forceApprove(address(feeManager), amount);
-        uint256 fee = feeManager.collect(moduleId, token, address(this), amount);
+        uint256 fee = feeManager.collect(moduleId, token, amount);
         IERC20(token).forceApprove(address(feeManager), 0);
         netAmount = amount - fee;
         IERC20(token).safeTransfer(msg.sender, netAmount);

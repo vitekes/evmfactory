@@ -38,12 +38,12 @@ contract ContestEscrowStressTest is Test {
         }
 
         vm.prank(creator);
-        escrow.finalize(winners, 0, 0);
+        escrow.finalize(winners, 0);
         assertEq(escrow.processedWinners(), 20);
         assertFalse(escrow.finalized());
 
         vm.prank(creator);
-        escrow.finalize(winners, 0, 0);
+        escrow.finalize(winners, 0);
         assertEq(escrow.processedWinners(), count);
         assertTrue(escrow.finalized());
         assertEq(token.balanceOf(winners[0]), 1 ether);

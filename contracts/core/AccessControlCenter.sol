@@ -7,6 +7,10 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 
 contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     // Roles
     bytes32 public constant FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
     bytes32 public constant OPERATOR_ROLE = keccak256('OPERATOR_ROLE');

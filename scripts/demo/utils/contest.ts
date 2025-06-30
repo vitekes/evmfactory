@@ -209,6 +209,6 @@ export async function finalizeContest(
   winners: string[]
 ): Promise<void> {
   const escrow = await ethers.getContractAt("ContestEscrow", contestAddress);
-  const tx = await escrow.finalize(winners, 0n, 0n);
+  const tx = await escrow.finalize(winners, 0n);
   await tx.wait();
 }

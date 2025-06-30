@@ -42,7 +42,7 @@ contract ContestEscrowTest is Test {
         winners[0] = w1;
         winners[1] = w2;
         vm.prank(creator);
-        escrow.finalize(winners, 0, 0);
+        escrow.finalize(winners, 0);
         assertEq(token.balanceOf(w1), 100 ether);
         assertEq(token.balanceOf(w2), 50 ether);
         assertTrue(escrow.finalized());
@@ -103,7 +103,7 @@ contract ContestEscrowTest is Test {
         winners[1] = w2;
         winners[2] = address(0x3);
         vm.prank(creator);
-        esc.finalize(winners, 0, 0);
+        esc.finalize(winners, 0);
         assertEq(token.balanceOf(w1), 30 ether);
         assertEq(token.balanceOf(w2), 20 ether);
     }
@@ -116,7 +116,7 @@ contract ContestEscrowTest is Test {
         address[] memory winners = new address[](1);
         winners[0] = w1;
         vm.prank(creator);
-        esc.finalize(winners, 0, 0);
+        esc.finalize(winners, 0);
         assertTrue(esc.finalized());
     }
 
@@ -131,7 +131,7 @@ contract ContestEscrowTest is Test {
         winners[0] = w1;
         winners[1] = w2;
         vm.prank(creator);
-        esc.finalize(winners, 0, 0);
+        esc.finalize(winners, 0);
         assertEq(token.balanceOf(w1), 1 ether);
         assertTrue(esc.finalized());
     }

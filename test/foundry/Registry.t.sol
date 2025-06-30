@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {Registry} from "contracts/core/Registry.sol";
 import {TokenRegistry} from "contracts/core/TokenRegistry.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {InvalidImplementation, InvalidAddress, NotFound} from "contracts/errors/Errors.sol";
 
 contract RegistryTest is Test {
@@ -18,15 +19,21 @@ contract RegistryTest is Test {
     address internal token = address(0xCAFE);
 
     function setUp() public {
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
 
-        registry = new Registry();
-        registry.initialize(address(acc));
+        Registry regImpl = new Registry();
+        bytes memory regData = abi.encodeCall(Registry.initialize, address(acc));
+        ERC1967Proxy regProxy = new ERC1967Proxy(address(regImpl), regData);
+        registry = Registry(address(regProxy));
 
-        tokenReg = new TokenRegistry();
-        tokenReg.initialize(address(acc));
+        TokenRegistry tokenImpl = new TokenRegistry();
+        bytes memory tokenData = abi.encodeCall(TokenRegistry.initialize, address(acc));
+        ERC1967Proxy tokenProxy = new ERC1967Proxy(address(tokenImpl), tokenData);
+        tokenReg = TokenRegistry(address(tokenProxy));
     }
 
     function testRegisterAndUpgradeFeature() public {

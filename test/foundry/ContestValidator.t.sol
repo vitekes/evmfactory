@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ContestValidator} from "contracts/modules/contests/ContestValidator.sol";
 import {MockValidator} from "contracts/mocks/MockValidator.sol";
 import {TestToken} from "contracts/mocks/TestToken.sol";
@@ -18,8 +19,10 @@ contract ContestValidatorTest is Test {
     address internal other = address(0xBEEF);
 
     function setUp() public {
-        acc = new AccessControlCenter();
-        acc.initialize(governor);
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, governor);
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.GOVERNOR_ROLE(), governor);
         mval = new MockValidator();
         val = new ContestValidator(address(acc), address(mval));
