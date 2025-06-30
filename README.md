@@ -40,6 +40,7 @@
    ```
    > The `lib` directory stores external libraries. Only `lib/chainlink` is tracked in Git; other subfolders may be ignored.
 2. Create a `.env` file:
+
    ```env
    PRIVATE_KEY=your_private_key
    RPC_URL=https://...
@@ -57,7 +58,7 @@
 
 5. Run the showcase script to see a complete end-to-end flow:
    ```bash
-   npx hardhat run scripts/showcase-all.ts --network localhost
+   npx hardhat run scripts/showcase-marketplace.ts --network localhost
    ```
 
 ## Deployment order
