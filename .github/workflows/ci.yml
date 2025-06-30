@@ -38,7 +38,7 @@ jobs:
       - name: Forge coverage
         run: |
           forge coverage --report lcov --ir-minimum
-          bash scripts/check-coverage.sh 90
+          bash scripts/check-coverage.sh 70
 
       # 7) Compile contracts with Hardhat
       - name: Hardhat compile

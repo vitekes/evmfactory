@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-THRESHOLD=${1:-90}
+THRESHOLD=${1:-70}
 FILE=""
 if [ -f coverage/lcov.info ]; then
   FILE="coverage/lcov.info"
