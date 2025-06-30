@@ -19,6 +19,10 @@ contract MockRegistry {
         return moduleServices[moduleId][serviceId];
     }
 
+    function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) external {
+        moduleServices[moduleId][serviceId] = addr;
+    }
+
     function setCoreService(bytes32 serviceId, address addr) external {
         coreServices[serviceId] = addr;
     }
@@ -29,5 +33,9 @@ contract MockRegistry {
 
     function registerFeature(bytes32 id, address impl, uint8) external {
         features[id] = impl;
+    }
+
+    function upgradeFeature(bytes32 id, address newImpl) external {
+        features[id] = newImpl;
     }
 }
