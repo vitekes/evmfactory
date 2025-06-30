@@ -2,14 +2,14 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../contracts/shared/AccessManaged.sol";
-import "../contracts/core/AccessControlCenter.sol";
+import "contracts/shared/AccessManaged.sol";
+import "contracts/core/AccessControlCenter.sol";
 
 // Мок-контракт для тестирования AccessManaged
 contract MockAccessManaged is AccessManaged {
     constructor(address accessControl) AccessManaged(accessControl) {}
-    
-    function doSomethingWithRole(bytes32 role) external onlyRole(role) returns (bool) {
+
+    function doSomethingWithRole(bytes32 role) external view onlyRole(role) returns (bool) {
         return true;
     }
     
@@ -31,7 +31,7 @@ contract AccessManagedTest is Test {
         
         // Деплоим ACL
         acl = new AccessControlCenter();
-        acl.initialize();
+        acl.initialize(admin);
         
         // Даем админу роль DEFAULT_ADMIN_ROLE
         bytes32 adminRole = acl.DEFAULT_ADMIN_ROLE();
@@ -70,16 +70,16 @@ contract AccessManagedTest is Test {
         vm.startPrank(admin);
         
         // Тестируем проверку роли
-        bool hasRole = managed.hasRole(ROLE_A, admin);
+        bool hasRole = acl.hasRole(ROLE_A, admin);
         assertTrue(hasRole, "Admin should have ROLE_A");
         
-        bool userHasRole = managed.hasRole(ROLE_A, user);
+        bool userHasRole = acl.hasRole(ROLE_A, user);
         assertFalse(userHasRole, "User should not have ROLE_A");
         
         vm.stopPrank();
     }
     
-    function testAccAddressStorage() public {
+    function testAccAddressStorage() public view {
         // Проверяем, что _ACC правильно хранится в контракте
         address storedAcc = managed.getAcc();
         assertEq(storedAcc, address(acl), "ACC address should be stored correctly");

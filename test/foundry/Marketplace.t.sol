@@ -72,7 +72,7 @@ contract MarketplaceTest is Test {
         l.chainIds[0] = block.chainid;
     }
 
-    function _sign(bytes32 digest, uint256 pk) internal view returns (bytes memory) {
+    function _sign(bytes32 digest, uint256 pk) internal pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
     }

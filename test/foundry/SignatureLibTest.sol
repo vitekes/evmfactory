@@ -2,14 +2,25 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../contracts/lib/SignatureLib.sol";
+import "contracts/lib/SignatureLib.sol";
+
+contract SignatureLibWrapper {
+    function hashPlan(SignatureLib.Plan calldata plan, bytes32 ds) external pure returns (bytes32) {
+        return SignatureLib.hashPlan(plan, ds);
+    }
+}
+
+using SignatureLib for SignatureLib.Plan;
 
 contract SignatureLibTest is Test {
-    bytes32 private constant _TYPE_HASH = keccak256("Plan(address merchant,address token,uint256 price,uint256 period,uint256 expiry,uint256[] chainIds,string description)");
+    bytes32 private constant _TYPE_HASH = keccak256(
+        "Plan(uint256[] chainIds,uint256 price,uint256 period,address token,address merchant,uint256 salt,uint64 expiry)"
+    );
     address private constant _TEST_MERCHANT = address(0x1234);
     address private constant _TEST_TOKEN = address(0x5678);
     
     bytes32 private _domainSeparator;
+    SignatureLibWrapper private wrapper;
     
     function setUp() public {
         // Создаем правильный domain separator для тестов
@@ -20,44 +31,45 @@ contract SignatureLibTest is Test {
                 address(this)
             )
         );
+        wrapper = new SignatureLibWrapper();
     }
     
-    function testHashPlan() public {
+    function testHashPlan() public view {
         // Создаем тестовый план
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = block.chainid;
         
         SignatureLib.Plan memory plan = SignatureLib.Plan({
-            merchant: _TEST_MERCHANT,
-            token: _TEST_TOKEN,
+            chainIds: chainIds,
             price: 100,
             period: 30 days,
-            expiry: block.timestamp + 365 days,
-            chainIds: chainIds,
-            description: "Test Plan"
+            token: _TEST_TOKEN,
+            merchant: _TEST_MERCHANT,
+            salt: 0,
+            expiry: uint64(block.timestamp + 365 days)
         });
         
         // Хешируем план
         bytes32 structHash = keccak256(
             abi.encode(
                 _TYPE_HASH,
-                plan.merchant,
-                plan.token,
+                keccak256(abi.encodePacked(plan.chainIds)),
                 plan.price,
                 plan.period,
-                plan.expiry,
-                keccak256(abi.encodePacked(plan.chainIds)),
-                keccak256(bytes(plan.description))
+                plan.token,
+                plan.merchant,
+                plan.salt,
+                plan.expiry
             )
         );
         
         bytes32 expectedHash = keccak256(abi.encodePacked("\x19\x01", _domainSeparator, structHash));
-        bytes32 actualHash = SignatureLib.hashPlan(plan, _domainSeparator);
+        bytes32 actualHash = wrapper.hashPlan(plan, _domainSeparator);
         
         assertEq(actualHash, expectedHash, "Plan hash calculation is incorrect");
     }
     
-    function testHashPlanWithDifferentChainIds() public {
+    function testHashPlanWithDifferentChainIds() public view {
         // Проверка с несколькими chainIds
         uint256[] memory chainIds1 = new uint256[](1);
         chainIds1[0] = 1;
@@ -67,47 +79,47 @@ contract SignatureLibTest is Test {
         chainIds2[1] = 137;
         
         SignatureLib.Plan memory plan1 = SignatureLib.Plan({
-            merchant: _TEST_MERCHANT,
-            token: _TEST_TOKEN,
+            chainIds: chainIds1,
             price: 100,
             period: 30 days,
-            expiry: block.timestamp + 365 days,
-            chainIds: chainIds1,
-            description: "Test Plan"
+            token: _TEST_TOKEN,
+            merchant: _TEST_MERCHANT,
+            salt: 0,
+            expiry: uint64(block.timestamp + 365 days)
         });
         
         SignatureLib.Plan memory plan2 = SignatureLib.Plan({
-            merchant: _TEST_MERCHANT,
-            token: _TEST_TOKEN,
+            chainIds: chainIds2,
             price: 100,
             period: 30 days,
-            expiry: block.timestamp + 365 days,
-            chainIds: chainIds2,
-            description: "Test Plan"
+            token: _TEST_TOKEN,
+            merchant: _TEST_MERCHANT,
+            salt: 0,
+            expiry: uint64(block.timestamp + 365 days)
         });
         
-        bytes32 hash1 = SignatureLib.hashPlan(plan1, _domainSeparator);
-        bytes32 hash2 = SignatureLib.hashPlan(plan2, _domainSeparator);
+        bytes32 hash1 = wrapper.hashPlan(plan1, _domainSeparator);
+        bytes32 hash2 = wrapper.hashPlan(plan2, _domainSeparator);
         
         assertTrue(hash1 != hash2, "Plans with different chainIds should have different hashes");
     }
     
-    function testHashPlanWithEmptyChainIds() public {
+    function testHashPlanWithEmptyChainIds() public view {
         // Проверка с пустым массивом chainIds
         uint256[] memory emptyChainIds = new uint256[](0);
         
         SignatureLib.Plan memory plan = SignatureLib.Plan({
-            merchant: _TEST_MERCHANT,
-            token: _TEST_TOKEN,
+            chainIds: emptyChainIds,
             price: 100,
             period: 30 days,
-            expiry: block.timestamp + 365 days,
-            chainIds: emptyChainIds,
-            description: "Test Plan"
+            token: _TEST_TOKEN,
+            merchant: _TEST_MERCHANT,
+            salt: 0,
+            expiry: uint64(block.timestamp + 365 days)
         });
         
         // Не должно быть ревертов
-        bytes32 hash = SignatureLib.hashPlan(plan, _domainSeparator);
+        bytes32 hash = wrapper.hashPlan(plan, _domainSeparator);
         assertTrue(hash != bytes32(0), "Hash should not be zero even with empty chainIds");
     }
 }

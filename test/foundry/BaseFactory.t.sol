@@ -12,7 +12,7 @@ contract DummyFactory is BaseFactory {
         BaseFactory(reg, gateway, moduleId)
     {}
 
-    function adminCall() external onlyFactoryAdmin returns (uint256) {
+    function adminCall() external view onlyFactoryAdmin returns (uint256) {
         return 42;
     }
 }
@@ -43,14 +43,19 @@ contract BaseFactoryTest is Test {
 
     function testGatewayRegisteredOnDeploy() public {
         registry.registerFeature(MODULE_ID, address(this), 1);
-        DummyFactory f = new DummyFactory(address(registry), gateway, MODULE_ID);
-        assertEq(registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway"), gateway);
+        new DummyFactory(address(registry), gateway, MODULE_ID);
+        assertEq(
+            registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway"),
+            gateway
+        );
     }
 
     function testNoRegistrationWhenModuleMissing() public {
-        DummyFactory f = new DummyFactory(address(registry), gateway, MODULE_ID);
-        assertEq(registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway"), address(0));
-        (f); // silence unused variable warning
+        new DummyFactory(address(registry), gateway, MODULE_ID);
+        assertEq(
+            registry.getModuleServiceByAlias(MODULE_ID, "PaymentGateway"),
+            address(0)
+        );
     }
 
     function testOnlyFactoryAdmin() public {
