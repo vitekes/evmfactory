@@ -118,13 +118,13 @@ export async function deployCore(): Promise<{
 
   // 7. Деплой платежного шлюза
   const gateway = await safeExecute("деплой платежного шлюза", async () => {
-    // Пробуем сначала мок, затем реальный шлюз
+    // Сначала пытаемся использовать реальный шлюз, затем fallback на мок
     let Gateway;
     try {
-      Gateway = await ethers.getContractFactory("MockPaymentGateway");
-    } catch (error) {
-      console.log('MockPaymentGateway не найден, пробуем PaymentGateway...');
       Gateway = await ethers.getContractFactory("PaymentGateway");
+    } catch (error) {
+      console.log('PaymentGateway не найден, пробуем MockPaymentGateway...');
+      Gateway = await ethers.getContractFactory("MockPaymentGateway");
     }
 
     const gateway = await Gateway.deploy();

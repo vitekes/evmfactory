@@ -47,13 +47,6 @@ async function main() {
     await gateway.getAddress()
   );
 
-  await safeExecute("configure commission", async () => {
-    await feeManager.setPercentFee(
-      CONSTANTS.MARKETPLACE_ID,
-      await token.getAddress(),
-      500n
-    );
-  });
 
   // Grant required roles
   await ensureRoles(acl, deployer.address);
@@ -70,6 +63,16 @@ async function main() {
     marketplaceAddress
   );
   console.log(`Marketplace deployed: ${marketplaceAddress}\n`);
+
+  // Configure commission for the deployed marketplace using its module id
+  const moduleId = await marketplace.MODULE_ID();
+  await safeExecute("configure commission", async () => {
+    await feeManager.setPercentFee(
+      moduleId,
+      await token.getAddress(),
+      500n
+    );
+  });
 
   // Create listing
   const price = ethers.parseEther("10");
@@ -95,13 +98,13 @@ async function main() {
   console.log(`Buyer balance:  ${ethers.formatEther(buyerBal)} tokens`);
 
   const fees = await feeManager.collectedFees(
-    CONSTANTS.MARKETPLACE_ID,
+    moduleId,
     await token.getAddress()
   );
   console.log(`Collected fees: ${ethers.formatEther(fees)} tokens`);
   if (fees > 0n) {
     await feeManager.withdrawFees(
-      CONSTANTS.MARKETPLACE_ID,
+      moduleId,
       await token.getAddress(),
       deployer.address
     );
