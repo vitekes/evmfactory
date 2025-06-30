@@ -34,23 +34,21 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
 
-      # 6) Run Foundry tests with coverage enforcement
+      # 6) Install Slither for static analysis
+      - name: Install Slither
+        run: |
+          pip install --user slither-analyzer
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # 7) Run Foundry tests with coverage enforcement
       - name: Forge coverage
         run: |
           forge coverage --report lcov --ir-minimum
           bash scripts/check-coverage.sh 70
 
-      # 7) Compile contracts with Hardhat
+      # 8) Compile contracts with Hardhat
       - name: Hardhat compile
         run: npx hardhat compile
-
-      # 8) Run Hardhat JS tests (e2e/integration)
-      - name: Run Hardhat tests
-        run: npx hardhat test
-
-      # 8.5) Generate Hardhat gas report
-      - name: Hardhat gas report
-        run: npm run gasreport
 
       # 9) Run showcase scripts
       - name: Run showcase scripts
@@ -62,7 +60,7 @@ jobs:
       # 10) Hardhat coverage (using solidity-coverage)
       - name: Hardhat coverage
         run: npm run coverage
-      
+
       # 11) Static analysis with Slither
       - name: Slither static
-        run: slither . --fail-on-issue High
+        run: slither . --fail-high
