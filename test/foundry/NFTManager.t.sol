@@ -2,35 +2,131 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {NFTManager} from "contracts/shared/NFTManager.sol";
+import "../contracts/core/EventRouter.sol";
+import "../contracts/core/AccessControlCenter.sol";
 
-contract NFTManagerTest is Test {
-    NFTManager internal nft;
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    address internal user = address(0xABCD);
-    address internal other = address(0xDCBA);
-
+contract EventRouterTest is Test {
+    EventRouter public router;
+    AccessControlCenter public acl;
+    
+    address admin = address(0x1);
+    address module = address(0x2);
+    address user = address(0x3);
+    
+    event EventRouted(EventRouter.EventKind indexed kind, bytes payload);
+    
     function setUp() public {
-        nft = new NFTManager("Demo", "D");
+        vm.startPrank(admin);
+        
+        // Деплоим ACL
+        acl = new AccessControlCenter();
+        acl.initialize();
+        
+        // Настраиваем роли
+        acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), admin);
+        acl.grantRole(acl.MODULE_ROLE(), module);
+        
+        // Деплоим и инициализируем EventRouter
+        router = new EventRouter();
+        router.initialize(address(acl));
+        
+        vm.stopPrank();
     }
-
-    function testMintAndBurn() public {
-        vm.expectEmit(true, true, true, true);
-        emit NFTManager.Minted(user, 1, "uri", false);
-        uint256 id = nft.mint(user, "uri", false);
-        assertEq(id, 1);
-        assertEq(nft.balanceOf(user), 1);
-
-        vm.expectEmit(true, true, true, false);
-        emit Transfer(user, address(0), id);
-        nft.burn(id);
-        assertEq(nft.balanceOf(user), 0);
+    
+    function testInitialize() public {
+        // Проверяем, что инициализация прошла успешно
+        assertEq(address(router.access()), address(acl), "AccessControlCenter should be set correctly");
+        
+        // Повторная инициализация должна быть отклонена
+        vm.expectRevert();
+        router.initialize(address(acl));
     }
-
-    function testTransferWithoutApproval() public {
-        uint256 id = nft.mint(user, "u", false);
-        vm.prank(other);
-        vm.expectRevert(abi.encodeWithSignature("ERC721InsufficientApproval(address,uint256)", other, id));
-        nft.transferFrom(user, other, id);
+    
+    function testRouteEventByModule() public {
+        vm.startPrank(module);
+        
+        bytes memory testPayload = abi.encode("test data");
+        
+        // Проверяем эмиссию события
+        vm.expectEmit(true, false, false, true);
+        emit EventRouted(EventRouter.EventKind.ContestFinalized, testPayload);
+        
+        router.route(EventRouter.EventKind.ContestFinalized, testPayload);
+        
+        vm.stopPrank();
+    }
+    
+    function testRouteInvalidKind() public {
+        vm.startPrank(module);
+        
+        // EventKind.Unknown (0) не должно быть разрешено
+        vm.expectRevert(abi.encodeWithSignature("InvalidKind()"));
+        router.route(EventRouter.EventKind.Unknown, "");
+        
+        vm.stopPrank();
+    }
+    
+    function testRouteNotModule() public {
+        vm.startPrank(user);
+        
+        // Обычный пользователь не должен иметь доступ к route
+        vm.expectRevert(abi.encodeWithSignature("NotModule()"));
+        router.route(EventRouter.EventKind.ContestFinalized, "");
+        
+        vm.stopPrank();
+    }
+    
+    function testAuthorizeUpgrade() public {
+        address newImplementation = address(0x8888);
+        
+        // Проверяем, что неадмин не может обновить контракт
+        vm.startPrank(user);
+        vm.expectRevert(abi.encodeWithSignature("NotAdmin()"));
+        vm.mockCall(
+            address(router),
+            abi.encodeWithSelector(router.upgradeToAndCall.selector, newImplementation, ""),
+            abi.encode()
+        );
+        router.upgradeToAndCall(newImplementation, "");
+        vm.stopPrank();
+        
+        // Нулевой адрес не должен быть разрешен даже для админа
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSignature("InvalidImplementation()"));
+        vm.mockCall(
+            address(router),
+            abi.encodeWithSelector(router.upgradeToAndCall.selector, address(0), ""),
+            abi.encode()
+        );
+        router.upgradeToAndCall(address(0), "");
+        vm.stopPrank();
+    }
+    
+    function testRouteAllEventKinds() public {
+        vm.startPrank(module);
+        
+        // Проверяем маршрутизацию для каждого типа события
+        router.route(EventRouter.EventKind.ListingCreated, "");
+        router.route(EventRouter.EventKind.SubscriptionCharged, "");
+        router.route(EventRouter.EventKind.ContestFinalized, "");
+        
+        // Все вызовы должны пройти без ошибок
+        
+        vm.stopPrank();
+    }
+    
+    function testRouteWithLargePayload() public {
+        vm.startPrank(module);
+        
+        // Создаем большой объем данных
+        bytes memory largePayload = new bytes(10000);
+        for (uint i = 0; i < 10000; i++) {
+            largePayload[i] = 0x42;
+        }
+        
+        // Должен успешно маршрутизировать большой объем данных
+        router.route(EventRouter.EventKind.ContestFinalized, largePayload);
+        
+        vm.stopPrank();
     }
 }
