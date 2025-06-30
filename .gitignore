@@ -15,6 +15,9 @@ node_modules
 
 # Foundry build artifacts
 /lib
+# Keep required libraries (Chainlink)
+!lib/chainlink/
+!lib/chainlink/**
 /out
 
 # Hardhat Ignition default folder for deployments against a local node

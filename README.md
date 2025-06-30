@@ -38,6 +38,7 @@
    cd evmcontest
    npm install
    ```
+   > The `lib` directory stores external libraries. Only `lib/chainlink` is tracked in Git; other subfolders may be ignored.
 2. Create a `.env` file:
    ```env
    PRIVATE_KEY=your_private_key
