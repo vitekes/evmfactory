@@ -3,6 +3,8 @@ module.exports = {
     'core',
     'errors',
     'interfaces',
+    '**/interfaces',
+    '**/interfaces/**',
     'lib',
     'mocks',
     'modules',
