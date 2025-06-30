@@ -242,72 +242,23 @@ export async function purchaseListing(marketplace: any, token: any, buyer: any, 
         console.log("Сигнатуры buy:", availableBuySignatures);
         console.log("Сигнатуры purchase:", availablePurchaseSignatures);
 
-        // Выполняем покупку с помощью различных стратегий
-
-        // Стратегия 1: Используем функцию покупки в зависимости от доступных методов
+        // Выполняем покупку. По умолчанию маркетплейс поддерживает покупку через
+        // функцию `buy(uint256)` для ончейн-листинга, поэтому используем её
+        // напрямую, не пытаясь определить сложные сигнатуры.
         try {
-            // Попытка 1: Проверяем, доступен ли метод purchase
-            if (availableMethods.includes('purchase') || availablePurchaseSignatures.length > 0) {
-                console.log("Используем метод purchase...");
-                let purchaseTx = await marketplace.connect(buyer).purchase(listingId, {
-                    gasLimit: 1000000
-                });
-                console.log("Транзакция отправлена:", purchaseTx.hash);
-                await purchaseTx.wait();
-            }
-            // Попытка 2: Проверяем, доступен ли метод buy
-            else if (availableMethods.includes('buy') || availableBuySignatures.length > 0) {
-                console.log("Используем метод buy...");
-
-                // Определяем точную сигнатуру функции buy
-                if (availableBuySignatures.includes('buy(uint256,uint256)')) {
-                    console.log("Вызываем buy(uint256,uint256)");
-                    let buyTx = await marketplace.connect(buyer)["buy(uint256,uint256)"](listingId, 0, {
-                        gasLimit: 1000000
-                    });
-                    console.log("Транзакция отправлена:", buyTx.hash);
-                    await buyTx.wait();
-                } else if (availableBuySignatures.includes('buy(uint256)')) {
-                    console.log("Вызываем buy(uint256)");
-                    let buyTx = await marketplace.connect(buyer)["buy(uint256)"](listingId, {
-                        gasLimit: 1000000
-                    });
-                    console.log("Транзакция отправлена:", buyTx.hash);
-                    await buyTx.wait();
-                } else {
-                    console.log("Вызываем buy с одним параметром");
-                    let buyTx = await marketplace.connect(buyer).buy(listingId, {
-                        gasLimit: 1000000
-                    });
-                    console.log("Транзакция отправлена:", buyTx.hash);
-                    await buyTx.wait();
-                }
-            }
-            // Если методы не найдены, пробуем использовать интерфейс напрямую
-            else {
-                // Последняя попытка с прямым доступом к функциям
-                const availableFunctions = Object.keys(marketplace.functions || {});
-
-                if (availableFunctions.includes('purchase')) {
-                    console.log("Используем функцию purchase из functions...");
-                    let functionTx = await marketplace.functions.purchase(listingId, { gasLimit: 1000000 });
-                    console.log("Транзакция отправлена:", functionTx.hash);
-                    await functionTx.wait();
-                } else if (availableFunctions.includes('buy')) {
-                    console.log("Используем функцию buy из functions...");
-                    let functionTx = await marketplace.functions.buy(listingId, { gasLimit: 1000000 });
-                    console.log("Транзакция отправлена:", functionTx.hash);
-                    await functionTx.wait();
-                } else {
-                    throw new Error("Не найдены методы для покупки товара");
-                }
-            }
+            let tx = await marketplace.connect(buyer).buy(listingId, {
+                gasLimit: 1000000
+            });
+            console.log("Транзакция отправлена:", tx.hash);
+            await tx.wait();
 
             console.log("Покупка успешно завершена!");
             return true;
         } catch (purchaseError) {
-            console.error("Все попытки покупки не удались:", 
-                purchaseError instanceof Error ? purchaseError.message : "Неизвестная ошибка");
+            console.error(
+                "Все попытки покупки не удались:",
+                purchaseError instanceof Error ? purchaseError.message : "Неизвестная ошибка"
+            );
             throw purchaseError;
         }
     } catch (error) {
