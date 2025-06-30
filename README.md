@@ -38,7 +38,7 @@
    cd evmcontest
    npm install
    ```
-2. Create a `.env` file:
+2. Copy `.env.example` to `.env` and fill in the variables:
    ```env
    PRIVATE_KEY=your_private_key
    RPC_URL=https://...
