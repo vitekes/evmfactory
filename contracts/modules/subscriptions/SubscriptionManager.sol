@@ -13,10 +13,11 @@ import '../../interfaces/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
 import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
-contract SubscriptionManager is AccessManaged {
+contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -100,7 +101,11 @@ contract SubscriptionManager is AccessManaged {
     /// @param plan Plan parameters signed by the merchant
     /// @param sigMerchant Merchant signature over the plan
     /// @param permitSig Optional permit or Permit2 signature for token spending
-    function subscribe(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, bytes calldata permitSig) external {
+    function subscribe(
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        bytes calldata permitSig
+    ) external nonReentrant {
         bytes32 planHash = hashPlan(plan);
         if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
         if (!(plan.expiry == 0 || plan.expiry >= block.timestamp)) revert Expired();
@@ -161,7 +166,11 @@ contract SubscriptionManager is AccessManaged {
 
     /// @notice Charge a user according to their plan
     /// @param user Address of the subscriber to charge
-    function charge(address user) public onlyAutomation {
+    function charge(address user) public onlyAutomation nonReentrant {
+        _charge(user);
+    }
+
+    function _charge(address user) internal {
         Subscriber storage s = subscribers[user];
         SignatureLib.Plan memory plan = plans[s.planHash];
         if (plan.merchant == address(0)) revert NoPlan();
@@ -189,7 +198,7 @@ contract SubscriptionManager is AccessManaged {
         }
         uint256 len = limit;
         for (uint256 i = 0; i < len; ) {
-            charge(users[i]);
+            _charge(users[i]);
             unchecked {
                 ++i;
             }
