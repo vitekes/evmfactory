@@ -38,7 +38,9 @@
    cd evmcontest
    npm install
    ```
-2. Copy `.env.example` to `.env` and fill in the variables:
+   > The `lib` directory stores external libraries. Only `lib/chainlink` is tracked in Git; other subfolders may be ignored.
+2. Create a `.env` file:
+
    ```env
    PRIVATE_KEY=your_private_key
    RPC_URL=https://...
