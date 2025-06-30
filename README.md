@@ -56,7 +56,7 @@
 
 5. Run the showcase script to see a complete end-to-end flow:
    ```bash
-   npx hardhat run scripts/showcase-all.ts --network localhost
+   npx hardhat run scripts/showcase-marketplace.ts --network localhost
    ```
 
 ## Deployment order
