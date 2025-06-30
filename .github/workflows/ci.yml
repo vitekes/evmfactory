@@ -34,9 +34,11 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
 
-      # 6) Run Foundry unit and fuzz tests
-      - name: Run Foundry tests
-        run: forge test -vv
+      # 6) Run Foundry tests with coverage enforcement
+      - name: Forge coverage
+        run: |
+          forge coverage --report lcov --ir-minimum
+          bash scripts/check-coverage.sh 90
 
       # 7) Compile contracts with Hardhat
       - name: Hardhat compile
@@ -57,16 +59,10 @@ jobs:
             npx hardhat run "$f" || exit 1
           done
 
-      # 10) Forge coverage report + coverage gate (≥90%)
-      - name: Forge coverage
-        run: |
-          forge coverage --report lcov --ir-minimum
-          bash scripts/check-coverage.sh 90
-
-      # 11) Hardhat coverage (using solidity-coverage)
+      # 10) Hardhat coverage (using solidity-coverage)
       - name: Hardhat coverage
         run: npm run coverage
-
-      # 12) Static analysis with Slither
+      
+      # 11) Static analysis with Slither
       - name: Slither static
         run: slither . --fail-on-issue High
