@@ -8,8 +8,8 @@ import "contracts/core/AccessControlCenter.sol";
 // Мок-контракт для тестирования AccessManaged
 contract MockAccessManaged is AccessManaged {
     constructor(address accessControl) AccessManaged(accessControl) {}
-    
-    function doSomethingWithRole(bytes32 role) external onlyRole(role) returns (bool) {
+
+    function doSomethingWithRole(bytes32 role) external view onlyRole(role) returns (bool) {
         return true;
     }
     
@@ -79,7 +79,7 @@ contract AccessManagedTest is Test {
         vm.stopPrank();
     }
     
-    function testAccAddressStorage() public {
+    function testAccAddressStorage() public view {
         // Проверяем, что _ACC правильно хранится в контракте
         address storedAcc = managed.getAcc();
         assertEq(storedAcc, address(acl), "ACC address should be stored correctly");

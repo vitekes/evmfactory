@@ -34,7 +34,7 @@ contract SignatureLibTest is Test {
         wrapper = new SignatureLibWrapper();
     }
     
-    function testHashPlan() public {
+    function testHashPlan() public view {
         // Создаем тестовый план
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = block.chainid;
@@ -69,7 +69,7 @@ contract SignatureLibTest is Test {
         assertEq(actualHash, expectedHash, "Plan hash calculation is incorrect");
     }
     
-    function testHashPlanWithDifferentChainIds() public {
+    function testHashPlanWithDifferentChainIds() public view {
         // Проверка с несколькими chainIds
         uint256[] memory chainIds1 = new uint256[](1);
         chainIds1[0] = 1;
@@ -104,7 +104,7 @@ contract SignatureLibTest is Test {
         assertTrue(hash1 != hash2, "Plans with different chainIds should have different hashes");
     }
     
-    function testHashPlanWithEmptyChainIds() public {
+    function testHashPlanWithEmptyChainIds() public view {
         // Проверка с пустым массивом chainIds
         uint256[] memory emptyChainIds = new uint256[](0);
         
