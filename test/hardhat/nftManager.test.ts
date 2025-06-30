@@ -61,4 +61,24 @@ describe("NFTManager", function () {
       nft.mintBatch(recipients, uris, false)
     ).to.be.revertedWithCustomError(nft, "BatchTooLarge");
   });
+
+  it("allows transfer after approval", async () => {
+    await nft.mint(user.address, "u", false);
+    await nft.connect(user).approve(other.address, 1);
+    await expect(
+      nft.connect(other).transferFrom(user.address, other.address, 1)
+    )
+      .to.emit(nft, "Transfer")
+      .withArgs(user.address, other.address, 1n);
+    expect(await nft.balanceOf(other.address)).to.equal(1n);
+  });
+
+  it("non owner cannot burn", async () => {
+    await nft.mint(user.address, "u", false);
+    await expect(
+      nft.connect(user).burn(1)
+    )
+      .to.be.revertedWithCustomError(nft, "OwnableUnauthorizedAccount")
+      .withArgs(user.address);
+  });
 });
