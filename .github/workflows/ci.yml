@@ -46,6 +46,10 @@ jobs:
       - name: Run Hardhat tests
         run: npx hardhat test
 
+      # 8.5) Generate Hardhat gas report
+      - name: Hardhat gas report
+        run: npm run gasreport
+
       # 9) Run showcase scripts
       - name: Run showcase scripts
         run: |
