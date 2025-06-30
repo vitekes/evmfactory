@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {TokenRegistry} from "contracts/core/TokenRegistry.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract TokenRegistrySoloTest is Test {
     AccessControlCenter internal acc;
@@ -13,12 +14,16 @@ contract TokenRegistrySoloTest is Test {
     address internal t2 = address(0x2);
 
     function setUp() public {
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         acc.grantRole(acc.DEFAULT_ADMIN_ROLE(), address(this));
-        reg = new TokenRegistry();
-        reg.initialize(address(acc));
+        TokenRegistry regImpl = new TokenRegistry();
+        bytes memory regData = abi.encodeCall(TokenRegistry.initialize, address(acc));
+        ERC1967Proxy regProxy = new ERC1967Proxy(address(regImpl), regData);
+        reg = TokenRegistry(address(regProxy));
     }
 
     function testBulkWhitelist() public {
@@ -31,8 +36,10 @@ contract TokenRegistrySoloTest is Test {
     }
 
     function testSetAccessControl() public {
-        AccessControlCenter other = new AccessControlCenter();
-        other.initialize(address(this));
+        AccessControlCenter otherImpl = new AccessControlCenter();
+        bytes memory data = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(otherImpl), data);
+        AccessControlCenter other = AccessControlCenter(address(proxy));
         vm.prank(address(this));
         reg.setAccessControl(address(other));
         assertEq(address(reg.access()), address(other));

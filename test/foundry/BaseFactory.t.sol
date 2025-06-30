@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {BaseFactory} from "contracts/shared/BaseFactory.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockRegistry} from "contracts/mocks/MockRegistry.sol";
 import {NotFactoryAdmin} from "contracts/errors/Errors.sol";
 
@@ -32,8 +33,10 @@ contract BaseFactoryTest is Test {
     bytes32 internal constant MODULE_ID = keccak256("Module");
 
     function setUp() public {
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter impl = new AccessControlCenter();
+        bytes memory data = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
+        acc = AccessControlCenter(address(proxy));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(this));
         acc.grantRole(acc.FEATURE_OWNER_ROLE(), address(1));
 

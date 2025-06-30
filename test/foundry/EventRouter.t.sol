@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import {AccessControlCenter} from "contracts/core/AccessControlCenter.sol";
 import {EventRouter} from "contracts/core/EventRouter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {InvalidKind} from "contracts/errors/Errors.sol";
 
 contract EventRouterTest is Test {
@@ -12,12 +13,16 @@ contract EventRouterTest is Test {
     address internal module = address(0xBEEF);
 
     function setUp() public {
-        acc = new AccessControlCenter();
-        acc.initialize(address(this));
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, address(this));
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acc = AccessControlCenter(address(accProxy));
         acc.grantRole(acc.MODULE_ROLE(), module);
 
-        router = new EventRouter();
-        router.initialize(address(acc));
+        EventRouter routerImpl = new EventRouter();
+        bytes memory routerData = abi.encodeCall(EventRouter.initialize, address(acc));
+        ERC1967Proxy routerProxy = new ERC1967Proxy(address(routerImpl), routerData);
+        router = EventRouter(address(routerProxy));
     }
 
     function testRouteEmitsEvent() public {

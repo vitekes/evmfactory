@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import "contracts/core/EventRouter.sol";
 import "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract EventRouterTest is Test {
     EventRouter public router;
@@ -19,16 +20,20 @@ contract EventRouterTest is Test {
         vm.startPrank(admin);
         
         // Деплоим ACL
-        acl = new AccessControlCenter();
-        acl.initialize(admin);
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, admin);
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acl = AccessControlCenter(address(accProxy));
         
         // Настраиваем роли
         acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), admin);
         acl.grantRole(acl.MODULE_ROLE(), module);
         
         // Деплоим и инициализируем EventRouter
-        router = new EventRouter();
-        router.initialize(address(acl));
+        EventRouter impl = new EventRouter();
+        bytes memory data = abi.encodeCall(EventRouter.initialize, address(acl));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
+        router = EventRouter(address(proxy));
         
         vm.stopPrank();
     }
@@ -81,13 +86,13 @@ contract EventRouterTest is Test {
         
         // Проверяем, что неадмин не может обновить контракт
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
+        vm.expectRevert(abi.encodeWithSignature("NotAdmin()"));
         router.upgradeToAndCall(newImplementation, "");
         vm.stopPrank();
         
         // Нулевой адрес не должен быть разрешен даже для админа
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
+        vm.expectRevert(abi.encodeWithSignature("InvalidImplementation()"));
         router.upgradeToAndCall(address(0), "");
         vm.stopPrank();
     }

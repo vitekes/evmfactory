@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import "contracts/core/GasSubsidyManager.sol";
 import "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract GasSubsidyManagerTest is Test {
     GasSubsidyManager public gasManager;
@@ -22,8 +23,10 @@ contract GasSubsidyManagerTest is Test {
         vm.startPrank(admin);
         
         // Деплоим ACL
-        acl = new AccessControlCenter();
-        acl.initialize(admin);
+        AccessControlCenter accImpl = new AccessControlCenter();
+        bytes memory accData = abi.encodeCall(AccessControlCenter.initialize, admin);
+        ERC1967Proxy accProxy = new ERC1967Proxy(address(accImpl), accData);
+        acl = AccessControlCenter(address(accProxy));
         
         // Настраиваем роли
         acl.grantRole(acl.DEFAULT_ADMIN_ROLE(), admin);
@@ -31,8 +34,10 @@ contract GasSubsidyManagerTest is Test {
         acl.grantRole(acl.AUTOMATION_ROLE(), automation);
         
         // Деплоим GasSubsidyManager
-        gasManager = new GasSubsidyManager();
-        gasManager.initialize(address(acl));
+        GasSubsidyManager gmImpl = new GasSubsidyManager();
+        bytes memory gmData = abi.encodeCall(GasSubsidyManager.initialize, address(acl));
+        ERC1967Proxy gmProxy = new ERC1967Proxy(address(gmImpl), gmData);
+        gasManager = GasSubsidyManager(payable(address(gmProxy)));
         
         vm.stopPrank();
         
@@ -208,13 +213,13 @@ contract GasSubsidyManagerTest is Test {
         
         // Проверяем, что неадмин не может обновить контракт
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
+        vm.expectRevert(abi.encodeWithSignature("NotAdmin()"));
         gasManager.upgradeToAndCall(newImplementation, "");
         vm.stopPrank();
-        
+
         // Нулевой адрес не должен быть разрешен даже для админа
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSignature("UUPSUnauthorizedCallContext()"));
+        vm.expectRevert(abi.encodeWithSignature("InvalidImplementation()"));
         gasManager.upgradeToAndCall(address(0), "");
         vm.stopPrank();
     }

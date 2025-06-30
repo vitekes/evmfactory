@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import "contracts/shared/AccessManaged.sol";
 import "contracts/core/AccessControlCenter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // Мок-контракт для тестирования AccessManaged
 contract MockAccessManaged is AccessManaged {
@@ -29,9 +30,11 @@ contract AccessManagedTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         
-        // Деплоим ACL
-        acl = new AccessControlCenter();
-        acl.initialize(admin);
+        // Deploy ACL via proxy
+        AccessControlCenter impl = new AccessControlCenter();
+        bytes memory data = abi.encodeCall(AccessControlCenter.initialize, admin);
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
+        acl = AccessControlCenter(address(proxy));
         
         // Даем админу роль DEFAULT_ADMIN_ROLE
         bytes32 adminRole = acl.DEFAULT_ADMIN_ROLE();

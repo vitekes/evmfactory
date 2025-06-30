@@ -48,9 +48,7 @@ contract AccessControlCenterTest is Test {
 
     function testUpgradeOnImplementationFails() public {
         AccessControlCenter impl = new AccessControlCenter();
-        impl.initialize(admin);
         AccessControlCenter newImpl = new AccessControlCenter();
-        vm.prank(admin);
         vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
         impl.upgradeToAndCall(address(newImpl), bytes(""));
     }
