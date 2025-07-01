@@ -24,3 +24,4 @@ scripts/security/run-slither.sh --include-mocks
 - `exclude_informational`: Исключить ли информационные предупреждения
 
 Для исключения конкретных файлов используйте `.slitherignore`.
+Каталог `contracts/mocks/` уже указан в этом файле и не участвует в анализе по умолчанию.
