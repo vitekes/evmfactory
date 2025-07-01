@@ -47,7 +47,11 @@ contract NFTManager is ERC721URIStorage, Ownable, ReentrancyGuard {
     /// @param recipients Addresses receiving tokens
     /// @param uris Metadata URIs
     /// @param soulbound Whether minted tokens are soulbound
-    function mintBatch(address[] calldata recipients, string[] calldata uris, bool soulbound) external onlyOwner nonReentrant {
+    function mintBatch(
+        address[] calldata recipients,
+        string[] calldata uris,
+        bool soulbound
+    ) external onlyOwner nonReentrant {
         if (recipients.length != uris.length) revert LengthMismatch();
         if (recipients.length > MAX_BATCH_MINT) revert BatchTooLarge();
         for (uint256 i = 0; i < recipients.length; i++) {

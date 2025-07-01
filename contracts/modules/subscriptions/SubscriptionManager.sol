@@ -76,17 +76,17 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
 
-            // Инициализируем DOMAIN_SEPARATOR как immutable переменную
-            DOMAIN_SEPARATOR = keccak256(
-                abi.encode(
-                    keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        // Инициализируем DOMAIN_SEPARATOR как immutable переменную
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
+                block.chainid,
+                address(this)
+            )
+        );
         // Service registration handled externally after deployment
 
-            // DOMAIN_SEPARATOR теперь инициализируется в конструкторе как immutable
+        // DOMAIN_SEPARATOR теперь инициализируется в конструкторе как immutable
 
         // Role assignment should be done outside the constructor
 

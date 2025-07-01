@@ -64,10 +64,7 @@ contract ContestEscrow is ReentrancyGuard {
     /// @notice Finalize contest and distribute prizes
     /// @param _winners List of winner addresses
     /// @param priorityCap Priority fee cap for gas refund calculation
-    function finalize(
-        address[] calldata _winners,
-        uint256 priorityCap
-    ) external nonReentrant onlyCreator {
+    function finalize(address[] calldata _winners, uint256 priorityCap) external nonReentrant onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
