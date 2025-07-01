@@ -18,13 +18,16 @@ async function setupMarketplaceRoles(registry: Contract, addr: string) {
     const relayerRole = await acl.RELAYER_ROLE();
 
     if (!(await acl.hasRole(moduleRole, addr))) {
-        await acl.grantRole(moduleRole, addr);
+        const tx = await acl.grantRole(moduleRole, addr);
+        await tx.wait();
     }
     if (!(await acl.hasRole(featureOwnerRole, addr))) {
-        await acl.grantRole(featureOwnerRole, addr);
+        const tx = await acl.grantRole(featureOwnerRole, addr);
+        await tx.wait();
     }
     if (!(await acl.hasRole(relayerRole, addr))) {
-        await acl.grantRole(relayerRole, addr);
+        const tx = await acl.grantRole(relayerRole, addr);
+        await tx.wait();
     }
 }
 
