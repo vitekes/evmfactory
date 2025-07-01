@@ -20,7 +20,19 @@ scripts/security/run-slither.sh --include-mocks
 Конфигурация Slither находится в файле `.slither.config.json`. Вы можете настроить следующие параметры:
 
 - `filter_paths`: Строка с регулярными выражениями, разделёнными запятыми, для фильтрации путей к анализируемым файлам
-- `detectors_to_exclude`: Список детекторов, которые следует исключить из анализа
+- `detectors_to_exclude`: Список детекторов, которые следует исключить из анализа.
+  По умолчанию исключаются следующие детекторы:
+  - `pragma`
+  - `solc-version`
+  - `different-pragma`
+  - `arbitrary-from-in-transferfrom`
+  - `incorrect-exp`
+  - `unused-return`
+  - `local-variable-shadowing`
+  - `calls-inside-a-loop`
+  - `reentrancy-vulnerabilities-2`
+  - `reentrancy-vulnerabilities-3`
+  - `block-timestamp`
 - `exclude_informational`: Исключить ли информационные предупреждения
 
 Для исключения конкретных файлов используйте `.slitherignore`.
