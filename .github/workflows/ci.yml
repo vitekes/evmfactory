@@ -63,4 +63,4 @@ jobs:
 
       # 11) Static analysis with Slither
       - name: Slither static
-        run: ~/.local/bin/slither . --fail-high --exclude-paths "contracts/mocks/"
+        run: bash scripts/security/run-slither.sh --critical-only

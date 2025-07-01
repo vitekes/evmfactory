@@ -1,9 +1,5 @@
 {
-  "filter_paths": [
-    "contracts/(?!mocks).*",
-    "node_modules/",
-    "lib/"
-  ],
+  "filter_paths": "contracts/(?!mocks).*,node_modules/,lib/",
   "exclude_informational": true,
   "exclude_low": false,
   "exclude_medium": false,
