@@ -24,6 +24,8 @@ contract ContestFactory {
     uint256 public defaultContestDuration = 180 days;
 
     constructor(address _registry, address _feeManager) {
+        if (_registry == address(0)) revert ZeroAddress();
+        if (_feeManager == address(0)) revert ZeroAddress();
         registry = IRegistry(_registry);
         feeManager = _feeManager;
         access = AccessControlCenter(IRegistry(_registry).getCoreService(keccak256('AccessControlCenter')));

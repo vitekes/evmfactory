@@ -147,15 +147,16 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
             }
         }
 
-        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
-            .processPayment(MODULE_ID, plan.token, msg.sender, plan.price, '');
-
-        IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
-
+        // Сохраняем план и создаем подписчика до внешних вызовов (CEI паттерн)
         if (plans[planHash].merchant == address(0)) {
             plans[planHash] = plan;
         }
         subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
+
+        uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
+            .processPayment(MODULE_ID, plan.token, msg.sender, plan.price, '');
+
+        IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
         emit Subscribed(msg.sender, planHash, plan.price, plan.token);
     }
@@ -179,14 +180,16 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (plan.merchant == address(0)) revert NoPlan();
         if (block.timestamp < s.nextBilling) revert NotDue();
 
+        // Обновляем состояние перед внешним вызовом (CEI паттерн)
+        uint256 nextBillingTime = s.nextBilling + plan.period;
+        s.nextBilling = nextBillingTime;
+
         uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
 
-        s.nextBilling += plan.period;
-
-        emit SubscriptionCharged(user, s.planHash, plan.price, s.nextBilling);
+        emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
     }
 
     /// @notice Charge multiple subscribers in a single transaction.

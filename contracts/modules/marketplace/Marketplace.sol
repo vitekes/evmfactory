@@ -90,12 +90,14 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         OnchainListing storage l = listings[id];
         if (!l.active) revert NotListed();
 
+        // Обновляем состояние перед внешним вызовом (CEI паттерн)
+        l.active = false;
+
         uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, l.token, msg.sender, l.price, '');
 
         IERC20(l.token).safeTransfer(l.seller, netAmount);
 
-        l.active = false;
         emit MarketplaceListingSold(id, msg.sender);
     }
     /// @notice Purchase a lazily listed item using EIP-712 signature
@@ -113,12 +115,14 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         }
         if (!chainAllowed) revert InvalidChain();
 
+        // Обновляем состояние перед внешним вызовом (CEI паттерн)
+        consumed[listingHash][msg.sender] = true;
+
         uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, listing.token, msg.sender, listing.price, '');
 
         IERC20(listing.token).safeTransfer(listing.seller, netAmount);
 
-        consumed[listingHash][msg.sender] = true;
         emit MarketplaceListingPurchased(msg.sender, listingHash, block.chainid);
     }
 

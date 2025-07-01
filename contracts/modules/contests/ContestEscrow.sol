@@ -20,11 +20,11 @@ contract ContestEscrow is ReentrancyGuard {
     PrizeInfo[] public prizes;
     address[] public winners;
 
-    address public commissionToken;
+    address public immutable commissionToken;
     uint256 public gasPool;
     uint256 public processedWinners;
     bool public finalized;
-    uint256 public deadline;
+    uint256 public immutable deadline;
     uint256 public constant GRACE_PERIOD = 30 days;
 
     uint8 public constant maxWinnersPerTx = 20;
@@ -51,6 +51,8 @@ contract ContestEscrow is ReentrancyGuard {
     ) {
         // factory should deploy the escrow, not the creator
         assert(msg.sender != _creator);
+        if (_registry == address(0)) revert ZeroAddress();
+        if (_commissionToken == address(0)) revert ZeroAddress();
         registry = Registry(_registry);
         creator = _creator;
         commissionToken = _commissionToken;

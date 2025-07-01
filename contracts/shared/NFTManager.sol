@@ -22,9 +22,11 @@ contract NFTManager is ERC721URIStorage, Ownable, ReentrancyGuard {
     /// @return tokenId Newly minted token id
     function mint(address to, string calldata uri, bool soulbound) external onlyOwner nonReentrant returns (uint256) {
         uint256 tokenId = ++tokenIdCounter;
-        _safeMint(to, tokenId);
-        _setTokenURI(tokenId, uri);
-        isSoulbound[tokenId] = soulbound;
+            // Установить состояние перед внешним вызовом
+            isSoulbound[tokenId] = soulbound;
+            // Безопасный внешний вызов
+            _safeMint(to, tokenId);
+            _setTokenURI(tokenId, uri);
 
         emit Minted(to, tokenId, uri, soulbound);
         return tokenId;
@@ -56,9 +58,11 @@ contract NFTManager is ERC721URIStorage, Ownable, ReentrancyGuard {
         if (recipients.length > MAX_BATCH_MINT) revert BatchTooLarge();
         for (uint256 i = 0; i < recipients.length; i++) {
             uint256 id = ++tokenIdCounter;
-            _safeMint(recipients[i], id);
-            _setTokenURI(id, uris[i]);
-            isSoulbound[id] = soulbound;
+                // Установить состояние перед внешним вызовом
+                isSoulbound[id] = soulbound;
+                // Безопасный внешний вызов
+                _safeMint(recipients[i], id);
+                _setTokenURI(id, uris[i]);
             emit Minted(recipients[i], id, uris[i], soulbound);
         }
     }
