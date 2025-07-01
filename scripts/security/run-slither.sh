@@ -41,4 +41,8 @@ if [ -z "$SLITHER_BIN" ]; then
   echo "Slither not found in PATH" >&2
   exit 1
 fi
+if ! command -v forge >/dev/null; then
+  echo "forge not found in PATH" >&2
+  exit 1
+fi
 $SLITHER_BIN . $SEVERITY $CONFIG
