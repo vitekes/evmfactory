@@ -38,6 +38,9 @@ async function main() {
     }
   );
 
+  // Grant required roles to the factory so it can register instances
+  await ensureRoles(acl, await marketplaceFactory.getAddress());
+
   // Register marketplace module
   await registerModule(
     registry,
