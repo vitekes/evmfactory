@@ -7,6 +7,30 @@
 import { ethers } from "hardhat";
 import { Contract } from "ethers";
 
+/** Helper that grants required roles to a marketplace instance */
+async function setupMarketplaceRoles(registry: Contract, addr: string) {
+    const aclAddress = await registry.getCoreService(
+        ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter"))
+    );
+    const acl = await ethers.getContractAt("AccessControlCenter", aclAddress);
+    const moduleRole = await acl.MODULE_ROLE();
+    const featureOwnerRole = await acl.FEATURE_OWNER_ROLE();
+    const relayerRole = await acl.RELAYER_ROLE();
+
+    if (!(await acl.hasRole(moduleRole, addr))) {
+        const tx = await acl.grantRole(moduleRole, addr);
+        await tx.wait();
+    }
+    if (!(await acl.hasRole(featureOwnerRole, addr))) {
+        const tx = await acl.grantRole(featureOwnerRole, addr);
+        await tx.wait();
+    }
+    if (!(await acl.hasRole(relayerRole, addr))) {
+        const tx = await acl.grantRole(relayerRole, addr);
+        await tx.wait();
+    }
+}
+
 /**
  * Создает маркетплейс через фабрику или напрямую (если вызов фабрики завершается ошибкой)
  * @param marketplaceFactory Контракт фабрики маркетплейса
@@ -42,6 +66,7 @@ export async function createMarketplace(
         if (event && event.args) {
             const marketplaceAddress = event.args.marketplace;
             console.log(`Маркетплейс успешно создан через фабрику: ${marketplaceAddress}`);
+            await setupMarketplaceRoles(registry, marketplaceAddress);
             return marketplaceAddress;
         } else {
             throw new Error("Не удалось найти событие MarketplaceCreated в транзакции");
@@ -116,27 +141,7 @@ async function createMarketplaceDirectly(
     await registry.setModuleServiceAlias(instanceId, "PaymentGateway", gatewayAddress);
 
     // Получаем контракт управления доступом
-    const aclAddress = await registry.getCoreService(ethers.keccak256(ethers.toUtf8Bytes("AccessControlCenter")));
-    const acl = await ethers.getContractAt("AccessControlCenter", aclAddress);
-
-    // Выдаем необходимые роли маркетплейсу
-    console.log("Выдаем необходимые роли маркетплейсу...");
-    const moduleRole = await acl.MODULE_ROLE();
-    const featureOwnerRole = await acl.FEATURE_OWNER_ROLE();
-
-    // Проверяем наличие ролей у маркетплейса
-    const hasModuleRole = await acl.hasRole(moduleRole, marketplaceAddress);
-    const hasFeatureOwnerRole = await acl.hasRole(featureOwnerRole, marketplaceAddress);
-
-    if (!hasModuleRole) {
-        await acl.grantRole(moduleRole, marketplaceAddress);
-        console.log(`Роль MODULE_ROLE выдана маркетплейсу`);
-    }
-
-    if (!hasFeatureOwnerRole) {
-        await acl.grantRole(featureOwnerRole, marketplaceAddress);
-        console.log(`Роль FEATURE_OWNER_ROLE выдана маркетплейсу`);
-    }
+    await setupMarketplaceRoles(registry, marketplaceAddress);
 
     console.log(`Маркетплейс успешно создан и настроен!`);
     return marketplaceAddress;
