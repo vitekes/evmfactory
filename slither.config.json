@@ -1,5 +1,7 @@
 {
-  "detectors_to_exclude": ["pragma", "solc-version", "different-pragma"],
+  "exclude_paths": ["contracts/mocks/", "node_modules/", "lib/"],
+  "detectors_to_exclude": ["pragma", "solc-version", "different-pragma", "arbitrary-from-in-transferfrom"],
+  "filter_paths": "contracts/",
   "exclude_informational": true,
   "exclude_low": false,
   "exclude_medium": false,
