@@ -10,10 +10,11 @@ import './interfaces/IContestValidator.sol';
 /// @title ContestValidator
 /// @notice Basic validator for Contest prizes
 contract ContestValidator is IContestValidator {
-    AccessControlCenter public access;
+        AccessControlCenter public immutable access;
     IMultiValidator public tokenValidator;
 
     constructor(address _access, address _tokenValidator) {
+            // Инициализация immutable переменной
         access = AccessControlCenter(_access);
         tokenValidator = IMultiValidator(_tokenValidator);
     }

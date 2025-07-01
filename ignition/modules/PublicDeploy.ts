@@ -26,10 +26,20 @@ const PublicDeploy = buildModule("PublicDeploy", (m) => {
   m.call(core.registry, "registerFeature", [CONTEST_ID, contestFactory, 0]);
   m.call(core.registry, "setModuleServiceAlias", [CONTEST_ID, "Validator", contestValidator]);
 
+  // Добавляем маркетплейс
+  const MARKETPLACE_ID = ethers.keccak256(ethers.toUtf8Bytes("Marketplace"));
+  const marketplace = m.contract("Marketplace", [core.registry, core.paymentGateway, MARKETPLACE_ID]);
+
+  // Регистрируем маркетплейс и платежный шлюз
+  m.call(core.registry, "registerFeature", [MARKETPLACE_ID, marketplace, 0]);
+  m.call(core.registry, "setModuleServiceAlias", [MARKETPLACE_ID, "PaymentGateway", core.paymentGateway]);
+  m.call(core.access, "grantRole", [FEATURE_OWNER_ROLE, marketplace]);
+
   return {
     ...core,
     contestFactory,
     contestValidator,
+    marketplace,
   };
 });
 

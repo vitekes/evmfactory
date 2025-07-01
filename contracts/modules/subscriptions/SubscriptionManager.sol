@@ -41,7 +41,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     uint16 public batchLimit;
 
     /// @notice EIP-712 domain separator for plan signatures
-    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 public immutable DOMAIN_SEPARATOR;
 
     /// @notice Emitted when a user subscribes to a plan
     /// @param user Subscriber address
@@ -75,15 +75,18 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     ) AccessManaged(Registry(_registry).getCoreService(keccak256('AccessControlCenter'))) {
         registry = Registry(_registry);
         MODULE_ID = moduleId;
+
+            // Инициализируем DOMAIN_SEPARATOR как immutable переменную
+            DOMAIN_SEPARATOR = keccak256(
+                abi.encode(
+                    keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
+                    block.chainid,
+                    address(this)
+                )
+            );
         // Service registration handled externally after deployment
 
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
-                block.chainid,
-                address(this)
-            )
-        );
+            // DOMAIN_SEPARATOR теперь инициализируется в конструкторе как immutable
 
         // Role assignment should be done outside the constructor
 

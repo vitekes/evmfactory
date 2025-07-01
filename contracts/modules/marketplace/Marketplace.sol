@@ -34,7 +34,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
 
     mapping(bytes32 => mapping(address => bool)) public consumed;
 
-    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 public immutable DOMAIN_SEPARATOR;
 
     event MarketplaceListingCreated(uint256 indexed id, address indexed seller, address token, uint256 price);
     event MarketplaceListingSold(uint256 indexed id, address indexed buyer);
@@ -54,6 +54,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         MODULE_ID = moduleId;
         // Service registration moved outside the constructor to avoid role issues
 
+        // Инициализируем DOMAIN_SEPARATOR как immutable переменную
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
