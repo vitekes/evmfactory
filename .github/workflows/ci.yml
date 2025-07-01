@@ -50,10 +50,10 @@ jobs:
       - name: Hardhat compile
         run: npx hardhat compile
 
-      # 9) Run showcase scripts
-      - name: Run showcase scripts
+      # 9) Run demo scripts
+      - name: Run demo scripts
         run: |
-          for f in scripts/showcase*.ts; do
+          for f in scripts/demo/*.ts; do
             npx hardhat run "$f" || exit 1
           done
 
