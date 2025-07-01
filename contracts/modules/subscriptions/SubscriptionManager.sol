@@ -121,6 +121,12 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         }
         if (!chainAllowed) revert InvalidChain();
 
+        // Сохраняем план и создаем подписчика до внешних вызовов (CEI паттерн)
+        if (plans[planHash].merchant == address(0)) {
+            plans[planHash] = plan;
+        }
+        subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
+
         if (permitSig.length > 0) {
             (uint256 deadline, uint8 v, bytes32 r, bytes32 s) = abi.decode(
                 permitSig,
@@ -146,12 +152,6 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
                 if (!ok) revert PermitFailed();
             }
         }
-
-        // Сохраняем план и создаем подписчика до внешних вызовов (CEI паттерн)
-        if (plans[planHash].merchant == address(0)) {
-            plans[planHash] = plan;
-        }
-        subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
 
         uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, plan.token, msg.sender, plan.price, '');
@@ -184,12 +184,13 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         uint256 nextBillingTime = s.nextBilling + plan.period;
         s.nextBilling = nextBillingTime;
 
+        // Генерируем событие до внешнего вызова для предотвращения reentrancy-events
+        emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
+
         uint256 netAmount = IGateway(registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY))
             .processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
-
-        emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
     }
 
     /// @notice Charge multiple subscribers in a single transaction.

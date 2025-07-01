@@ -15,6 +15,7 @@ error InvalidAddress();
 error ZeroAddress();
 error NotAdmin();
 error NotAutomation();
+error NotAuthorized();
 error NotFeatureOwner();
 error NotModule();
 error NotSeller();

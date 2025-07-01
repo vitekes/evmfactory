@@ -94,6 +94,13 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
             if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
         }
 
+        // Проверяем, что вызывающий имеет право переводить от имени payer
+        if (payer != msg.sender && 
+            !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) && 
+            !access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
+            revert NotAuthorized();
+        }
+
         IERC20(token).safeTransferFrom(payer, address(this), amount);
         IERC20(token).forceApprove(address(feeManager), amount);
         uint256 fee = feeManager.collect(moduleId, token, amount);
