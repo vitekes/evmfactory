@@ -1,0 +1,18 @@
+{
+  "filter_paths": [
+    "contracts/(?!mocks).*",
+    "node_modules/",
+    "lib/"
+  ],
+  "exclude_informational": true,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "detectors_to_exclude": [
+    "pragma",
+    "solc-version",
+    "different-pragma",
+    "arbitrary-from-in-transferfrom",
+    "incorrect-exp"
+  ]
+}
