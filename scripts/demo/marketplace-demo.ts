@@ -58,6 +58,8 @@ async function main() {
     validator,
     gateway
   );
+  // Grant roles to the newly deployed marketplace to allow payment processing
+  await ensureRoles(acl, marketplaceAddress);
   const marketplace = await ethers.getContractAt(
     "Marketplace",
     marketplaceAddress
