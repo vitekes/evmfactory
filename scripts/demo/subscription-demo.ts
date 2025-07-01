@@ -46,6 +46,11 @@ async function main() {
     const moduleRole = await acl.MODULE_ROLE();
     await acl.grantRole(featureRole, await manager.getAddress());
     await acl.grantRole(moduleRole, await manager.getAddress());
+
+    // Allow the manager to act as a relayer when calling the PaymentGateway
+    const relayerRole = await acl.RELAYER_ROLE();
+    await acl.grantRole(relayerRole, await manager.getAddress());
+
     const autoRole = await acl.AUTOMATION_ROLE();
     await acl.grantRole(autoRole, keeper.address);
   });
