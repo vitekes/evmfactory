@@ -94,7 +94,8 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
             if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
         }
 
-        // Проверяем, что вызывающий имеет право переводить от имени payer
+        // Require the caller to be authorized to debit tokens from `payer`.
+        // `payer` must have approved this contract or the transfer will revert.
         if (payer != msg.sender && 
             !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) && 
             !access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
