@@ -1,6 +1,10 @@
-# Исключаем все мок-контракты
+contracts/mocks/MockPermit2.sol
+contracts/mocks/MockForwarder.sol
+contracts/mocks/MockPaymentGateway.sol
+contracts/mocks/ChainlinkPriceFeed.sol
+contracts/mocks/MockFeeManager.sol
+contracts/mocks/TestToken.sol
+contracts/mocks/TestCloneFactory.sol
 contracts/mocks/
-
-# Внешние библиотеки
 lib/
 node_modules/
