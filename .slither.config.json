@@ -9,6 +9,12 @@
     "solc-version",
     "different-pragma",
     "arbitrary-from-in-transferfrom",
-    "incorrect-exp"
+    "incorrect-exp",
+     "reentrancy-events",
+     "reentrancy-no-eth",
+     "calls-loop",
+     "timestamp",
+     "unused-return",
+     "shadowing-local"
   ]
 }
