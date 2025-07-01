@@ -38,6 +38,9 @@ async function main() {
     }
   );
 
+  // Grant required roles to the factory so it can register instances
+  await ensureRoles(acl, await marketplaceFactory.getAddress());
+
   // Register marketplace module
   await registerModule(
     registry,
@@ -58,6 +61,8 @@ async function main() {
     validator,
     gateway
   );
+  // Grant roles to the newly deployed marketplace to allow payment processing
+  await ensureRoles(acl, marketplaceAddress);
   const marketplace = await ethers.getContractAt(
     "Marketplace",
     marketplaceAddress

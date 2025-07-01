@@ -154,6 +154,14 @@ export async function deployCore(): Promise<{
     return gateway;
   });
 
+  // Grant FEATURE_OWNER_ROLE to the gateway so it can collect fees
+  await safeExecute("grant gateway roles", async () => {
+    const featureRole = await acl.FEATURE_OWNER_ROLE();
+    if (!(await acl.hasRole(featureRole, await gateway.getAddress()))) {
+      await acl.grantRole(featureRole, await gateway.getAddress());
+    }
+  });
+
   // 8. Деплой и настройка токенного валидатора
   const validator = await safeExecute("деплой валидатора", async () => {
     const validator = await deployProxy("MultiValidator", [await acl.getAddress()]);
