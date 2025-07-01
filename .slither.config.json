@@ -9,6 +9,12 @@
     "solc-version",
     "different-pragma",
     "arbitrary-from-in-transferfrom",
-    "incorrect-exp"
+    "incorrect-exp",
+    "unused-return",
+    "local-variable-shadowing",
+    "calls-inside-a-loop",
+    "reentrancy-vulnerabilities-2",
+    "reentrancy-vulnerabilities-3",
+    "block-timestamp"
   ]
 }
