@@ -1,7 +1,26 @@
 import { ethers } from "hardhat";
 import { CONSTANTS, ROLES } from "./constants";
 import { safeExecute, saveDeployment } from "./helpers";
-import type { Contract } from "ethers";
+import type { Contract, ContractFactory } from "ethers";
+
+/** Helper to deploy an upgradeable implementation with ERC1967Proxy */
+async function deployProxy(
+  name: string,
+  initializeArgs: any[]
+): Promise<Contract> {
+  const ImplFactory: ContractFactory = await ethers.getContractFactory(name);
+  const impl = await ImplFactory.deploy();
+  await impl.waitForDeployment();
+  const implAddress = await impl.getAddress();
+  const initData = ImplFactory.interface.encodeFunctionData(
+    "initialize",
+    initializeArgs
+  );
+  const Proxy = await ethers.getContractFactory("ERC1967Proxy");
+  const proxy = await Proxy.deploy(implAddress, initData);
+  await proxy.waitForDeployment();
+  return ImplFactory.attach(await proxy.getAddress());
+}
 
 
 /**
@@ -47,11 +66,8 @@ export async function deployCore(): Promise<{
 
   // 2. Деплой системы контроля доступа
   const acl = await safeExecute("деплой ACL", async () => {
-    const ACL = await ethers.getContractFactory("AccessControlCenter");
-    const acl = await ACL.deploy();
-    await acl.waitForDeployment();
+    const acl = await deployProxy("AccessControlCenter", [deployer.address]);
     console.log(`ACL: ${await acl.getAddress()}`);
-    await acl.initialize(deployer.address);
     return acl;
   });
 
@@ -78,32 +94,19 @@ export async function deployCore(): Promise<{
 
   // 4. Деплой реестра
   const registry = await safeExecute("деплой реестра", async () => {
-    const Registry = await ethers.getContractFactory("Registry");
-    const registry = await Registry.deploy();
-    await registry.waitForDeployment();
-    const aclAddress = await acl.getAddress();
-    await registry.initialize(aclAddress);
-    await registry.setCoreService(CONSTANTS.ACCESS_SERVICE, aclAddress);
+    const registry = await deployProxy("Registry", [await acl.getAddress()]);
+    await registry.setCoreService(
+      CONSTANTS.ACCESS_SERVICE,
+      await acl.getAddress()
+    );
     console.log(`Реестр: ${await registry.getAddress()}`);
     return registry;
   });
 
   // 5. Деплой менеджера комиссий
   const feeManager = await safeExecute("деплой менеджера комиссий", async () => {
-    const FeeManager = await ethers.getContractFactory("CoreFeeManager");
-    const feeManager = await FeeManager.deploy();
-    await feeManager.waitForDeployment();
-    const address = await feeManager.getAddress();
-    try {
-      await feeManager.initialize(await acl.getAddress());
-      console.log(`Менеджер комиссий инициализирован: ${address}`);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('already initialized')) {
-        console.log(`Менеджер комиссий уже инициализирован: ${address}`);
-      } else {
-        throw error;
-      }
-    }
+    const feeManager = await deployProxy("CoreFeeManager", [await acl.getAddress()]);
+    console.log(`Менеджер комиссий: ${await feeManager.getAddress()}`);
     return feeManager;
   });
 
@@ -119,73 +122,43 @@ export async function deployCore(): Promise<{
   // 7. Деплой платежного шлюза
   const gateway = await safeExecute("деплой платежного шлюза", async () => {
     // Сначала пытаемся использовать реальный шлюз, затем fallback на мок
+    let name = "PaymentGateway";
     let Gateway;
     try {
-      Gateway = await ethers.getContractFactory("PaymentGateway");
+      Gateway = await ethers.getContractFactory(name);
     } catch (error) {
       console.log('PaymentGateway не найден, пробуем MockPaymentGateway...');
-      Gateway = await ethers.getContractFactory("MockPaymentGateway");
+      name = "MockPaymentGateway";
+      Gateway = await ethers.getContractFactory(name);
     }
 
-    const gateway = await Gateway.deploy();
-    await gateway.waitForDeployment();
-    const gatewayAddress = await gateway.getAddress();
-    console.log(`Платежный шлюз: ${gatewayAddress}`);
-
-    // Проверяем, нужно ли инициализировать
-    if ('initialize' in gateway && typeof gateway.initialize === 'function') {
-      try {
-        const aclAddress = await acl.getAddress();
-        const registryAddress = await registry.getAddress();
-        const feeManagerAddress = await feeManager.getAddress();
-
-        console.log(`Инициализация платежного шлюза с параметрами:`);
-        console.log(`- ACL: ${aclAddress}`);
-        console.log(`- Registry: ${registryAddress}`);
-        console.log(`- FeeManager: ${feeManagerAddress}`);
-
-        await gateway.initialize(aclAddress, registryAddress, feeManagerAddress);
-        console.log('Платежный шлюз успешно инициализирован');
-      } catch (initError) {
-        if (initError instanceof Error && initError.message.includes('already initialized')) {
-          console.log('Платежный шлюз уже инициализирован');
-        } else {
-          console.log('Ошибка при инициализации платежного шлюза:', initError);
-        }
-      }
-    }
-
-    // Настраиваем платежный шлюз
-    if ('setFeeManager' in gateway && typeof gateway.setFeeManager === 'function') {
-      try {
+    let gateway: Contract;
+    if (name === "PaymentGateway") {
+      gateway = await deployProxy(name, [
+        await acl.getAddress(),
+        await registry.getAddress(),
+        await feeManager.getAddress(),
+      ]);
+    } else {
+      gateway = await Gateway.deploy();
+      await gateway.waitForDeployment();
+      if (
+        'setFeeManager' in gateway &&
+        typeof (gateway as any).setFeeManager === 'function'
+      ) {
         await gateway.setFeeManager(await feeManager.getAddress());
-        console.log('FeeManager установлен в платежном шлюзе');
-      } catch (error) {
-        console.log('Ошибка при установке FeeManager:', error);
       }
     }
 
+    console.log(`Платежный шлюз: ${await gateway.getAddress()}`);
     return gateway;
   });
 
   // 8. Деплой и настройка токенного валидатора
   const validator = await safeExecute("деплой валидатора", async () => {
-    const MultiValidator = await ethers.getContractFactory("MultiValidator");
-    const validator = await MultiValidator.deploy();
-    await validator.waitForDeployment();
+    const validator = await deployProxy("MultiValidator", [await acl.getAddress()]);
     const validatorAddress = await validator.getAddress();
     console.log(`Валидатор: ${validatorAddress}`);
-
-    try {
-      await validator.initialize(await acl.getAddress());
-      console.log("Валидатор инициализирован");
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('already initialized')) {
-        console.log("Валидатор уже инициализирован");
-      } else {
-        throw error;
-      }
-    }
 
     // Добавляем токен в валидатор
     try {
