@@ -94,7 +94,8 @@ contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUp
             if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
         }
 
-        // Проверяем, что вызывающий имеет право переводить от имени payer
+        // Ensure the caller has permission to transfer on behalf of `payer`.
+        // This prevents an arbitrary account from invoking `safeTransferFrom`.
         if (payer != msg.sender && 
             !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) && 
             !access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
