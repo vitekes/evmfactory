@@ -29,7 +29,6 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @notice Base token for each price feed
     mapping(address => address) public baseTokens;
 
-
     /// @notice Initialize the oracle with access control
     /// @param _accessControl Address of the access control contract
     /// @param _registry Address of the registry contract
@@ -63,11 +62,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param token Token address
     /// @param priceFeed Chainlink price feed address
     /// @param baseToken Base token address (e.g. USDC for USD feeds)
-    function setPriceFeed(
-        address token,
-        address priceFeed,
-        address baseToken
-    ) external {
+    function setPriceFeed(address token, address priceFeed, address baseToken) external {
         if (!accessControl.hasRole(accessControl.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
         if (token == address(0) || priceFeed == address(0) || baseToken == address(0)) revert InvalidAddress();
 
@@ -85,10 +80,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
                 convertedAmount: 0,
                 version: 1
             });
-            IEventRouter(router).route(
-                IEventRouter.EventKind.PriceConverted,
-                abi.encode(eventData)
-            );
+            IEventRouter(router).route(IEventRouter.EventKind.PriceConverted, abi.encode(eventData));
         }
     }
 
@@ -100,7 +92,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     function getPrice(address token, address baseToken) public view override returns (uint256 price, uint8 decimals) {
         // Если токены совпадают, возвращаем 1:1
         if (token == baseToken) {
-            return (10**IERC20Metadata(token).decimals(), IERC20Metadata(token).decimals());
+            return (10 ** IERC20Metadata(token).decimals(), IERC20Metadata(token).decimals());
         }
 
         // Проверяем, есть ли прямой feed
@@ -112,13 +104,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
 
         // Получаем данные из Chainlink
         AggregatorV3Interface feed = AggregatorV3Interface(directFeed);
-        (
-            uint80 roundId,
-            int256 answer,
-            ,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        ) = feed.latestRoundData();
+        (uint80 roundId, int256 answer, , uint256 updatedAt, uint80 answeredInRound) = feed.latestRoundData();
 
         // Проверяем корректность данных
         if (answer <= 0) revert InvalidPrice();
@@ -132,12 +118,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param toToken Целевой токен
     /// @param amount Исходная сумма
     /// @param convertedAmount Конвертированная сумма
-    function emitConversionEvent(
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        uint256 convertedAmount
-    ) external {
+    function emitConversionEvent(address fromToken, address toToken, uint256 amount, uint256 convertedAmount) external {
         if (!accessControl.hasRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         address eventRouter = _getEventRouter();
         if (eventRouter != address(0)) {
@@ -149,10 +130,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
                 convertedAmount: convertedAmount,
                 version: 1
             });
-            IEventRouter(eventRouter).route(
-                IEventRouter.EventKind.TokenConverted,
-                abi.encode(eventData)
-            );
+            IEventRouter(eventRouter).route(IEventRouter.EventKind.TokenConverted, abi.encode(eventData));
         }
     }
     /// @notice Convert amount from one token to another using price feeds
@@ -190,11 +168,11 @@ contract ChainlinkPriceOracle is IPriceOracle {
         uint8 toTokenDecimals = IERC20Metadata(toToken).decimals();
 
         // Рассчитываем промежуточную сумму в базовом токене
-        uint256 baseAmount = (amount * fromPrice) / (10**fromDecimals);
+        uint256 baseAmount = (amount * fromPrice) / (10 ** fromDecimals);
 
         // Конвертируем в целевой токен
-        uint256 adjustedForDecimals = (baseAmount * (10**toTokenDecimals)) / (10**fromTokenDecimals);
-        convertedAmount = (adjustedForDecimals * (10**toDecimals)) / toPrice;
+        uint256 adjustedForDecimals = (baseAmount * (10 ** toTokenDecimals)) / (10 ** fromTokenDecimals);
+        convertedAmount = (adjustedForDecimals * (10 ** toDecimals)) / toPrice;
 
         // События перенесены в отдельный метод emitConversionEvent, который может быть вызван после convertAmount
 

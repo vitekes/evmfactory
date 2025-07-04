@@ -5,32 +5,29 @@ import '../../shared/BaseFactory.sol';
 import './ContestEscrow.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
-import "../../interfaces/IEventRouter.sol";
-import "../../interfaces/IEventPayload.sol";
+import '../../interfaces/IEventRouter.sol';
+import '../../interfaces/IEventPayload.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '../../interfaces/CoreDefs.sol';
 
- /// @title ContestFactory
- /// @notice Factory for creating contests and managing their initial funding
- /// @dev Inherits from BaseFactory for architecture consistency
+/// @title ContestFactory
+/// @notice Factory for creating contests and managing their initial funding
+/// @dev Inherits from BaseFactory for architecture consistency
 contract ContestFactory is BaseFactory {
     using SafeERC20 for IERC20;
 
     uint256 public defaultContestDuration = 180 days;
 
-    constructor(
-        address registry,
-        address feeManager
-    ) BaseFactory(registry, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
+    constructor(address registry, address feeManager) BaseFactory(registry, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
 
-                 /// @notice Creates a new contest with specified prizes
-                 /// @param _prizes List of contest prizes
-                 /// @param /* metadata */ Unused metadata
-                 /// @return escrow Address of created escrow contract
+    /// @notice Creates a new contest with specified prizes
+    /// @param _prizes List of contest prizes
+    /// @param /* metadata */ Unused metadata
+    /// @return escrow Address of created escrow contract
     function createContest(
         PrizeInfo[] calldata _prizes,
-            bytes calldata /* metadata */
+        bytes calldata /* metadata */
     ) external payable onlyFactoryAdmin nonReentrant returns (address escrow) {
         // Check prizes array length first to save gas (cheapest check)
         uint256 prizesLen = _prizes.length;
@@ -89,7 +86,7 @@ contract ContestFactory is BaseFactory {
         // Handle potential native currency (ETH) value sent with transaction
         if (msg.value > 0) {
             // Forward any ETH sent to the escrow contract
-            (bool success,) = payable(escrow).call{value: msg.value}("");
+            (bool success, ) = payable(escrow).call{value: msg.value}('');
             if (!success) revert ContestFundingMissing();
         }
 
@@ -104,9 +101,7 @@ contract ContestFactory is BaseFactory {
         // Check token limit
         uint256 uniqueTokensCount = 0;
         for (uint256 i = 0; i < prizesLen; i++) {
-            if (_prizes[i].prizeType == PrizeType.MONETARY && 
-                _prizes[i].amount > 0 && 
-                _prizes[i].token != address(0)) {
+            if (_prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0 && _prizes[i].token != address(0)) {
                 uniqueTokensCount++;
             }
         }
@@ -157,17 +152,17 @@ contract ContestFactory is BaseFactory {
         // Send event through EventRouter
         address router = registry.getModuleServiceByAlias(CoreDefs.CONTEST_MODULE_ID, 'EventRouter');
         IEventPayload.ContestEvent memory eventData = IEventPayload.ContestEvent({
-            creator: msg.sender,       // Creator
-            escrowAddress: escrow,     // Escrow contract address
-            deadline: deadline,        // Deadline
-            version: 1                 // Version
+            creator: msg.sender, // Creator
+            escrowAddress: escrow, // Escrow contract address
+            deadline: deadline, // Deadline
+            version: 1 // Version
         });
         // Отдельно передаем призы, поскольку они сложно структурированы
         IEventRouter(router).route(IEventRouter.EventKind.ContestCreated, abi.encode(eventData, _prizes));
     }
 
-                 /// @notice Sets default contest duration
-                 /// @param duration Duration in seconds
+    /// @notice Sets default contest duration
+    /// @param duration Duration in seconds
     function setDefaultContestDuration(uint256 duration) external onlyFactoryAdmin {
         defaultContestDuration = duration;
     }
@@ -177,6 +172,6 @@ contract ContestFactory is BaseFactory {
 
     /// @notice Fallback function that requires specific function calls
     fallback() external payable {
-        revert("Use createContest");
+        revert('Use createContest');
     }
 }

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import '../interfaces/IGateway.sol';
-import "../interfaces/IRegistry.sol";
-import "../interfaces/IEventRouter.sol";
+import '../interfaces/IRegistry.sol';
+import '../interfaces/IEventRouter.sol';
 import '../interfaces/CoreDefs.sol';
 import '../errors/Errors.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -14,8 +14,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 /// @title MockPaymentGateway
 /// @notice Test implementation of payment gateway interface
 /// @dev Used only for testing, not for production use
-    contract MockPaymentGateway is IGateway, ReentrancyGuard {
-
+contract MockPaymentGateway is IGateway, ReentrancyGuard {
     /// @notice Получить цену в указанной валюте
     /// @param amount Сумма в исходном токене
     /// @return price Цена в целевом токене
@@ -47,7 +46,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
     );
 
     constructor(address _registry) {
-        require(_registry != address(0), "Registry cannot be zero address");
+        require(_registry != address(0), 'Registry cannot be zero address');
         registry = IRegistry(_registry);
     }
 
@@ -169,7 +168,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
             // Handle refund if excess ETH was sent
             uint256 excess = msg.value - amount;
             if (excess > 0) {
-                (bool refundSuccess,) = payable(payer).call{value: excess}("");
+                (bool refundSuccess, ) = payable(payer).call{value: excess}('');
                 if (!refundSuccess) revert RefundDisabled();
             }
 
@@ -199,13 +198,13 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
         address router = registry.getModuleServiceByAlias(moduleId, 'EventRouter');
         if (router != address(0)) {
             bytes memory eventData = abi.encode(
-                payer,      // Payer
-                token,      // Token
-                amount,     // Gross amount
-                fee,        // Fee
-                netAmount,  // Net amount
-                moduleId,   // Module ID
-                uint16(1)   // Version
+                payer, // Payer
+                token, // Token
+                amount, // Gross amount
+                fee, // Fee
+                netAmount, // Net amount
+                moduleId, // Module ID
+                uint16(1) // Version
             );
             IEventRouter(router).route(IEventRouter.EventKind.PaymentProcessed, eventData);
         } else {
@@ -242,7 +241,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
         if (token.isNative()) {
             // Transfer native currency
-            (bool success,) = payable(to).call{value: amount}("");
+            (bool success, ) = payable(to).call{value: amount}('');
             if (!success) revert RefundDisabled();
         } else {
             // Transfer ERC20 token

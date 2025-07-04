@@ -6,9 +6,9 @@ import './SubscriptionManager.sol';
 import '../../interfaces/CoreDefs.sol';
 import '../../interfaces/IGateway.sol';
 
- /// @title SubscriptionManagerFactory
- /// @notice Factory for creating subscription manager instances
- /// @dev Uses PaymentGateway (IGateway) for payment processing
+/// @title SubscriptionManagerFactory
+/// @notice Factory for creating subscription manager instances
+/// @dev Uses PaymentGateway (IGateway) for payment processing
 contract SubscriptionManagerFactory is BaseFactory {
     event SubscriptionManagerCreated(address indexed creator, address subManager);
 
@@ -17,8 +17,8 @@ contract SubscriptionManagerFactory is BaseFactory {
         address paymentGateway
     ) BaseFactory(registry, paymentGateway, CoreDefs.SUBSCRIPTION_MODULE_ID) {}
 
-             /// @notice Creates a new subscription manager instance
-             /// @return m Address of the created subscription manager
+    /// @notice Creates a new subscription manager instance
+    /// @return m Address of the created subscription manager
     function createSubscriptionManager() external onlyFactoryAdmin nonReentrant returns (address m) {
         // Cache addresses to reduce storage reads
         address gateway = paymentGateway;

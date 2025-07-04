@@ -2,15 +2,15 @@
 pragma solidity ^0.8.28;
 
 import './AccessControlCenter.sol';
-import "../interfaces/IRegistry.sol";
-import "../interfaces/IMultiValidator.sol";
+import '../interfaces/IRegistry.sol';
+import '../interfaces/IMultiValidator.sol';
 import '../interfaces/IPriceOracle.sol';
 import '../interfaces/IGateway.sol';
 import './CoreFeeManager.sol';
 import '../errors/Errors.sol';
 import '../lib/SignatureLib.sol';
 import '../interfaces/CoreDefs.sol';
-import "../interfaces/IEventRouter.sol";
+import '../interfaces/IEventRouter.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -21,7 +21,13 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../utils/Native.sol';
 
-abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable, IGateway {
+abstract contract PaymentGateway is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable,
+    IGateway
+{
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -62,11 +68,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         uint16 version
     );
 
-    event DomainSeparatorUpdated(
-        bytes32 oldDomainSeparator,
-        bytes32 newDomainSeparator,
-        uint256 chainId
-    );
+    event DomainSeparatorUpdated(bytes32 oldDomainSeparator, bytes32 newDomainSeparator, uint256 chainId);
 
     modifier onlyFeatureOwner() {
         if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
@@ -174,11 +176,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
     /// @param baseToken Base token (0x0 or ETH_SENTINEL for native currency)
     /// @param paymentToken Payment token (0x0 or ETH_SENTINEL for native currency)
     /// @return supported Whether the pair is supported
-    function isPairSupported(
-        bytes32 moduleId,
-        address baseToken,
-        address paymentToken
-    ) external view returns (bool) {
+    function isPairSupported(bytes32 moduleId, address baseToken, address paymentToken) external view returns (bool) {
         // Normalize and check if tokens are identical
         address normalizedBase = baseToken.isNative() ? Native.ETH_SENTINEL : baseToken;
         address normalizedPayment = paymentToken.isNative() ? Native.ETH_SENTINEL : paymentToken;
@@ -226,9 +224,11 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
 
         // Verify signature only if not a direct payment and not a trusted service
         // (most expensive operation is performed last and only when necessary)
-        if (!isDirectPayment &&
-        !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) &&
-        !access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
+        if (
+            !isDirectPayment &&
+            !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) &&
+            !access.hasRole(access.RELAYER_ROLE(), msg.sender)
+        ) {
             _verifyPaymentSignature(moduleId, token, payer, amount, signature);
         }
 
@@ -278,8 +278,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         if (payer == msg.sender) return;
 
         // Check if sender has required roles
-        if (access.hasRole(access.AUTOMATION_ROLE(), msg.sender) || 
-            access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
+        if (access.hasRole(access.AUTOMATION_ROLE(), msg.sender) || access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
             return;
         }
 
@@ -328,7 +327,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         // Refund excess ETH if necessary
         uint256 excess = msg.value - amount;
         if (excess > 0) {
-            (bool refundSuccess,) = payable(payer).call{value: excess}("");
+            (bool refundSuccess, ) = payable(payer).call{value: excess}('');
             if (!refundSuccess) revert RefundDisabled();
         }
 
@@ -403,7 +402,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         if (withdrawAmount > address(this).balance) revert InsufficientBalance();
 
         // Transfer fees
-        (bool success,) = payable(to).call{value: withdrawAmount}("");
+        (bool success, ) = payable(to).call{value: withdrawAmount}('');
         if (!success) revert RefundDisabled();
     }
 
@@ -420,11 +419,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
     /// @param token Token address (ETH_SENTINEL for native)
     /// @param amount Gross payment amount
     /// @return feeAmount Total fee amount
-    function _calculateFee(
-        bytes32 moduleId,
-        address token,
-        uint256 amount
-    ) internal view returns (uint256 feeAmount) {
+    function _calculateFee(bytes32 moduleId, address token, uint256 amount) internal view returns (uint256 feeAmount) {
         // Delegate fee calculation to CoreFeeManager for unified logic
         return feeManager.calculateFee(moduleId, token, amount);
     }
@@ -445,7 +440,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
         if (router != address(0)) {
             IEventRouter(router).route(
-                IEventRouter.EventKind.PriceConverted, 
+                IEventRouter.EventKind.PriceConverted,
                 abi.encode(baseToken, paymentToken, baseAmount, paymentAmount, moduleId, uint16(1))
             );
         } else {
@@ -471,7 +466,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
         address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
         if (router != address(0)) {
             IEventRouter(router).route(
-                IEventRouter.EventKind.PaymentProcessed, 
+                IEventRouter.EventKind.PaymentProcessed,
                 abi.encode(payer, token, amount, fee, netAmount, moduleId, uint16(1))
             );
         } else {
@@ -491,7 +486,7 @@ abstract contract PaymentGateway is Initializable, ReentrancyGuardUpgradeable, P
 
     /// @notice Fallback function, rejects direct ETH sends without calldata
     fallback() external payable {
-        revert("Use processPayment");
+        revert('Use processPayment');
     }
 
     uint256[45] private __gap; // Reduced from 50 to 45 due to added storage variables

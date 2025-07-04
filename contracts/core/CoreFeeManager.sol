@@ -246,15 +246,11 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param moduleId Module identifier
     /// @param token Token address
     /// @param amount Fee amount
-    function _emitFeeCollectedEvent(
-        bytes32 moduleId,
-        address token,
-        uint256 amount
-    ) internal {
+    function _emitFeeCollectedEvent(bytes32 moduleId, address token, uint256 amount) internal {
         address router = _getEventRouter(moduleId);
         if (router != address(0)) {
             IEventRouter(router).route(
-                IEventRouter.EventKind.FeeCollected, 
+                IEventRouter.EventKind.FeeCollected,
                 abi.encode(moduleId, token, amount, uint16(1))
             );
         } else {
@@ -267,12 +263,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param token Token address
     /// @param to Recipient address
     /// @param amount Fee amount
-    function _emitFeeWithdrawnEvent(
-        bytes32 moduleId,
-        address token,
-        address to,
-        uint256 amount
-    ) internal {
+    function _emitFeeWithdrawnEvent(bytes32 moduleId, address token, address to, uint256 amount) internal {
         address router = _getEventRouter(moduleId);
         if (router != address(0)) {
             IEventRouter(router).route(

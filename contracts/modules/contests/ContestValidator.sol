@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import '../../core/AccessControlCenter.sol';
-import "../../interfaces/IMultiValidator.sol";
+import '../../interfaces/IMultiValidator.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
@@ -59,14 +59,11 @@ contract ContestValidator is IContestValidator {
             if (!isTokenAllowed(prize.token)) revert NotAllowedToken();
 
             // Finally, check distribution validity
-            if (!isDistributionValid(prize.amount, prize.distribution)) 
-                revert InvalidDistribution();
-        } 
-        else if (prizeType == PrizeType.PROMO) {
+            if (!isDistributionValid(prize.amount, prize.distribution)) revert InvalidDistribution();
+        } else if (prizeType == PrizeType.PROMO) {
             // Use bitwise OR to check multiple conditions simultaneously
             // This allows checking in a single operation
-            if ((prize.amount | uint160(prize.token)) != 0) 
-                revert InvalidPrizeData_InvalidPromoSettings();
+            if ((prize.amount | uint160(prize.token)) != 0) revert InvalidPrizeData_InvalidPromoSettings();
         }
     }
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import '../../core/Registry.sol';
 import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
-import "../../interfaces/IEventRouter.sol";
+import '../../interfaces/IEventRouter.sol';
 import '../../core/AccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
 import '../../interfaces/IPermit2.sol';
@@ -186,7 +186,8 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (!chainAllowed) revert InvalidChain();
 
         // Проверяем наличие платежного шлюза до изменения состояния
-        if (registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0)) revert PaymentGatewayNotRegistered();
+        if (registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0))
+            revert PaymentGatewayNotRegistered();
 
         // Вычисляем хэш плана перед проверкой подписи
         bytes32 planHash = hashPlan(plan);
@@ -231,13 +232,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Обрабатываем платеж через шлюз
-        uint256 netAmount = IGateway(gateway).processPayment(
-            MODULE_ID, 
-            paymentToken, 
-            msg.sender, 
-            paymentAmount, 
-            ''
-        );
+        uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
 
         // Переводим средства продавцу
         IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
@@ -247,13 +242,13 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         if (router != address(0)) {
             bytes memory eventData = abi.encode(
-                msg.sender,      // Подписчик
-                plan.merchant,   // Продавец
-                planHash,        // Хеш плана
-                paymentToken,    // Токен оплаты
-                paymentAmount,   // Сумма платежа
-                plan.period,     // Период подписки
-                block.timestamp + plan.period  // Следующее списание
+                msg.sender, // Подписчик
+                plan.merchant, // Продавец
+                planHash, // Хеш плана
+                paymentToken, // Токен оплаты
+                paymentAmount, // Сумма платежа
+                plan.period, // Период подписки
+                block.timestamp + plan.period // Следующее списание
             );
             IEventRouter(router).route(IEventRouter.EventKind.SubscriptionCreated, eventData);
         }
@@ -286,11 +281,11 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         if (router != address(0)) {
             bytes memory eventData = abi.encode(
-                user,           // Подписчик
-                plan.merchant,  // Продавец
-                s.planHash,     // Хеш плана
-                plan.token,     // Токен оплаты
-                plan.price,     // Сумма платежа
+                user, // Подписчик
+                plan.merchant, // Продавец
+                s.planHash, // Хеш плана
+                plan.token, // Токен оплаты
+                plan.price, // Сумма платежа
                 nextBillingTime // Следующее списание
             );
             IEventRouter(router).route(IEventRouter.EventKind.SubscriptionRenewed, eventData);
@@ -304,13 +299,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Обрабатываем платеж через шлюз
-        uint256 netAmount = IGateway(gateway).processPayment(
-            MODULE_ID, 
-            plan.token, 
-            user, 
-            plan.price, 
-            ''
-        );
+        uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         // Переводим средства продавцу
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
@@ -361,7 +350,10 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     /// @param plan План для расчета платежа
     /// @param paymentToken Токен для оплаты
     /// @return paymentAmount Сумма платежа в указанном токене
-    function getPlanPaymentInToken(SignatureLib.Plan calldata plan, address paymentToken) external view returns (uint256 paymentAmount) {
+    function getPlanPaymentInToken(
+        SignatureLib.Plan calldata plan,
+        address paymentToken
+    ) external view returns (uint256 paymentAmount) {
         if (paymentToken == address(0)) revert InvalidAddress();
         if (paymentToken == plan.token) {
             return plan.price;
@@ -395,10 +387,10 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         if (router != address(0)) {
             bytes memory eventData = abi.encode(
-                msg.sender,        // Подписчик
-                plans[s.planHash].merchant,  // Продавец
-                s.planHash,        // Хеш плана
-                block.timestamp    // Время отмены
+                msg.sender, // Подписчик
+                plans[s.planHash].merchant, // Продавец
+                s.planHash, // Хеш плана
+                block.timestamp // Время отмены
             );
             IEventRouter(router).route(IEventRouter.EventKind.SubscriptionCancelled, eventData);
         } else {

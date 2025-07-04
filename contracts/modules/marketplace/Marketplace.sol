@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../interfaces/IRegistry.sol";
+import '../../interfaces/IRegistry.sol';
 import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
-import "../../interfaces/IAccessControlCenter.sol";
+import '../../interfaces/IAccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
-import "../../interfaces/IEventRouter.sol";
-import "../../interfaces/IEventPayload.sol";
+import '../../interfaces/IEventRouter.sol';
+import '../../interfaces/IEventPayload.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
@@ -92,12 +92,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             }
 
             // Calculate amount in selected currency
-            paymentAmount = paymentGateway.convertAmount(
-                MODULE_ID,
-                listing.token,
-                actualPaymentToken,
-                listing.price
-            );
+            paymentAmount = paymentGateway.convertAmount(MODULE_ID, listing.token, actualPaymentToken, listing.price);
             if (paymentAmount == 0) revert InvalidPrice();
 
             // Verify payment amount doesn't exceed maximum limit
@@ -111,24 +106,22 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         address seller = listing.seller;
 
         // Cache if token is native to avoid multiple calls
-        bool isNativeToken = actualPaymentToken == address(0) || 
-                            actualPaymentToken == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+        bool isNativeToken = actualPaymentToken == address(0) ||
+            actualPaymentToken == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
         uint256 netAmount;
         if (isNativeToken) {
             // Process payment with native currency
-            netAmount = paymentGateway.processPayment{
-                value: paymentAmount
-            }(
+            netAmount = paymentGateway.processPayment{value: paymentAmount}(
                 MODULE_ID,
                 address(0), // Use zero address for native currency
                 buyer,
                 paymentAmount,
-                "" // Empty signature for direct payments
+                '' // Empty signature for direct payments
             );
 
             // Transfer native currency to seller
-            (bool success,) = payable(seller).call{value: netAmount}("");
+            (bool success, ) = payable(seller).call{value: netAmount}('');
             if (!success) revert RefundDisabled();
         } else {
             // Process payment with ERC20 token
@@ -137,7 +130,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
                 actualPaymentToken,
                 buyer,
                 paymentAmount,
-                "" // Empty signature for direct payments
+                '' // Empty signature for direct payments
             );
 
             // Transfer funds to seller using cached addresses
@@ -148,15 +141,15 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         address buyEventRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         if (buyEventRouter != address(0)) {
             IEventPayload.MarketplaceEvent memory buyEventData = IEventPayload.MarketplaceEvent({
-                sku: listing.sku,               // ID листинга
-                seller: listing.seller,         // Продавец
-                buyer: msg.sender,              // Покупатель
-                price: listing.price,           // Цена в базовом токене
+                sku: listing.sku, // ID листинга
+                seller: listing.seller, // Продавец
+                buyer: msg.sender, // Покупатель
+                price: listing.price, // Цена в базовом токене
                 paymentToken: actualPaymentToken, // Валюта платежа
-                paymentAmount: paymentAmount,   // Сумма платежа
-                timestamp: block.timestamp,     // Время продажи
-                listingHash: buyListingHash,    // Хэш листинга
-                version: 1                      // Версия события
+                paymentAmount: paymentAmount, // Сумма платежа
+                timestamp: block.timestamp, // Время продажи
+                listingHash: buyListingHash, // Хэш листинга
+                version: 1 // Версия события
             });
             IEventRouter(buyEventRouter).route(IEventRouter.EventKind.MarketplaceSale, abi.encode(buyEventData));
         }
@@ -176,22 +169,14 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         }
 
         // Иначе получаем цену в предпочитаемой валюте
-        return paymentGateway.convertAmount(
-            MODULE_ID,
-            listing.token,
-            preferredCurrency,
-            listing.price
-        );
+        return paymentGateway.convertAmount(MODULE_ID, listing.token, preferredCurrency, listing.price);
     }
 
     /// @notice Проверка валидности листинга
     /// @param listing Структура листинга
     /// @param skuOnly Проверять только SKU, без проверки конкретного листинга
     /// @return valid Валидность листинга
-    function isListingValid(
-        SignatureLib.Listing calldata listing,
-        bool skuOnly
-    ) external view returns (bool valid) {
+    function isListingValid(SignatureLib.Listing calldata listing, bool skuOnly) external view returns (bool valid) {
         // Проверка срока действия
         if (listing.expiry > 0 && listing.expiry < block.timestamp) {
             return false;
@@ -238,15 +223,15 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         // Отправляем событие через EventRouter
         address revokeRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
-            sku: sku,                     // SKU товара
-            seller: msg.sender,           // Продавец
-            buyer: address(0),            // Покупатель (нет при отзыве)
-            price: 0,                    // Цена (нет при отзыве)
-            paymentToken: address(0),     // Валюта платежа (нет при отзыве)
-            paymentAmount: 0,             // Сумма платежа (нет при отзыве)
-            timestamp: block.timestamp,   // Время отзыва
-            listingHash: bytes32(0),      // Хеш листинга (0 для отзыва по SKU)
-            version: 1                    // Версия события
+            sku: sku, // SKU товара
+            seller: msg.sender, // Продавец
+            buyer: address(0), // Покупатель (нет при отзыве)
+            price: 0, // Цена (нет при отзыве)
+            paymentToken: address(0), // Валюта платежа (нет при отзыве)
+            paymentAmount: 0, // Сумма платежа (нет при отзыве)
+            timestamp: block.timestamp, // Время отзыва
+            listingHash: bytes32(0), // Хеш листинга (0 для отзыва по SKU)
+            version: 1 // Версия события
         });
         // Используем правильный тип события для отзыва листинга
         IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
@@ -255,10 +240,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     /// @notice Отзыв конкретного листинга
     /// @param listing Структура листинга
     /// @param sellerSignature Подпись продавца
-    function revokeListing(
-        SignatureLib.Listing calldata listing,
-        bytes calldata sellerSignature
-    ) external {
+    function revokeListing(SignatureLib.Listing calldata listing, bytes calldata sellerSignature) external {
         // Сначала проверяем дешевые условия
         if (listing.seller == address(0)) revert ZeroAddress();
 
@@ -271,15 +253,15 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             // Эмитируем событие и выходим из функции
             address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
             IEventPayload.MarketplaceEvent memory eventData = IEventPayload.MarketplaceEvent({
-                sku: listing.sku,            // SKU товара
-                seller: listing.seller,      // Продавец
-                buyer: address(0),           // Покупатель (нет при отзыве)
-                price: 0,                   // Цена (нет при отзыве)
-                paymentToken: address(0),    // Валюта платежа (нет при отзыве)
+                sku: listing.sku, // SKU товара
+                seller: listing.seller, // Продавец
+                buyer: address(0), // Покупатель (нет при отзыве)
+                price: 0, // Цена (нет при отзыве)
+                paymentToken: address(0), // Валюта платежа (нет при отзыве)
                 paymentAmount: listing.salt, // Используем это поле для передачи salt
-                timestamp: block.timestamp,  // Время отзыва
-                listingHash: currentListingHash,    // Хеш листинга
-                version: 1                   // Версия события
+                timestamp: block.timestamp, // Время отзыва
+                listingHash: currentListingHash, // Хеш листинга
+                version: 1 // Версия события
             });
             IEventRouter(router).route(IEventRouter.EventKind.ListingRevoked, abi.encode(eventData));
             return;
@@ -296,20 +278,20 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         }
 
         // Отзываем листинг
-            revokedListings[listingHash] = true;
+        revokedListings[listingHash] = true;
 
         // Отправляем событие через EventRouter
         address revokeRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
         IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
-            sku: listing.sku,            // SKU товара
-            seller: listing.seller,      // Продавец
-            buyer: address(0),           // Покупатель (нет при отзыве)
-            price: 0,                   // Цена (нет при отзыве)
-            paymentToken: address(0),    // Валюта платежа (нет при отзыве)
+            sku: listing.sku, // SKU товара
+            seller: listing.seller, // Продавец
+            buyer: address(0), // Покупатель (нет при отзыве)
+            price: 0, // Цена (нет при отзыве)
+            paymentToken: address(0), // Валюта платежа (нет при отзыве)
             paymentAmount: listing.salt, // Используем это поле для передачи salt
-            timestamp: block.timestamp,  // Время отзыва
-            listingHash: listingHash,    // Хеш листинга
-            version: 1                   // Версия события
+            timestamp: block.timestamp, // Время отзыва
+            listingHash: listingHash, // Хеш листинга
+            version: 1 // Версия события
         });
         // Используем правильный тип события для отзыва листинга
         IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
@@ -385,6 +367,6 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
 
     /// @notice Fallback function to reject unintended calls with ETH
     fallback() external payable {
-        revert("Use buy() for purchases");
+        revert('Use buy() for purchases');
     }
 }

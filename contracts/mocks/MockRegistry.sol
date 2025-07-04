@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IRegistry.sol";
+import '../interfaces/IRegistry.sol';
 
 /// @title MockRegistry
 /// @notice Test registry for modular testing
@@ -32,7 +32,7 @@ contract MockRegistry is IRegistry {
 
     // Basic access control modifier for testing
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+        require(msg.sender == owner, 'Not owner');
         _;
     }
 
@@ -41,8 +41,8 @@ contract MockRegistry is IRegistry {
     /// @param implementation Implementation address
     /// @param context Module context
     function registerFeature(bytes32 id, address implementation, uint8 context) external onlyOwner {
-        require(id != bytes32(0), "Invalid module ID");
-        require(implementation != address(0), "Zero address not allowed");
+        require(id != bytes32(0), 'Invalid module ID');
+        require(implementation != address(0), 'Zero address not allowed');
         modules[id] = implementation;
         moduleContexts[id] = context;
     }
@@ -51,8 +51,8 @@ contract MockRegistry is IRegistry {
     /// @param id Module ID
     /// @param newImplementation New implementation address
     function upgradeFeature(bytes32 id, address newImplementation) external onlyOwner {
-        require(id != bytes32(0), "Invalid module ID");
-        require(newImplementation != address(0), "Zero address not allowed");
+        require(id != bytes32(0), 'Invalid module ID');
+        require(newImplementation != address(0), 'Zero address not allowed');
         modules[id] = newImplementation;
     }
 
@@ -75,8 +75,8 @@ contract MockRegistry is IRegistry {
     /// @param serviceId Service ID
     /// @param addr Service address
     function setCoreService(bytes32 serviceId, address addr) external onlyOwner {
-        require(serviceId != bytes32(0), "Invalid service ID");
-        require(addr != address(0), "Zero address not allowed");
+        require(serviceId != bytes32(0), 'Invalid service ID');
+        require(addr != address(0), 'Zero address not allowed');
         coreSrvByBytes[serviceId] = addr;
     }
 
@@ -108,13 +108,13 @@ contract MockRegistry is IRegistry {
     /// @param serviceAlias Service name
     /// @param addr Service address
     function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external onlyOwner {
-        require(moduleId != bytes32(0), "Invalid module ID");
-        require(bytes(serviceAlias).length > 0, "Empty service alias");
-        require(addr != address(0), "Zero address not allowed");
+        require(moduleId != bytes32(0), 'Invalid module ID');
+        require(bytes(serviceAlias).length > 0, 'Empty service alias');
+        require(addr != address(0), 'Zero address not allowed');
 
         moduleServices[moduleId][serviceAlias] = addr;
         bytes32 serviceId = keccak256(bytes(serviceAlias));
-        require(serviceId != bytes32(0), "Invalid service ID");
+        require(serviceId != bytes32(0), 'Invalid service ID');
         moduleSrvByBytes[moduleId][serviceId] = addr;
     }
 
@@ -137,7 +137,7 @@ contract MockRegistry is IRegistry {
     /// @notice Sets new access control contract
     /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyOwner {
-        require(newAccess != address(0), "Zero address not allowed");
+        require(newAccess != address(0), 'Zero address not allowed');
         accessControl = newAccess;
     }
 

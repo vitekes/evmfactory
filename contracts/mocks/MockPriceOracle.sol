@@ -39,9 +39,9 @@ contract MockPriceOracle is IPriceOracle {
     /// @param priceInWei Price in wei
     /// @param decimals Number of token decimals
     function setTokenPrice(address token, uint256 priceInWei, uint8 decimals) external {
-        require(token != address(0), "Zero address not allowed");
-        require(priceInWei > 0, "Price must be positive");
-        require(decimals <= 18, "Decimals must be <= 18"); // Common limit for most ERC20 tokens
+        require(token != address(0), 'Zero address not allowed');
+        require(priceInWei > 0, 'Price must be positive');
+        require(decimals <= 18, 'Decimals must be <= 18'); // Common limit for most ERC20 tokens
 
         tokenPrices[token] = priceInWei;
         tokenDecimals[token] = decimals;
@@ -52,9 +52,9 @@ contract MockPriceOracle is IPriceOracle {
     /// @param paymentToken Payment token
     /// @param supported Support flag
     function setPairSupport(address baseToken, address paymentToken, bool supported) external {
-        require(baseToken != address(0), "Base token cannot be zero address");
-        require(paymentToken != address(0), "Payment token cannot be zero address");
-        require(baseToken != paymentToken, "Tokens must be different");
+        require(baseToken != address(0), 'Base token cannot be zero address');
+        require(paymentToken != address(0), 'Payment token cannot be zero address');
+        require(baseToken != paymentToken, 'Tokens must be different');
 
         supportedPairs[baseToken][paymentToken] = supported;
         supportedPairs[paymentToken][baseToken] = supported;
@@ -89,7 +89,7 @@ contract MockPriceOracle is IPriceOracle {
     function getPrice(address token, address baseToken) external view returns (uint256 price, uint8 decimals) {
         // If tokens are identical, return 1:1
         if (token == baseToken) {
-            return (10**uint256(tokenDecimals[token]), tokenDecimals[token]);
+            return (10 ** uint256(tokenDecimals[token]), tokenDecimals[token]);
         }
 
         // Check if price exists for token

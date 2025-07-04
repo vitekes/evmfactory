@@ -93,16 +93,13 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
             // Для события регистрации пользователя используем структуру ServiceEvent
             // поскольку основная информация - это роль и аккаунт
             IEventPayload.ServiceEvent memory eventData = IEventPayload.ServiceEvent({
-                serviceId: role,        // Идентификатор роли
+                serviceId: role, // Идентификатор роли
                 serviceAddress: account, // Адрес аккаунта
                 moduleId: bytes32(uint256(uint160(sender))), // Преобразуем sender в bytes32
                 version: 1
             });
 
-            IEventRouter(router).route(
-                IEventRouter.EventKind.UserRegistered,
-                abi.encode(eventData)
-            );
+            IEventRouter(router).route(IEventRouter.EventKind.UserRegistered, abi.encode(eventData));
         }
     }
 

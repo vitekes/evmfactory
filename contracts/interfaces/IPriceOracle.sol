@@ -16,7 +16,11 @@ interface IPriceOracle {
     /// @param toToken Token to convert to
     /// @param amount Amount to convert
     /// @return convertedAmount Amount in target token
-    function convertAmount(address fromToken, address toToken, uint256 amount) external view returns (uint256 convertedAmount);
+    function convertAmount(
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) external view returns (uint256 convertedAmount);
 
     /// @notice Check if a token pair is supported
     /// @param token Token to check

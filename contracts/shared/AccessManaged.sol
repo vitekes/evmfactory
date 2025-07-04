@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IAccessControlCenter.sol";
+import '../interfaces/IAccessControlCenter.sol';
 import '../errors/Errors.sol';
 
 abstract contract AccessManaged {

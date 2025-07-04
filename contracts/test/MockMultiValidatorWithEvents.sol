@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../core/MultiValidator.sol";
+import '../core/MultiValidator.sol';
 
 /// @title MockMultiValidatorWithEvents
 /// @notice MultiValidator с дублирующими событиями для сравнения расхода газа

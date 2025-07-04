@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IMultiValidator.sol";
-import "../interfaces/IAccessControlCenter.sol";
+import '../interfaces/IMultiValidator.sol';
+import '../interfaces/IAccessControlCenter.sol';
 
 /// @title MockMultiValidator
 /// @notice Тестовый валидатор токенов для модульного тестирования

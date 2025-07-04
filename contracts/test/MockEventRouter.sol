@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IEventRouter.sol";
+import '../interfaces/IEventRouter.sol';
 
 /// @title MockEventRouter
 /// @notice Простая реализация EventRouter для тестирования

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import '../../core/Registry.sol';
-import "../../interfaces/IEventRouter.sol";
+import '../../interfaces/IEventRouter.sol';
 import '../../shared/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
@@ -125,7 +125,10 @@ contract ContestEscrow is ReentrancyGuard {
 
             address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
             if (router != address(0)) {
-                IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
+                IEventRouter(router).route(
+                    IEventRouter.EventKind.ContestFinalized,
+                    abi.encode(creator, winners, prizes)
+                );
             }
 
             address nft = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);

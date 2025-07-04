@@ -13,8 +13,8 @@ contract MarketplaceFactory is BaseFactory {
         address paymentGateway
     ) BaseFactory(registry, paymentGateway, CoreDefs.MARKETPLACE_MODULE_ID) {}
 
-         /// @notice Создает новый экземпляр маркетплейса
-         /// @return m Адрес созданного маркетплейса
+    /// @notice Создает новый экземпляр маркетплейса
+    /// @return m Адрес созданного маркетплейса
     function createMarketplace() external onlyFactoryAdmin nonReentrant returns (address m) {
         // Проверяем платежный шлюз
         if (paymentGateway == address(0)) revert PaymentGatewayNotRegistered();

@@ -40,7 +40,7 @@ contract MockPriceFeed is IPriceOracle {
     function getPrice(address token, address baseToken) external view returns (uint256 price, uint8 decimals) {
         // Если токены совпадают, возвращаем 1:1
         if (token == baseToken) {
-            return (10**IERC20Metadata(token).decimals(), IERC20Metadata(token).decimals());
+            return (10 ** IERC20Metadata(token).decimals(), IERC20Metadata(token).decimals());
         }
 
         // Проверяем поддержку пары
@@ -56,7 +56,11 @@ contract MockPriceFeed is IPriceOracle {
     /// @param toToken Token to convert to
     /// @param amount Amount to convert
     /// @return convertedAmount Amount in target token
-    function convertAmount(address fromToken, address toToken, uint256 amount) external view returns (uint256 convertedAmount) {
+    function convertAmount(
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) external view returns (uint256 convertedAmount) {
         // Если токены совпадают, возвращаем исходную сумму
         if (fromToken == toToken) {
             return amount;
@@ -83,11 +87,11 @@ contract MockPriceFeed is IPriceOracle {
 
         // Конвертируем сумму
         // 1. Преобразуем в базовую сумму
-        uint256 baseAmount = (amount * fromPrice) / (10**fromPriceDecimals);
+        uint256 baseAmount = (amount * fromPrice) / (10 ** fromPriceDecimals);
         // 2. Корректируем десятичные знаки
-        uint256 adjustedAmount = (baseAmount * (10**toTokenDecimals)) / (10**fromTokenDecimals);
+        uint256 adjustedAmount = (baseAmount * (10 ** toTokenDecimals)) / (10 ** fromTokenDecimals);
         // 3. Конвертируем в целевой токен
-        convertedAmount = (adjustedAmount * (10**toPriceDecimals)) / toPrice;
+        convertedAmount = (adjustedAmount * (10 ** toPriceDecimals)) / toPrice;
 
         return convertedAmount;
     }

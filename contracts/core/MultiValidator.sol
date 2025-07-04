@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import './AccessControlCenter.sol';
 import '../errors/Errors.sol';
-import "../interfaces/IMultiValidator.sol";
-import "../interfaces/IEventRouter.sol";
-import "../interfaces/IEventPayload.sol";
-import "../interfaces/CoreDefs.sol";
-import "../interfaces/IRegistry.sol";
+import '../interfaces/IMultiValidator.sol';
+import '../interfaces/IEventRouter.sol';
+import '../interfaces/IEventPayload.sol';
+import '../interfaces/CoreDefs.sol';
+import '../interfaces/IRegistry.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
@@ -140,9 +140,9 @@ contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
     function _emitTokenEvent(address token, bool status) internal virtual {
         address router = _getEventRouter();
         if (router != address(0)) {
-            IEventRouter.EventKind kind = status ? 
-                IEventRouter.EventKind.TokenAllowed : 
-                IEventRouter.EventKind.TokenDenied;
+            IEventRouter.EventKind kind = status
+                ? IEventRouter.EventKind.TokenAllowed
+                : IEventRouter.EventKind.TokenDenied;
 
             IEventPayload.TokenEvent memory eventData = IEventPayload.TokenEvent({
                 tokenAddress: token,
@@ -153,10 +153,7 @@ contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
                 version: 1
             });
 
-            IEventRouter(router).route(
-                kind,
-                abi.encode(eventData)
-            );
+            IEventRouter(router).route(kind, abi.encode(eventData));
         }
     }
 

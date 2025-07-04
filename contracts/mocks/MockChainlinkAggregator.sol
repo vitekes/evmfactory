@@ -13,11 +13,7 @@ contract MockChainlinkAggregator is AggregatorV3Interface {
     uint256 private _timestamp;
     uint80 private _roundId;
 
-    constructor(
-        uint8 decimals_,
-        string memory description_,
-        int256 initialAnswer
-    ) {
+    constructor(uint8 decimals_, string memory description_, int256 initialAnswer) {
         _decimals = decimals_;
         _description = description_;
         _version = 1;
@@ -38,23 +34,23 @@ contract MockChainlinkAggregator is AggregatorV3Interface {
         return _version;
     }
 
-    function getRoundData(uint80 roundIdParam) external view override returns (
-        uint80 roundId,
-        int256 answer,
-        uint256 startedAt,
-        uint256 updatedAt,
-        uint80 answeredInRound
-    ) {
+    function getRoundData(
+        uint80 roundIdParam
+    )
+        external
+        view
+        override
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+    {
         return (roundIdParam, _answer, _timestamp, _timestamp, roundIdParam);
     }
 
-    function latestRoundData() external view override returns (
-        uint80 roundId,
-        int256 answer,
-        uint256 startedAt,
-        uint256 updatedAt,
-        uint80 answeredInRound
-    ) {
+    function latestRoundData()
+        external
+        view
+        override
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+    {
         return (_roundId, _answer, _timestamp, _timestamp, _roundId);
     }
 
@@ -66,11 +62,7 @@ contract MockChainlinkAggregator is AggregatorV3Interface {
         _roundId++;
     }
 
-    function updateRoundData(
-        uint80 roundId,
-        int256 answer,
-        uint256 timestamp
-    ) external {
+    function updateRoundData(uint80 roundId, int256 answer, uint256 timestamp) external {
         _roundId = roundId;
         _answer = answer;
         _timestamp = timestamp;

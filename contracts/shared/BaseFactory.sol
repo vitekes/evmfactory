@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IRegistry.sol";
-import "../interfaces/IAccessControlCenter.sol";
+import '../interfaces/IRegistry.sol';
+import '../interfaces/IAccessControlCenter.sol';
 import '../errors/Errors.sol';
 import './CloneFactory.sol';
 import '../interfaces/CoreDefs.sol';
@@ -36,7 +36,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
                 // In real contract we could add logging via event
                 // emit RegistryError(reason);
             }
-            } catch Error(string memory /* reason */) {
+        } catch Error(string memory /* reason */) {
             // In real contract we could add logging via event
             // emit FeatureNotFound(reason);
         } catch {
@@ -54,10 +54,10 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         _;
     }
 
-                 /// @dev Copies service from main module to instance if service exists
-                 /// @param instanceId Instance ID
-                 /// @param serviceName Service name
-                 /// @return Address of copied service or address(0) if service doesn't exist
+    /// @dev Copies service from main module to instance if service exists
+    /// @param instanceId Instance ID
+    /// @param serviceName Service name
+    /// @return Address of copied service or address(0) if service doesn't exist
     function _copyServiceIfExists(bytes32 instanceId, string memory serviceName) internal returns (address) {
         // Check input parameters validity
         if (instanceId == bytes32(0)) revert InvalidAddress();
@@ -84,13 +84,16 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         _instanceCounter++;
 
         // Optimized version with enhanced entropy
-        return keccak256(abi.encodePacked(
-            bytes32(bytes(prefix)), // Fixed size 32 bytes saves gas
-            uint160(address(this)), // Directly use uint160
-            block.timestamp, 
-            block.prevrandao,
-            _instanceCounter,       // Add incrementing counter
-            blockhash(block.number - 1) // Use previous block hash for additional entropy
-        ));
+        return
+            keccak256(
+                abi.encodePacked(
+                    bytes32(bytes(prefix)), // Fixed size 32 bytes saves gas
+                    uint160(address(this)), // Directly use uint160
+                    block.timestamp,
+                    block.prevrandao,
+                    _instanceCounter, // Add incrementing counter
+                    blockhash(block.number - 1) // Use previous block hash for additional entropy
+                )
+            );
     }
 }
