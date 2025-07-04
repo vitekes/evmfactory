@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import '../../core/AccessControlCenter.sol';
-import '../../interfaces/core/IMultiValidator.sol';
+import "../../interfaces/IMultiValidator.sol";
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
@@ -14,7 +14,10 @@ contract ContestValidator is IContestValidator {
     IMultiValidator public tokenValidator;
 
     constructor(address _access, address _tokenValidator) {
-        // Инициализация immutable переменной
+        // Check for zero addresses during initialization
+        if (_access == address(0) || _tokenValidator == address(0)) revert ZeroAddress();
+
+        // Initialize immutable variable
         access = AccessControlCenter(_access);
         tokenValidator = IMultiValidator(_tokenValidator);
     }
@@ -24,22 +27,46 @@ contract ContestValidator is IContestValidator {
         _;
     }
 
+    event TokenValidatorUpdated(address oldValidator, address newValidator);
+
     function setTokenValidator(address newValidator) external onlyGovernor {
         if (newValidator == address(0)) revert ZeroAddress();
+        address oldValidator = address(tokenValidator);
         tokenValidator = IMultiValidator(newValidator);
+        emit TokenValidatorUpdated(oldValidator, newValidator);
     }
 
     // --- IContestValidator ---
 
     function validatePrize(PrizeInfo calldata prize) external view override {
-        if (prize.prizeType == PrizeType.MONETARY) {
-            if (prize.amount == 0) revert InvalidPrizeData();
+        // Check prize type validity before other checks
+        if (uint8(prize.prizeType) > 1) {
+            revert InvalidPrizeData_UnsupportedType();
+        }
+
+        // Cache prize type to reduce calldata access
+        PrizeType prizeType = prize.prizeType;
+
+        // Structure checks from cheap to expensive to optimize gas
+        if (prizeType == PrizeType.MONETARY) {
+            // Check for zero token address
+            if (prize.token == address(0)) revert InvalidPrizeData();
+
+            // Check cheapest conditions first
+            if (prize.amount == 0) revert InvalidPrizeData_ZeroAmount();
+
+            // Then check token allowance
             if (!isTokenAllowed(prize.token)) revert NotAllowedToken();
-            if (!isDistributionValid(prize.amount, prize.distribution)) revert InvalidDistribution();
-        } else if (prize.prizeType == PrizeType.PROMO) {
-            if (prize.amount != 0 || prize.token != address(0)) revert InvalidPrizeData();
-        } else {
-            revert InvalidPrizeData();
+
+            // Finally, check distribution validity
+            if (!isDistributionValid(prize.amount, prize.distribution)) 
+                revert InvalidDistribution();
+        } 
+        else if (prizeType == PrizeType.PROMO) {
+            // Use bitwise OR to check multiple conditions simultaneously
+            // This allows checking in a single operation
+            if ((prize.amount | uint160(prize.token)) != 0) 
+                revert InvalidPrizeData_InvalidPromoSettings();
         }
     }
 
@@ -47,13 +74,24 @@ contract ContestValidator is IContestValidator {
         return tokenValidator.isAllowed(token);
     }
 
+    /// @notice Checks validity of prize distribution scheme
+    /// @dev Supported distribution schemes:
+    ///   - 0: Fixed amount (same for all)
+    ///   - 1: Decreasing amount (proportional to ranking position)
+    /// @param amount Total prize amount
+    /// @param distribution Distribution scheme code
+    /// @return Validity of distribution scheme
     function isDistributionValid(uint256 amount, uint8 distribution) public pure override returns (bool) {
-        if (distribution == 0) {
-            return amount > 0;
-        }
-        if (distribution == 1) {
-            return amount > 0;
-        }
+        // Check that prize amount is not zero
+        if (amount == 0) return false;
+
+        // Type 0: Fixed amount (same for all)
+        if (distribution == 0) return true;
+
+        // Type 1: Decreasing amount (proportional to ranking position)
+        if (distribution == 1) return true;
+
+        // Other types not supported
         return false;
     }
 }

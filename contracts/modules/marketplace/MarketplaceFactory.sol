@@ -11,28 +11,27 @@ contract MarketplaceFactory is BaseFactory {
     constructor(
         address registry,
         address paymentGateway
-    ) BaseFactory(registry, paymentGateway, keccak256('Marketplace')) {}
+    ) BaseFactory(registry, paymentGateway, CoreDefs.MARKETPLACE_MODULE_ID) {}
 
+         /// @notice Создает новый экземпляр маркетплейса
+         /// @return m Адрес созданного маркетплейса
     function createMarketplace() external onlyFactoryAdmin nonReentrant returns (address m) {
-        // Получаем необходимые сервисы используя строковые алиасы вместо bytes32
-        address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
-        if (gateway == address(0)) revert PaymentGatewayNotRegistered();
+        // Проверяем платежный шлюз
+        if (paymentGateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Создаем ID для нового маркетплейса
-        bytes32 instanceId = keccak256(abi.encodePacked('Marketplace:', address(this), block.timestamp));
+        bytes32 instanceId = _generateInstanceId('Marketplace');
 
-        // Сначала регистрируем новый экземпляр (чтобы он существовал в реестре)
+        // Регистрируем новый экземпляр
         registry.registerFeature(instanceId, address(this), 1);
 
-        // Копируем сервисы из основного модуля в экземпляр используя строковые алиасы
-        address validator = registry.getModuleServiceByAlias(MODULE_ID, 'Validator');
-        if (validator != address(0)) {
-            registry.setModuleServiceAlias(instanceId, 'Validator', validator);
-        }
-        registry.setModuleServiceAlias(instanceId, 'PaymentGateway', gateway);
+        // Настраиваем сервисы для экземпляра
+        _copyServiceIfExists(instanceId, 'Validator');
+        _copyServiceIfExists(instanceId, 'PriceOracle');
+        registry.setModuleServiceAlias(instanceId, 'PaymentGateway', paymentGateway);
 
         // Создаем маркетплейс
-        m = address(new Marketplace(address(registry), gateway, instanceId));
+        m = address(new Marketplace(address(registry), paymentGateway, instanceId));
 
         // Обновляем адрес экземпляра в реестре
         registry.upgradeFeature(instanceId, m);

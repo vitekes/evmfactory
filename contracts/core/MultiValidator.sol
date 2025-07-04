@@ -3,24 +3,28 @@ pragma solidity ^0.8.28;
 
 import './AccessControlCenter.sol';
 import '../errors/Errors.sol';
-
-/// @title MultiValidator
-/// @notice Module-specific token whitelist deployed via minimal proxy clones.
-
+import "../interfaces/IMultiValidator.sol";
+import "../interfaces/IEventRouter.sol";
+import "../interfaces/IEventPayload.sol";
+import "../interfaces/CoreDefs.sol";
+import "../interfaces/IRegistry.sol";
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract MultiValidator is Initializable, UUPSUpgradeable {
+/// @title MultiValidator
+/// @notice Token validator with whitelist for specific modules
+/// @dev Used for validating tokens in payment transactions
+
+contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
     AccessControlCenter public access;
+    IRegistry public registry;
 
     // token => allowed
     mapping(address => bool) public allowed;
-
-    event TokenAllowed(address indexed token, bool allowed);
 
     modifier onlyGovernor() {
         if (!access.hasRole(access.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
@@ -32,13 +36,27 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
         _;
     }
 
-    /// @notice Initialize the validator
-    /// @param acl Address of AccessControlCenter
-    function initialize(address acl) public initializer {
+    /// @notice Initialize the token validator
+    /// @param acl Address of the access control contract (AccessControlCenter)
+    function initialize(address acl) external initializer {
         __UUPSUpgradeable_init();
+        if (acl == address(0)) revert ZeroAddress();
         access = AccessControlCenter(acl);
-        // Удаляем автоматическую выдачу роли, так как у контракта нет прав на это
-        // Роль должна выдаваться извне администратором
+        // Roles should be granted externally by admin
+    }
+
+    /// @notice Initialize the token validator
+    /// @param acl Address of the access control contract (AccessControlCenter)
+    /// @param registryAddress Address of the registry contract
+    function initialize(address acl, address registryAddress) public initializer {
+        __UUPSUpgradeable_init();
+        if (acl == address(0)) revert ZeroAddress();
+        access = AccessControlCenter(acl);
+
+        if (registryAddress != address(0)) {
+            registry = IRegistry(registryAddress);
+        }
+        // Roles should be granted externally by admin
     }
 
     /// @notice Allow or disallow a token
@@ -47,7 +65,7 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     function setToken(address token, bool status) public onlyGovernor {
         if (token == address(0)) revert ZeroAddress();
         allowed[token] = status;
-        emit TokenAllowed(token, status);
+        _emitTokenEvent(token, status);
     }
 
     /// @notice Add a token to the allowed list
@@ -66,7 +84,7 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
     /// @param tokens Token addresses
     /// @param status Allowance flag
     function bulkSetToken(address[] calldata tokens, bool status) external onlyGovernor {
-        for (uint i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < tokens.length; i++) {
             setToken(tokens[i], status);
         }
     }
@@ -78,11 +96,68 @@ contract MultiValidator is Initializable, UUPSUpgradeable {
         return allowed[token];
     }
 
+    /// @notice Check permissions for a list of tokens
+    /// @param tokens Array of token addresses to check
+    /// @return true if all tokens in the list are allowed
+    function areAllowed(address[] calldata tokens) external view returns (bool) {
+        uint256 length = tokens.length;
+        if (length == 0) return true;
+
+        for (uint256 i = 0; i < length; i++) {
+            address token = tokens[i];
+            if (token == address(0)) revert ZeroAddress();
+            if (!allowed[token]) return false;
+        }
+        return true;
+    }
+
     /// @notice Replace the AccessControlCenter contract
     /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
+    }
+
+    /// @notice Set registry address
+    /// @param registryAddress New registry address
+    function setRegistry(address registryAddress) external onlyAdmin {
+        if (registryAddress == address(0)) revert ZeroAddress();
+        registry = IRegistry(registryAddress);
+    }
+
+    /// @dev Get event router
+    /// @return router Event router address or address(0) if not available
+    function _getEventRouter() internal view returns (address router) {
+        if (address(registry) != address(0)) {
+            router = registry.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
+        }
+        return router;
+    }
+
+    /// @dev Emit token allowed/denied event through EventRouter
+    /// @param token Token address
+    /// @param status Allowed status
+    function _emitTokenEvent(address token, bool status) internal virtual {
+        address router = _getEventRouter();
+        if (router != address(0)) {
+            IEventRouter.EventKind kind = status ? 
+                IEventRouter.EventKind.TokenAllowed : 
+                IEventRouter.EventKind.TokenDenied;
+
+            IEventPayload.TokenEvent memory eventData = IEventPayload.TokenEvent({
+                tokenAddress: token,
+                fromToken: address(0),
+                toToken: address(0),
+                amount: 0,
+                convertedAmount: 0,
+                version: 1
+            });
+
+            IEventRouter(router).route(
+                kind,
+                abi.encode(eventData)
+            );
+        }
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {

@@ -1,35 +1,61 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+// Common errors
+error ZeroAddress();
+error InvalidAddress();
+error NotAdmin();
+error NotFeatureOwner();
+error NotOwner();
+error NotAuthorized();
+error NotFactoryAdmin();
+error NotGovernor();
+error NotSeller();
+error Unauthorized();
+error InvalidFee();
+error InvalidImplementation();
+error InvalidAmount();
+error InvalidState();
+error InvalidArgument();
+
+// Token-related errors
 error NotAllowedToken();
+error UnsupportedPair();
+error PriceFeedNotFound();
+error InvalidPrice();
+error ValidatorNotFound();
+
+// Signature errors
 error InvalidSignature();
+error Expired();
+error InvalidChain();
+error AlreadyPurchased();
+error PriceExceedsMaximum();
+
+// Contest errors
+error InvalidPrizeData();
+error InvalidPrizeData_ZeroAmount();
+error InvalidPrizeData_InvalidPromoSettings();
+error InvalidPrizeData_UnsupportedType();
+error InvalidDistribution();
+error ContestFundingMissing();
+
+// Payment errors
+error PaymentGatewayNotRegistered();
 error Forbidden();
 error LimitExceeded();
-error InvalidImplementation();
 error InvalidTemplateId();
-error InvalidDistribution();
 error InvalidBounds();
-error InvalidChain();
 error PriceZero();
-error InvalidAddress();
-error ZeroAddress();
-error NotAdmin();
 error NotAutomation();
-error NotAuthorized();
-error NotFeatureOwner();
 error NotModule();
-error NotSeller();
 error NotListed();
-error NotGovernor();
 error NotCreator();
-error NotFactoryAdmin();
 error NotTemplateAdmin();
 error InvalidKind();
 error Overflow();
-error AlreadyPurchased();
 error AmountZero();
 error BatchTooLarge();
-error Expired();
 error FeeExceedsAmount();
 error FeeTooHigh();
 error GasZero();
@@ -45,12 +71,15 @@ error SbtNonTransferable();
 error NotFound();
 error ExceedsRefundLimit();
 error InsufficientBalance();
-error ContestFundingMissing();
 error CommitmentInvalid();
 error AlreadyCommitted();
 error GracePeriodNotExpired();
 error TokenDuplicated();
-error InvalidPrizeData();
 error ContestAlreadyFinalized();
 error WrongWinnersCount();
-error PaymentGatewayNotRegistered();
+error InvalidParameters();
+error StalePrice();
+error PaymentTokenNotSupported();
+error PriceNotSet();
+error InvalidServiceName();
+error InvalidEventKind();

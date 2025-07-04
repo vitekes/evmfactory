@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import '../../core/Registry.sol';
-import '../../core/EventRouter.sol';
+import "../../interfaces/IEventRouter.sol";
 import '../../shared/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
@@ -32,7 +32,8 @@ contract ContestEscrow is ReentrancyGuard {
 
     event MonetaryPrizePaid(address indexed to, uint256 amount);
     event PromoPrizeIssued(uint8 indexed slot, address indexed to, string uri);
-    event PrizeAssigned(address indexed to, string uri);
+    event EmergencyWithdraw(address indexed creator, uint256 timestamp);
+    event ContestCancelled(address indexed creator, uint256 timestamp);
     event ContestFinalized(address[] winners);
     event GasRefunded(address indexed to, uint256 amount);
 
@@ -71,7 +72,13 @@ contract ContestEscrow is ReentrancyGuard {
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
         if (winners.length == 0) {
+            // Сохраняем массив победителей при первом вызове
             winners = _winners;
+        } else {
+            // Проверка, что массив победителей не изменился при повторных вызовах
+            for (uint256 i = 0; i < winners.length && i < _winners.length; i++) {
+                if (winners[i] != _winners[i]) revert InvalidParameters();
+            }
         }
 
         uint256 gasStart = gasleft();
@@ -79,21 +86,20 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        // mark as finalized before any external calls
-        if (end == prizes.length) {
-            finalized = true;
-        }
+        // Флаг finalized будет установлен в конце функции, если все призы обработаны
 
         for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
+            // Проверка валидности адреса победителя
+            if (winners[i] == address(0)) revert ZeroAddress();
+
             if (p.prizeType == PrizeType.MONETARY) {
                 uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
                 if (IERC20(p.token).balanceOf(address(this)) < amount) revert InsufficientBalance();
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
-                emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
-                emit PrizeAssigned(winners[i], p.uri);
+                emit PromoPrizeIssued(uint8(i), winners[i], p.uri); // Единое событие для неденежных призов
             }
             unchecked {
                 ++i;
@@ -114,12 +120,15 @@ contract ContestEscrow is ReentrancyGuard {
         }
 
         if (processedWinners == prizes.length) {
-            address router = registry.getModuleService(MODULE_ID, keccak256(bytes('EventRouter')));
+            // Только сейчас устанавливаем флаг финализации, когда все призы обработаны
+            finalized = true;
+
+            address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
             if (router != address(0)) {
-                EventRouter(router).route(EventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
+                IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, abi.encode(creator, winners, prizes));
             }
 
-            address nft = registry.getModuleService(MODULE_ID, keccak256(bytes('NFTManager')));
+            address nft = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);
             if (nft != address(0)) {
                 string[] memory uris = new string[](winners.length);
                 NFTManager(nft).mintBatch(winners, uris, false);
@@ -130,19 +139,36 @@ contract ContestEscrow is ReentrancyGuard {
     }
 
     /// @notice Cancel the contest and return all funds to the creator
+    /// @notice Отменить конкурс и вернуть все средства создателю
     function cancel() external onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
+
+        // Устанавливаем флаг финализации до внешних вызовов (CEI паттерн)
         finalized = true;
+
+        // Возвращаем все денежные призы создателю
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
                 IERC20(p.token).safeTransfer(creator, p.amount);
             }
         }
+
+        // Возвращаем остаток пула для компенсации газа
         if (gasPool > 0) {
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }
+
+        // Отправляем событие через EventRouter
+        address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
+        if (router != address(0)) {
+            // Используем специальный формат для события отмены
+            bytes memory eventData = abi.encode(creator, prizes, block.timestamp);
+            IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, eventData);
+        }
+
+        emit ContestCancelled(creator, block.timestamp);
     }
 
     /// @notice Number of prizes configured
@@ -157,28 +183,59 @@ contract ContestEscrow is ReentrancyGuard {
         return winners.length;
     }
 
+    /// @notice Рассчитывает сумму приза по убывающей схеме
+    /// @dev Сумма приза зависит от позиции (ранга) победителя
+    /// @param amount Общая сумма приза
+    /// @param idx Индекс победителя
+    /// @return Расчитанная сумма приза для данного победителя
     function _computeDescending(uint256 amount, uint8 idx) internal view returns (uint256) {
         uint256 n = prizes.length;
+
+        // Защита от переполнения при большом количестве призов
+        if (n > type(uint128).max) revert Overflow();
+
+        // Если индекс больше или равен количеству призов, возвращаем 0
+        if (idx >= n) return 0;
+
         uint256 rankWeight = n - idx;
         uint256 sumWeights = (n * (n + 1)) / 2;
+
+        // Защита от деления на ноль
+        if (sumWeights == 0) revert InvalidDistribution();
+
         return (amount * rankWeight) / sumWeights;
     }
 
-    /// @notice Emergency withdrawal if the contest was not finalized in time
+    /// @notice Аварийное изъятие средств, если конкурс не был финализирован вовремя
     function emergencyWithdraw() external onlyCreator nonReentrant {
         if (finalized) revert ContestAlreadyFinalized();
         if (block.timestamp <= deadline + GRACE_PERIOD) revert GracePeriodNotExpired();
 
+        // Устанавливаем флаг финализации до внешних вызовов (CEI паттерн)
         finalized = true;
+
+        // Возвращаем все денежные призы создателю
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
                 IERC20(p.token).safeTransfer(creator, p.amount);
             }
         }
+
+        // Возвращаем остаток пула для компенсации газа
         if (gasPool > 0) {
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }
+
+        // Отправляем событие через EventRouter
+        address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
+        if (router != address(0)) {
+            // Используем специальный формат для события аварийного изъятия
+            bytes memory eventData = abi.encode(creator, prizes, block.timestamp, true);
+            IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, eventData);
+        }
+
+        emit EmergencyWithdraw(creator, block.timestamp);
     }
 }

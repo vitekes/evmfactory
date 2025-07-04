@@ -10,5 +10,25 @@ interface IGateway {
         address payer,
         uint256 amount,
         bytes calldata signature
-    ) external returns (uint256 netAmount);
+    ) external payable returns (uint256 netAmount);
+
+    function getPriceInCurrency(
+        bytes32 moduleId,
+        address baseToken,
+        address paymentToken,
+        uint256 baseAmount
+    ) external view returns (uint256 paymentAmount);
+
+    function isPairSupported(
+        bytes32 moduleId,
+        address baseToken,
+        address paymentToken
+    ) external view returns (bool supported);
+
+    function convertAmount(
+        bytes32 moduleId,
+        address baseToken,
+        address paymentToken,
+        uint256 baseAmount
+    ) external view returns (uint256 paymentAmount);
 }

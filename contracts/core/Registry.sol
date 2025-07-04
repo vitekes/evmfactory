@@ -5,6 +5,9 @@ import './AccessControlCenter.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
+import '../interfaces/IEventRouter.sol';
+import '../interfaces/IEventPayload.sol';
+import '../interfaces/CoreDefs.sol';
 
 contract Registry is Initializable, UUPSUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -30,10 +33,6 @@ contract Registry is Initializable, UUPSUpgradeable {
     mapping(bytes32 => mapping(bytes32 => address)) private moduleServices;
 
     /// Events
-    event FeatureRegistered(bytes32 indexed id, address implementation, uint8 context);
-    event FeatureUpdated(bytes32 indexed featureId, address indexed oldImpl, address indexed newImpl);
-    event CoreServiceSet(bytes32 indexed id, address serviceAddress);
-    event ModuleServiceSet(bytes32 indexed moduleId, bytes32 indexed serviceId, address serviceAddress);
     event ModuleRegistered(bytes32 indexed moduleId, string serviceAlias, address serviceAddress);
 
     modifier onlyAdmin() {
@@ -60,7 +59,16 @@ contract Registry is Initializable, UUPSUpgradeable {
     function registerFeature(bytes32 id, address impl, uint8 context) external onlyFeatureOwner {
         if (impl == address(0)) revert InvalidImplementation();
         features[id] = Feature(impl, context, true);
-        emit FeatureRegistered(id, impl, context);
+
+        // Отправляем событие через EventRouter со стандартизированным payload
+        IEventPayload.FeatureEvent memory eventData = IEventPayload.FeatureEvent({
+            featureId: id,
+            oldImplementation: address(0),
+            newImplementation: impl,
+            context: context,
+            version: 1
+        });
+        _emitEvent(IEventRouter.EventKind.FeatureUpgraded, abi.encode(eventData));
     }
 
     function upgradeFeature(bytes32 id, address newImpl) external onlyFeatureOwner {
@@ -69,7 +77,16 @@ contract Registry is Initializable, UUPSUpgradeable {
         if (!f.exists) revert NotFound();
         address oldImpl = f.implementation;
         f.implementation = newImpl;
-        emit FeatureUpdated(id, oldImpl, newImpl);
+
+        // Отправляем событие через EventRouter со стандартизированным payload
+        IEventPayload.FeatureEvent memory eventData = IEventPayload.FeatureEvent({
+            featureId: id,
+            oldImplementation: oldImpl,
+            newImplementation: newImpl,
+            context: f.context,
+            version: 1
+        });
+        _emitEvent(IEventRouter.EventKind.FeatureUpgraded, abi.encode(eventData));
     }
 
     /// @notice Get feature implementation and context
@@ -96,7 +113,15 @@ contract Registry is Initializable, UUPSUpgradeable {
     /// @param addr Service address
     function setCoreService(bytes32 serviceId, address addr) external onlyAdmin {
         coreServices[serviceId] = addr;
-        emit CoreServiceSet(serviceId, addr);
+
+        // Отправляем событие через EventRouter со стандартизированным payload
+        IEventPayload.ServiceEvent memory eventData = IEventPayload.ServiceEvent({
+            serviceId: serviceId,
+            serviceAddress: addr,
+            moduleId: bytes32(0),
+            version: 1
+        });
+        _emitEvent(IEventRouter.EventKind.ServiceRegistered, abi.encode(eventData));
     }
 
     /// @notice Get address of a core service
@@ -107,14 +132,21 @@ contract Registry is Initializable, UUPSUpgradeable {
     }
 
     /// @notice Bind a service address to a module
-    /// @notice Bind a service address to a module
     /// @param moduleId Module identifier
     /// @param serviceId Service identifier
     /// @param addr Service address
     function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) public onlyFeatureOwner {
         if (!features[moduleId].exists) revert ModuleNotRegistered();
         moduleServices[moduleId][serviceId] = addr;
-        emit ModuleServiceSet(moduleId, serviceId, addr);
+
+        // Отправляем событие через EventRouter со стандартизированным payload
+        IEventPayload.ServiceEvent memory eventData = IEventPayload.ServiceEvent({
+            serviceId: serviceId,
+            serviceAddress: addr,
+            moduleId: moduleId,
+            version: 1
+        });
+        _emitEvent(IEventRouter.EventKind.ServiceRegistered, abi.encode(eventData));
     }
 
     /// @notice Bind a service using an alias string
@@ -132,7 +164,6 @@ contract Registry is Initializable, UUPSUpgradeable {
     }
 
     /// @notice Get service assigned to a module
-    /// @notice Get service assigned to a module
     /// @param moduleId Module identifier
     /// @param serviceId Service identifier
     /// @return Service address
@@ -144,24 +175,31 @@ contract Registry is Initializable, UUPSUpgradeable {
     /// @param moduleId Module identifier
     /// @param serviceAlias Alias used during registration
     /// @return Service address
-    function getModuleService(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
-        return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
-    }
-
-    /// @notice Get service assigned to a module by alias (backward compatible name)
-    /// @param moduleId Module identifier
-    /// @param serviceAlias Alias used during registration
-    /// @return Service address
     function getModuleServiceByAlias(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
         return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
     }
 
     /// @notice Replace the AccessControlCenter if needed
-    /// @notice Replace the AccessControlCenter if needed
     /// @param newAccess New AccessControlCenter address
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
         access = AccessControlCenter(newAccess);
+    }
+
+    /// @dev Получить адрес EventRouter
+    /// @return Адрес маршрутизатора событий или address(0), если не доступен
+    function _getEventRouter() internal view returns (address) {
+        return coreServices[CoreDefs.SERVICE_EVENT_ROUTER];
+    }
+
+    /// @dev Эмитировать событие через EventRouter
+    /// @param kind Тип события
+    /// @param payload Данные события
+    function _emitEvent(IEventRouter.EventKind kind, bytes memory payload) internal {
+        address router = _getEventRouter();
+        if (router != address(0)) {
+            IEventRouter(router).route(kind, payload);
+        }
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {

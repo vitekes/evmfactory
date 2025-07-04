@@ -66,7 +66,7 @@
 The Ignition modules deploy contracts in the following sequence:
 
 1. **CoreModule** – deploys `AccessControlCenter`, `Registry`, `CoreFeeManager`,
-   `PaymentGateway`, `MultiValidator`, `MarketplaceFactory` and a `MockPriceFeed`.
+   `PaymentGateway`, `MultiValidator`, `MarketplaceFactory` and a `ChainlinkPriceOracle` (or `MockPriceFeed` for testing).
    The marketplace module is registered along with validator and gateway services.
 2. **LocalDeploy** – in addition to the core contracts it deploys a test ERC-20
    token and the contest module (`ContestFactory` with its validator) for local
