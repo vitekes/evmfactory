@@ -3,17 +3,17 @@ pragma solidity ^0.8.28;
 
 import './AccessControlCenter.sol';
 import '../errors/Errors.sol';
-import '../interfaces/IMultiValidator.sol';
+import '../interfaces/ITokenValidator.sol';
 import '../interfaces/CoreDefs.sol';
 import '../interfaces/IRegistry.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-/// @title MultiValidator
+/// @title TokenValidator.sol
 /// @notice Token validator with whitelist for specific modules
 /// @dev Used for validating tokens in payment transactions
 
-contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
+contract TokenValidator is Initializable, UUPSUpgradeable, ITokenValidator {
     // События для отслеживания изменений статуса токенов
     event TokenAllowed(address indexed token, bytes32 indexed moduleId);
     event TokenDenied(address indexed token, bytes32 indexed moduleId);

@@ -29,11 +29,6 @@ interface IEventPayload {
     }
 }
 
-interface IEventRouter {
-    enum EventKind { ListingCreated, ListingRevoked, ListingSold }
-    function route(EventKind kind, bytes memory data) external;
-}
-
 /// @title Marketplace
 /// @notice Marketplace working only with off-chain listings via signatures
 contract Marketplace is AccessManaged, ReentrancyGuard {
@@ -253,17 +248,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         minSaltBySku[sku] = minSalt;
 
         // Отправляем прямое событие
-        emit ListingRevoked(
-            sku,
-            msg.sender,
-            address(0),
-            0,
-            address(0),
-            0,
-            block.timestamp,
-            bytes32(0),
-            MODULE_ID
-        );
+        emit ListingRevoked(sku, msg.sender, address(0), 0, address(0), 0, block.timestamp, bytes32(0), MODULE_ID);
     }
 
     /// @notice Отзыв конкретного листинга
@@ -306,10 +291,6 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         // Отзываем листинг
         revokedListings[listingHash] = true;
 
-        // Отправляем событие через EventRouter, если он есть
-        address revokeRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-
-        // Сначала отправляем стандартное событие
         emit ListingRevoked(
             listing.sku,
             listing.seller,
@@ -321,22 +302,6 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             listingHash,
             MODULE_ID
         );
-
-        // Если роутер доступен, отправляем через него
-        if (revokeRouter != address(0)) {
-            IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
-                sku: listing.sku,
-                seller: listing.seller,
-                buyer: address(0),
-                price: 0,
-                paymentToken: address(0),
-                paymentAmount: listing.salt,
-                timestamp: block.timestamp,
-                listingHash: listingHash,
-                version: 1
-            });
-            IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
-        }
     }
 
     /// @notice Хэширование листинга для проверки подписи
@@ -414,7 +379,6 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             revert InvalidSignature();
         }
     }
-
 
     /// @notice Allows the contract to receive ETH (required for native currency payments)
     receive() external payable {}

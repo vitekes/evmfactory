@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+
 import '../../core/AccessControlCenter.sol';
-import '../../interfaces/IMultiValidator.sol';
 import '../../errors/Errors.sol';
-import './shared/PrizeInfo.sol';
+import '../../interfaces/ITokenValidator.sol';
 import './interfaces/IContestValidator.sol';
+import './shared/PrizeInfo.sol';
 
 /// @title ContestValidator
 /// @notice Basic validator for Contest prizes
 contract ContestValidator is IContestValidator {
     AccessControlCenter public immutable access;
-    IMultiValidator public tokenValidator;
+    ITokenValidator public tokenValidator;
 
     constructor(address _access, address _tokenValidator) {
         // Check for zero addresses during initialization
@@ -19,7 +20,7 @@ contract ContestValidator is IContestValidator {
 
         // Initialize immutable variable
         access = AccessControlCenter(_access);
-        tokenValidator = IMultiValidator(_tokenValidator);
+        tokenValidator = ITokenValidator(_tokenValidator);
     }
 
     modifier onlyGovernor() {
@@ -32,7 +33,7 @@ contract ContestValidator is IContestValidator {
     function setTokenValidator(address newValidator) external onlyGovernor {
         if (newValidator == address(0)) revert ZeroAddress();
         address oldValidator = address(tokenValidator);
-        tokenValidator = IMultiValidator(newValidator);
+        tokenValidator = ITokenValidator(newValidator);
         emit TokenValidatorUpdated(oldValidator, newValidator);
     }
 

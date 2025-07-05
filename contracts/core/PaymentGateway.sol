@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import './AccessControlCenter.sol';
 import '../interfaces/IRegistry.sol';
-import '../interfaces/IMultiValidator.sol';
+import '../interfaces/ITokenValidator.sol';
 import '../interfaces/IPriceOracle.sol';
 import '../interfaces/IGateway.sol';
 import './CoreFeeManager.sol';
@@ -16,7 +16,7 @@ import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/Pausable.sol';
-import "../lib/Native.sol";
+import '../lib/Native.sol';
 
 contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
     using Address for address payable;
@@ -198,10 +198,10 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
 
         // Check token validity (natively supported or validator allowed)
         if (!token.isNative()) {
-            // Only validate non-native tokens through MultiValidator
+            // Only validate non-native tokens through TokenValidator.sol
             address val = registry.getModuleServiceByAlias(moduleId, 'Validator');
             if (val == address(0)) revert ValidatorNotFound();
-            if (!IMultiValidator(val).isAllowed(token)) revert NotAllowedToken();
+            if (!ITokenValidator(val).isAllowed(token)) revert NotAllowedToken();
         }
 
         // Verify signature only if not a direct payment and not a trusted service
@@ -218,7 +218,6 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         uint256 fee;
         (netAmount, fee) = _executePayment(moduleId, token, payer, amount);
 
-        // Emit event through EventRouter or local event
         _emitPaymentProcessedEvent(moduleId, payer, token, amount, fee, netAmount);
     }
 

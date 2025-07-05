@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-/// @title IMultiValidator
+/// @title ITokenValidator.sol
 /// @notice Interface for token validator with full set of methods
 /// @dev Contains methods for checking and managing the list of allowed tokens
-interface IMultiValidator {
+interface ITokenValidator {
     /// @notice Initializes the validator
     /// @param acl Address of the access control contract
     function initialize(address acl) external;

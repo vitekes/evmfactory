@@ -87,7 +87,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         // Флаг finalized будет установлен в конце функции, если все призы обработаны
 
-        for (uint256 i = start; i < end; ) {
+        for (uint256 i = start; i < end;) {
             PrizeInfo memory p = prizes[i];
             // Проверка валидности адреса победителя
             if (winners[i] == address(0)) revert ZeroAddress();
@@ -122,8 +122,6 @@ contract ContestEscrow is ReentrancyGuard {
             // Только сейчас устанавливаем флаг финализации, когда все призы обработаны
             finalized = true;
 
-            // Удалено обращение к EventRouter, используем прямую эмиссию событий
-
             address nft = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);
             if (nft != address(0)) {
                 string[] memory uris = new string[](winners.length);
@@ -155,8 +153,6 @@ contract ContestEscrow is ReentrancyGuard {
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }
-
-        // Событие отмены эмитируется напрямую
 
         emit ContestCancelled(creator, block.timestamp);
     }

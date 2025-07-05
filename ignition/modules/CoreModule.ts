@@ -37,7 +37,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
   m.call(gateway, "initialize", [access, registry, feeManager]);
   m.call(registry, "setCoreService", [PAYMENT_GATEWAY_SERVICE, gateway]);
 
-  const tokenValidator = m.contract("MultiValidator", []);
+  const tokenValidator = m.contract("TokenValidator.sol", []);
   m.call(tokenValidator, "initialize", [access]);
 
   // Разворачиваем оракул цен Chainlink и регистрируем его

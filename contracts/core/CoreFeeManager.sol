@@ -12,7 +12,7 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 import '../interfaces/CoreDefs.sol';
 import '../interfaces/IRegistry.sol';
-import "../lib/Native.sol";
+import '../lib/Native.sol';
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
