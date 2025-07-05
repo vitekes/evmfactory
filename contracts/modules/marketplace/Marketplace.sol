@@ -157,7 +157,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             );
 
             // Transfer native currency to seller
-            (bool success,) = payable(seller).call{value: netAmount}('');
+            (bool success, ) = payable(seller).call{value: netAmount}('');
             if (!success) revert RefundDisabled();
         } else {
             // Process payment with ERC20 token

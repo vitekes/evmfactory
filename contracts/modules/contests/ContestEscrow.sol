@@ -87,7 +87,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         // Флаг finalized будет установлен в конце функции, если все призы обработаны
 
-        for (uint256 i = start; i < end;) {
+        for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
             // Проверка валидности адреса победителя
             if (winners[i] == address(0)) revert ZeroAddress();
