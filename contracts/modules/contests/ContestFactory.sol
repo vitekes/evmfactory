@@ -17,12 +17,12 @@ contract ContestFactory is BaseFactory {
 
     uint256 public defaultContestDuration = 180 days;
 
-    /// @notice Событие создания нового конкурса
-    /// @param contestId Идентификатор конкурса
-    /// @param manager Адрес управляющего конкурсом
-    /// @param category Категория конкурса
-    /// @param metadata Метаданные конкурса
-    /// @param moduleId Идентификатор модуля
+    /// @notice Emitted when a new contest is created
+    /// @param contestId Contest identifier
+    /// @param manager Contest manager address
+    /// @param category Contest category
+    /// @param metadata Contest metadata
+    /// @param moduleId Module identifier
     event ContestCreated(uint256 contestId, address manager, bytes32 category, bytes metadata, bytes32 moduleId);
 
     constructor(address registry, address feeManager) BaseFactory(registry, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
@@ -155,7 +155,7 @@ contract ContestFactory is BaseFactory {
             if (afterBal - beforeBal != amount) revert ContestFundingMissing();
         }
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit ContestCreated(tcount, msg.sender, bytes32(0), abi.encode(_prizes), CoreDefs.CONTEST_MODULE_ID);
     }
 

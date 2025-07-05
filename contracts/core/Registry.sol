@@ -65,7 +65,7 @@ contract Registry is Initializable, UUPSUpgradeable {
         if (impl == address(0)) revert InvalidImplementation();
         features[id] = Feature(impl, context, true);
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit FeatureUpgraded(id, address(0), impl, context);
     }
 
@@ -76,7 +76,7 @@ contract Registry is Initializable, UUPSUpgradeable {
         address oldImpl = f.implementation;
         f.implementation = newImpl;
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit FeatureUpgraded(id, oldImpl, newImpl, f.context);
     }
 
@@ -105,7 +105,7 @@ contract Registry is Initializable, UUPSUpgradeable {
     function setCoreService(bytes32 serviceId, address addr) external onlyAdmin {
         coreServices[serviceId] = addr;
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit ServiceRegistered(serviceId, addr, bytes32(0));
     }
 
@@ -124,7 +124,7 @@ contract Registry is Initializable, UUPSUpgradeable {
         if (!features[moduleId].exists) revert ModuleNotRegistered();
         moduleServices[moduleId][serviceId] = addr;
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit ServiceRegistered(serviceId, addr, moduleId);
     }
 

@@ -14,11 +14,11 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 /// @dev Used for validating tokens in payment transactions
 
 contract TokenValidator is Initializable, UUPSUpgradeable, ITokenValidator {
-    // События для отслеживания изменений статуса токенов
+    // Events for tracking token status changes
     event TokenAllowed(address indexed token, bytes32 indexed moduleId);
     event TokenDenied(address indexed token, bytes32 indexed moduleId);
 
-    // Идентификатор модуля
+    // Module identifier
     bytes32 public moduleId = keccak256('VALIDATOR');
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

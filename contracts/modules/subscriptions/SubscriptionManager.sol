@@ -18,7 +18,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
-/// @dev Использует PaymentGateway (IGateway) для обработки платежей и конвертации токенов
+/// @dev Uses PaymentGateway (IGateway) for payment processing and token conversion
 contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
@@ -94,13 +94,12 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address paymentGateway,
         bytes32 moduleId
     ) AccessManaged(Registry(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
-        // Проверка наличия платежного шлюза (проверяем только валидность адреса,
-        // сам объект будет получен через registry при необходимости)
+        // Check gateway address validity (actual instance fetched from registry)
         if (paymentGateway == address(0)) revert InvalidAddress();
         registry = Registry(_registry);
         MODULE_ID = moduleId;
 
-        // Инициализируем DOMAIN_SEPARATOR как immutable переменную
+        // Initialize DOMAIN_SEPARATOR as immutable value
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
@@ -144,30 +143,30 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address paymentToken,
         uint256 maxPaymentAmount
     ) external nonReentrant {
-        // Предварительные проверки (самые дешевые)
+        // Cheap pre-checks
         if (paymentToken == address(0)) revert InvalidAddress();
         if (plan.price == 0) revert InvalidAmount();
         if (plan.merchant == address(0)) revert ZeroAddress();
 
-        // Если токены совпадают, используем стандартный метод (быстрый путь)
+        // If tokens match use the regular path
         if (paymentToken == plan.token) {
             _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
             return;
         }
 
-        // Проверяем наличие шлюза до выполнения сложных операций
+        // Ensure gateway is registered before heavy logic
         address gatewayAddress = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
         IGateway gateway = IGateway(gatewayAddress);
 
-        // Проверяем поддержку пары токенов
+        // Verify token pair support
         if (!gateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();
 
-        // Рассчитываем сумму платежа в выбранном токене
+        // Calculate payment amount in chosen token
         uint256 paymentAmount = gateway.convertAmount(MODULE_ID, plan.token, paymentToken, plan.price);
         if (paymentAmount == 0) revert InvalidPrice();
 
-        // Проверяем, что сумма не превышает максимальную
+        // Ensure amount does not exceed limit
         if (maxPaymentAmount > 0 && paymentAmount > maxPaymentAmount) {
             revert PriceExceedsMaximum();
         }
@@ -188,15 +187,15 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address paymentToken,
         uint256 paymentAmount
     ) internal {
-        // Сначала проверяем базовые параметры (самые дешевые проверки)
+        // Basic parameter checks first
         if (paymentAmount == 0) revert InvalidAmount();
         if (paymentToken == address(0)) revert ZeroAddress();
         if (plan.merchant == address(0)) revert ZeroAddress();
 
-        // Проверка срока действия (дешевая операция)
+        // Check plan expiry
         if (!(plan.expiry == 0 || plan.expiry >= block.timestamp)) revert Expired();
 
-        // Проверка поддержки цепочки (умеренно дешевая операция с циклом)
+        // Verify chain support
         bool chainAllowed = false;
         uint256 chainIdsLen = plan.chainIds.length;
         for (uint256 i = 0; i < chainIdsLen; i++) {
@@ -207,17 +206,17 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         }
         if (!chainAllowed) revert InvalidChain();
 
-        // Проверяем наличие платежного шлюза до изменения состояния
+        // Ensure payment gateway is registered
         if (registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0))
             revert PaymentGatewayNotRegistered();
 
-        // Вычисляем хэш плана перед проверкой подписи
+        // Compute plan hash before signature check
         bytes32 planHash = hashPlan(plan);
 
-        // Проверка подписи (самая дорогая операция) делается в последнюю очередь
+        // Verify signature last (expensive)
         if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
 
-        // Сохраняем план и создаем подписчика до внешних вызовов (CEI паттерн)
+        // Save plan and create subscriber before external calls
         if (plans[planHash].merchant == address(0)) {
             plans[planHash] = plan;
         }
@@ -249,24 +248,24 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
             }
         }
 
-        // Получаем адрес шлюза для обработки платежа
+        // Get gateway address for payment
         address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
-        // Обрабатываем платеж через шлюз
+        // Process payment via gateway
         uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
 
-        // Переводим средства продавцу
+        // Transfer funds to merchant
         IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit SubscriptionCreated(
-            uint256(planHash), // Используем хэш плана как ID подписки
-            msg.sender, // Подписчик
-            planHash, // Хеш плана
-            block.timestamp, // Время начала
-            block.timestamp + plan.period, // Время окончания
-            MODULE_ID // Идентификатор модуля
+            uint256(planHash), // Use plan hash as subscription ID
+            msg.sender,
+            planHash,
+            block.timestamp,
+            block.timestamp + plan.period,
+            MODULE_ID
         );
     }
 
@@ -289,22 +288,22 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (plan.merchant == address(0)) revert NoPlan();
         if (block.timestamp < s.nextBilling) revert NotDue();
 
-        // Обновляем состояние перед внешним вызовом (CEI паттерн)
+        // Update state before external call (CEI pattern)
         uint256 nextBillingTime = s.nextBilling + plan.period;
         s.nextBilling = nextBillingTime;
 
-        // Отправляем прямое событие
+        // Emit events directly
         emit SubscriptionRenewed(uint256(s.planHash), nextBillingTime, MODULE_ID);
         emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
 
-        // Получаем адрес шлюза для обработки платежа
+        // Get gateway address for payment
         address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
-        // Обрабатываем платеж через шлюз
+        // Process payment via gateway
         uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
-        // Переводим средства продавцу
+        // Transfer funds to merchant
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
     }
 
@@ -333,26 +332,26 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         batchLimit = newLimit;
     }
 
-    /// @notice Метод для обратной совместимости
-    /// @param plan План подписки, подписанный продавцом
-    /// @param sigMerchant Подпись продавца
-    /// @param permitSig Опциональная подпись для разрешения на списание токенов
-    /// @param paymentToken Альтернативный токен для оплаты
+    /// @notice Backwards-compatible method
+    /// @param plan Subscription plan signed by the merchant
+    /// @param sigMerchant Merchant signature
+    /// @param permitSig Optional permit signature
+    /// @param paymentToken Alternative payment token
     function subscribeWithToken(
         SignatureLib.Plan calldata plan,
         bytes calldata sigMerchant,
         bytes calldata permitSig,
         address paymentToken
     ) external nonReentrant {
-        // Вызываем новую версию с отключенной проверкой максимальной суммы
+        // Call new version with disabled max amount check
         this.subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, 0);
     }
 
-    /// @notice Получает сумму платежа для плана в указанном токене
-    /// @dev Использует PaymentGateway для конвертации валюты
-    /// @param plan План для расчета платежа
-    /// @param paymentToken Токен для оплаты
-    /// @return paymentAmount Сумма платежа в указанном токене
+    /// @notice Get payment amount for a plan in the specified token
+    /// @dev Uses PaymentGateway for currency conversion
+    /// @param plan Plan to calculate from
+    /// @param paymentToken Token to pay with
+    /// @return paymentAmount Amount in the desired token
     function getPlanPaymentInToken(
         SignatureLib.Plan calldata plan,
         address paymentToken
@@ -362,16 +361,16 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
             return plan.price;
         }
 
-        // Используем PaymentGateway для конвертации сумм
+        // Convert using PaymentGateway
         address gatewayAddress = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
 
         IGateway paymentGateway = IGateway(gatewayAddress);
 
-        // Проверяем поддержку пары токенов
+        // Check token pair support
         if (!paymentGateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();
 
-        // Конвертируем сумму
+        // Convert amount
         uint256 result = paymentGateway.convertAmount(MODULE_ID, plan.token, paymentToken, plan.price);
         if (result == 0) revert InvalidPrice();
         return result;
@@ -381,12 +380,12 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     /// @dev Emits {Unsubscribed} and {PlanCancelled}.
     function unsubscribe() external {
         Subscriber memory s = subscribers[msg.sender];
-        // Проверяем, что подписка существует
+        // Ensure subscription exists
         if (s.planHash == bytes32(0)) revert NoPlan();
 
         delete subscribers[msg.sender];
 
-        // Отправляем прямые события
+        // Emit events directly
         emit SubscriptionCancelled(uint256(s.planHash), MODULE_ID);
         emit Unsubscribed(msg.sender, s.planHash);
         emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
