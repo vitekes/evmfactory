@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import '../../core/Registry.sol';
-import '../../interfaces/IEventRouter.sol';
 import '../../shared/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
@@ -123,13 +122,7 @@ contract ContestEscrow is ReentrancyGuard {
             // Только сейчас устанавливаем флаг финализации, когда все призы обработаны
             finalized = true;
 
-            address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
-            if (router != address(0)) {
-                IEventRouter(router).route(
-                    IEventRouter.EventKind.ContestFinalized,
-                    abi.encode(creator, winners, prizes)
-                );
-            }
+            // Удалено обращение к EventRouter, используем прямую эмиссию событий
 
             address nft = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);
             if (nft != address(0)) {
@@ -163,13 +156,7 @@ contract ContestEscrow is ReentrancyGuard {
             gasPool = 0;
         }
 
-        // Отправляем событие через EventRouter
-        address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
-        if (router != address(0)) {
-            // Используем специальный формат для события отмены
-            bytes memory eventData = abi.encode(creator, prizes, block.timestamp);
-            IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, eventData);
-        }
+        // Событие отмены эмитируется напрямую
 
         emit ContestCancelled(creator, block.timestamp);
     }
@@ -231,13 +218,7 @@ contract ContestEscrow is ReentrancyGuard {
             gasPool = 0;
         }
 
-        // Отправляем событие через EventRouter
-        address router = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_EVENT_ROUTER);
-        if (router != address(0)) {
-            // Используем специальный формат для события аварийного изъятия
-            bytes memory eventData = abi.encode(creator, prizes, block.timestamp, true);
-            IEventRouter(router).route(IEventRouter.EventKind.ContestFinalized, eventData);
-        }
+        // Событие аварийного изъятия эмитируется напрямую
 
         emit EmergencyWithdraw(creator, block.timestamp);
     }

@@ -13,6 +13,7 @@ contract MockERC20 is ERC20, ERC20Burnable {
 
     constructor(string memory name, string memory symbol, uint8 tokenDecimals) ERC20(name, symbol) {
         _decimals = tokenDecimals;
+        _mint(msg.sender, 1000000 * 10 ** tokenDecimals);
     }
 
     function decimals() public view virtual override returns (uint8) {

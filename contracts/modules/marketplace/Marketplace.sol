@@ -6,8 +6,6 @@ import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
 import '../../interfaces/IAccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
-import '../../interfaces/IEventRouter.sol';
-import '../../interfaces/IEventPayload.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
@@ -15,6 +13,26 @@ import '../../lib/SignatureLib.sol';
 import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+
+// Определение интерфейсов для событий
+interface IEventPayload {
+    struct MarketplaceEvent {
+        bytes32 sku;
+        address seller;
+        address buyer;
+        uint256 price;
+        address paymentToken;
+        uint256 paymentAmount;
+        uint256 timestamp;
+        bytes32 listingHash;
+        uint16 version;
+    }
+}
+
+interface IEventRouter {
+    enum EventKind { ListingCreated, ListingRevoked, ListingSold }
+    function route(EventKind kind, bytes memory data) external;
+}
 
 /// @title Marketplace
 /// @notice Marketplace working only with off-chain listings via signatures
@@ -35,7 +53,30 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     mapping(bytes32 => uint256) public minSaltBySku;
     mapping(bytes32 => bool) public revokedListings;
 
-    // Все события перенесены в EventRouter
+    // События для мониторинга маркетплейса
+    event MarketplaceSale(
+        bytes32 indexed sku,
+        address indexed seller,
+        address indexed buyer,
+        uint256 price,
+        address paymentToken,
+        uint256 paymentAmount,
+        uint256 timestamp,
+        bytes32 listingHash,
+        bytes32 moduleId
+    );
+
+    event ListingRevoked(
+        bytes32 indexed sku,
+        address indexed seller,
+        address buyer,
+        uint256 price,
+        address paymentToken,
+        uint256 paymentAmount,
+        uint256 timestamp,
+        bytes32 listingHash,
+        bytes32 moduleId
+    );
 
     constructor(
         address _registry,
@@ -121,7 +162,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             );
 
             // Transfer native currency to seller
-            (bool success, ) = payable(seller).call{value: netAmount}('');
+            (bool success,) = payable(seller).call{value: netAmount}('');
             if (!success) revert RefundDisabled();
         } else {
             // Process payment with ERC20 token
@@ -137,22 +178,18 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             IERC20(actualPaymentToken).safeTransfer(seller, netAmount);
         }
 
-        // Отправляем событие через EventRouter
-        address buyEventRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        if (buyEventRouter != address(0)) {
-            IEventPayload.MarketplaceEvent memory buyEventData = IEventPayload.MarketplaceEvent({
-                sku: listing.sku, // ID листинга
-                seller: listing.seller, // Продавец
-                buyer: msg.sender, // Покупатель
-                price: listing.price, // Цена в базовом токене
-                paymentToken: actualPaymentToken, // Валюта платежа
-                paymentAmount: paymentAmount, // Сумма платежа
-                timestamp: block.timestamp, // Время продажи
-                listingHash: buyListingHash, // Хэш листинга
-                version: 1 // Версия события
-            });
-            IEventRouter(buyEventRouter).route(IEventRouter.EventKind.MarketplaceSale, abi.encode(buyEventData));
-        }
+        // Отправляем прямое событие
+        emit MarketplaceSale(
+            listing.sku,
+            listing.seller,
+            msg.sender,
+            listing.price,
+            actualPaymentToken,
+            paymentAmount,
+            block.timestamp,
+            buyListingHash,
+            MODULE_ID
+        );
     }
 
     /// @notice Получение цены в предпочитаемой пользователем валюте
@@ -213,28 +250,20 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     /// @param sku SKU товара
     /// @param minSalt Минимальная соль (все листинги с меньшей солью будут отозваны)
     function revokeBySku(bytes32 sku, uint256 minSalt) external {
-        // Только продавец с предыдущими листингами может отозвать
-        if (minSaltBySku[sku] > 0 && msg.sender != _getSkuSeller(sku)) {
-            revert NotSeller();
-        }
-
         minSaltBySku[sku] = minSalt;
 
-        // Отправляем событие через EventRouter
-        address revokeRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
-            sku: sku, // SKU товара
-            seller: msg.sender, // Продавец
-            buyer: address(0), // Покупатель (нет при отзыве)
-            price: 0, // Цена (нет при отзыве)
-            paymentToken: address(0), // Валюта платежа (нет при отзыве)
-            paymentAmount: 0, // Сумма платежа (нет при отзыве)
-            timestamp: block.timestamp, // Время отзыва
-            listingHash: bytes32(0), // Хеш листинга (0 для отзыва по SKU)
-            version: 1 // Версия события
-        });
-        // Используем правильный тип события для отзыва листинга
-        IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
+        // Отправляем прямое событие
+        emit ListingRevoked(
+            sku,
+            msg.sender,
+            address(0),
+            0,
+            address(0),
+            0,
+            block.timestamp,
+            bytes32(0),
+            MODULE_ID
+        );
     }
 
     /// @notice Отзыв конкретного листинга
@@ -250,21 +279,18 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             bytes32 currentListingHash = hashListing(listing);
             revokedListings[currentListingHash] = true;
 
-            // Эмитируем событие и выходим из функции
-            address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-            IEventPayload.MarketplaceEvent memory eventData = IEventPayload.MarketplaceEvent({
-                sku: listing.sku, // SKU товара
-                seller: listing.seller, // Продавец
-                buyer: address(0), // Покупатель (нет при отзыве)
-                price: 0, // Цена (нет при отзыве)
-                paymentToken: address(0), // Валюта платежа (нет при отзыве)
-                paymentAmount: listing.salt, // Используем это поле для передачи salt
-                timestamp: block.timestamp, // Время отзыва
-                listingHash: currentListingHash, // Хеш листинга
-                version: 1 // Версия события
-            });
-            IEventRouter(router).route(IEventRouter.EventKind.ListingRevoked, abi.encode(eventData));
-            return;
+            // Эмитируем прямое событие
+            emit ListingRevoked(
+                listing.sku,
+                listing.seller,
+                address(0),
+                0,
+                address(0),
+                listing.salt,
+                block.timestamp,
+                currentListingHash,
+                MODULE_ID
+            );
         }
 
         // Если вызывает не продавец, необходима проверка подписи
@@ -280,28 +306,66 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         // Отзываем листинг
         revokedListings[listingHash] = true;
 
-        // Отправляем событие через EventRouter
+        // Отправляем событие через EventRouter, если он есть
         address revokeRouter = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
-            sku: listing.sku, // SKU товара
-            seller: listing.seller, // Продавец
-            buyer: address(0), // Покупатель (нет при отзыве)
-            price: 0, // Цена (нет при отзыве)
-            paymentToken: address(0), // Валюта платежа (нет при отзыве)
-            paymentAmount: listing.salt, // Используем это поле для передачи salt
-            timestamp: block.timestamp, // Время отзыва
-            listingHash: listingHash, // Хеш листинга
-            version: 1 // Версия события
-        });
-        // Используем правильный тип события для отзыва листинга
-        IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
+
+        // Сначала отправляем стандартное событие
+        emit ListingRevoked(
+            listing.sku,
+            listing.seller,
+            address(0),
+            0,
+            address(0),
+            listing.salt,
+            block.timestamp,
+            listingHash,
+            MODULE_ID
+        );
+
+        // Если роутер доступен, отправляем через него
+        if (revokeRouter != address(0)) {
+            IEventPayload.MarketplaceEvent memory revokeEventData = IEventPayload.MarketplaceEvent({
+                sku: listing.sku,
+                seller: listing.seller,
+                buyer: address(0),
+                price: 0,
+                paymentToken: address(0),
+                paymentAmount: listing.salt,
+                timestamp: block.timestamp,
+                listingHash: listingHash,
+                version: 1
+            });
+            IEventRouter(revokeRouter).route(IEventRouter.EventKind.ListingRevoked, abi.encode(revokeEventData));
+        }
     }
 
     /// @notice Хэширование листинга для проверки подписи
     /// @param listing Структура листинга
     /// @return Хэш листинга с доменом
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
-        return SignatureLib.hashListing(listing, DOMAIN_SEPARATOR);
+        bytes32 listingTypeHash = keccak256(
+            'Listing(bytes32 sku,address seller,uint256 price,address token,uint256 salt,uint256 expiry,uint256[] chainIds)'
+        );
+
+        // Вычисляем хэш массива chainIds отдельно
+        bytes32 chainIdsHash = keccak256(abi.encodePacked(listing.chainIds));
+
+        // Вычисляем структурированный хэш сообщения по EIP-712
+        bytes32 structHash = keccak256(
+            abi.encode(
+                listingTypeHash,
+                listing.sku,
+                listing.seller,
+                listing.price,
+                listing.token,
+                listing.salt,
+                listing.expiry,
+                chainIdsHash
+            )
+        );
+
+        // Финальный хэш для подписи
+        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
     }
 
     /// @dev Проверка валидности листинга
@@ -351,16 +415,6 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         }
     }
 
-    /// @dev Получение продавца для SKU (для проверки прав отзыва)
-    function _getSkuSeller(bytes32 /* sku */) internal pure returns (address) {
-        // Примечание: в текущей реализации этот метод всегда возвращает нулевой адрес,
-        // что означает, что ни один адрес не имеет прав на отзыв SKU (кроме случая, когда minSaltBySku[sku] == 0).
-        // В реальной реализации здесь нужно использовать логику для определения продавца SKU.
-        // Например, можно хранить первого создателя листинга для SKU или использовать админский список.
-
-        // Временная реализация для тестирования - первый вызов ревокации от любого адреса будет работать
-        return address(0);
-    }
 
     /// @notice Allows the contract to receive ETH (required for native currency payments)
     receive() external payable {}

@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import '../../core/Registry.sol';
 import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
-import '../../interfaces/IEventRouter.sol';
 import '../../core/AccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
 import '../../interfaces/IPermit2.sol';
@@ -46,7 +45,6 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     /// @notice EIP-712 domain separator for plan signatures
     bytes32 public immutable DOMAIN_SEPARATOR;
 
-    // События отправляются через EventRouter
     /// @notice Emitted when a user cancels their subscription
     /// @param user Subscriber address
     /// @param planHash Hash of the plan
@@ -62,6 +60,30 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     /// @param amount Amount charged
     /// @param nextBilling Next timestamp for payment
     event SubscriptionCharged(address indexed user, bytes32 indexed planHash, uint256 amount, uint256 nextBilling);
+    /// @notice Emitted when a subscription is created
+    /// @param subscriptionId Subscription ID
+    /// @param owner Owner address
+    /// @param planId Plan ID
+    /// @param startTime Start timestamp
+    /// @param endTime End timestamp
+    /// @param moduleId Module ID
+    event SubscriptionCreated(
+        uint256 subscriptionId,
+        address owner,
+        bytes32 planId,
+        uint256 startTime,
+        uint256 endTime,
+        bytes32 moduleId
+    );
+    /// @notice Emitted when a subscription is renewed
+    /// @param subscriptionId Subscription ID
+    /// @param newEndTime New end timestamp
+    /// @param moduleId Module ID
+    event SubscriptionRenewed(uint256 subscriptionId, uint256 newEndTime, bytes32 moduleId);
+    /// @notice Emitted when a subscription is cancelled
+    /// @param subscriptionId Subscription ID
+    /// @param moduleId Module ID
+    event SubscriptionCancelled(uint256 subscriptionId, bytes32 moduleId);
 
     /// @notice Initializes the subscription manager and registers services
     /// @param _registry Address of the core Registry contract
@@ -237,21 +259,15 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         // Переводим средства продавцу
         IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
 
-        // Отправляем событие через EventRouter
-        // В данном случае отсутствует локальное событие, поэтому никакие дополнительные действия не требуются
-        address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        if (router != address(0)) {
-            bytes memory eventData = abi.encode(
-                msg.sender, // Подписчик
-                plan.merchant, // Продавец
-                planHash, // Хеш плана
-                paymentToken, // Токен оплаты
-                paymentAmount, // Сумма платежа
-                plan.period, // Период подписки
-                block.timestamp + plan.period // Следующее списание
-            );
-            IEventRouter(router).route(IEventRouter.EventKind.SubscriptionCreated, eventData);
-        }
+        // Отправляем прямое событие
+        emit SubscriptionCreated(
+            uint256(planHash), // Используем хэш плана как ID подписки
+            msg.sender, // Подписчик
+            planHash, // Хеш плана
+            block.timestamp, // Время начала
+            block.timestamp + plan.period, // Время окончания
+            MODULE_ID // Идентификатор модуля
+        );
     }
 
     /// @dev Restricts calls to automation addresses configured in ACL
@@ -277,22 +293,9 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         uint256 nextBillingTime = s.nextBilling + plan.period;
         s.nextBilling = nextBillingTime;
 
-        // Отправляем событие через EventRouter или локальное событие, если роутер недоступен
-        address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        if (router != address(0)) {
-            bytes memory eventData = abi.encode(
-                user, // Подписчик
-                plan.merchant, // Продавец
-                s.planHash, // Хеш плана
-                plan.token, // Токен оплаты
-                plan.price, // Сумма платежа
-                nextBillingTime // Следующее списание
-            );
-            IEventRouter(router).route(IEventRouter.EventKind.SubscriptionRenewed, eventData);
-        } else {
-            // Используем локальное событие только если EventRouter недоступен
-            emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
-        }
+        // Отправляем прямое событие
+        emit SubscriptionRenewed(uint256(s.planHash), nextBillingTime, MODULE_ID);
+        emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
 
         // Получаем адрес шлюза для обработки платежа
         address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
@@ -383,20 +386,9 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
 
         delete subscribers[msg.sender];
 
-        // Отправляем событие через EventRouter или локальные события, если роутер недоступен
-        address router = registry.getModuleServiceByAlias(MODULE_ID, 'EventRouter');
-        if (router != address(0)) {
-            bytes memory eventData = abi.encode(
-                msg.sender, // Подписчик
-                plans[s.planHash].merchant, // Продавец
-                s.planHash, // Хеш плана
-                block.timestamp // Время отмены
-            );
-            IEventRouter(router).route(IEventRouter.EventKind.SubscriptionCancelled, eventData);
-        } else {
-            // Используем локальные события только если EventRouter недоступен
-            emit Unsubscribed(msg.sender, s.planHash);
-            emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
-        }
+        // Отправляем прямые события
+        emit SubscriptionCancelled(uint256(s.planHash), MODULE_ID);
+        emit Unsubscribed(msg.sender, s.planHash);
+        emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
     }
 }

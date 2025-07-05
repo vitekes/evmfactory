@@ -3,30 +3,23 @@ pragma solidity ^0.8.28;
 
 import '../interfaces/IGateway.sol';
 import '../interfaces/IRegistry.sol';
-import '../interfaces/IEventRouter.sol';
 import '../interfaces/CoreDefs.sol';
 import '../errors/Errors.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '../utils/Native.sol';
+import "../lib/Native.sol";
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+interface IEventRouter {
+    enum EventKind {
+        PaymentProcessed
+    }
+    function route(EventKind kind, bytes memory data) external;
+}
 
 /// @title MockPaymentGateway
 /// @notice Test implementation of payment gateway interface
 /// @dev Used only for testing, not for production use
 contract MockPaymentGateway is IGateway, ReentrancyGuard {
-    /// @notice Получить цену в указанной валюте
-    /// @param amount Сумма в исходном токене
-    /// @return price Цена в целевом токене
-    function getPriceInCurrency(
-        bytes32 /* moduleId */,
-        address /* fromToken */,
-        address /* toToken */,
-        uint256 amount
-    ) external pure override returns (uint256 price) {
-        // Простая реализация для мока
-        return amount;
-    }
     using SafeERC20 for IERC20;
     using Native for address;
 
@@ -50,26 +43,17 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
         registry = IRegistry(_registry);
     }
 
-    /// @notice Gets price in preferred currency
-    /// @param /* moduleId */ Module ID (unused)
-    /// @param baseToken Base token
-    /// @param paymentToken Payment token
-    /// @param baseAmount Amount in base token
-    /// @return paymentAmount Amount in payment token
-    function getPriceInPreferredCurrency(
+    /// @notice Получить цену в указанной валюте
+    /// @param amount Сумма в исходном токене
+    /// @return price Цена в целевом токене
+    function getPriceInCurrency(
         bytes32 /* moduleId */,
-        address baseToken,
-        address paymentToken,
-        uint256 baseAmount
-    ) external pure returns (uint256 paymentAmount) {
-        // In test gateway, simply return the same amount for identical tokens
-        // or a conditional value for different tokens
-        if (baseToken == paymentToken) {
-            return baseAmount;
-        }
-
-        // For testing, use a simple conversion
-        return baseAmount * 2; // Conditional conversion for testing
+        address /* fromToken */,
+        address /* toToken */,
+        uint256 amount
+    ) external pure override returns (uint256 price) {
+        // Простая реализация для мока
+        return amount;
     }
 
     /// @notice Checks if token pair is supported
@@ -152,11 +136,6 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
                 revert Overflow();
             }
             fee = (amount * feePercent) / 100;
-
-            // Ensure fee doesn't exceed payment amount
-            if (fee > amount) {
-                revert FeeExceedsAmount();
-            }
         }
         netAmount = amount - fee;
 
@@ -174,12 +153,8 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
 
             // Track fee for later withdrawal
             accruedFees[address(0)] += fee;
-
-            // The calling contract is responsible for transferring the netAmount
-            // We don't automatically transfer ETH to avoid reentrancy risks
         } else {
             // Handle ERC20 tokens
-            // Cache addresses and objects to minimize storage access
             IERC20 tokenContract = IERC20(token);
             address self = address(this);
             address caller = msg.sender;
@@ -187,10 +162,10 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
             // Transfer tokens from payer to gateway
             tokenContract.safeTransferFrom(payer, self, amount);
 
-            // Track fee for later withdrawal
+            // Track fee
             accruedFees[token] += fee;
 
-            // Transfer net amount to calling contract using cached values
+            // Transfer net amount to caller
             tokenContract.safeTransfer(caller, netAmount);
         }
 
@@ -217,14 +192,8 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
     /// @notice Sets fee percentage
     /// @param percent New fee percentage
     function setFeePercent(uint256 percent) external {
-        // Check for reasonable fee limit and provide detailed error message
-        if (percent > 100) revert FeeTooHigh();
-
-        // Track fee changes
+        require(percent <= 100, 'Fee too high');
         feePercent = percent;
-
-        // Here we could add an event for audit purposes
-        // emit FeePercentChanged(oldFeePercent, percent);
     }
 
     /// @notice Withdraws accumulated fees for a token
@@ -254,8 +223,4 @@ contract MockPaymentGateway is IGateway, ReentrancyGuard {
 
     /// @notice Fallback function to handle direct ETH transfers
     fallback() external payable {}
-
-    /// @notice Helper function for legacy compatibility
-    /// @dev This was removed to avoid function overloading issues
-    /// Use getPriceInCurrency or the other convertAmount implementation instead
 }

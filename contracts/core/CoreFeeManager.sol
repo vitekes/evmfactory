@@ -11,9 +11,8 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 import '../interfaces/CoreDefs.sol';
-import '../interfaces/IEventRouter.sol';
 import '../interfaces/IRegistry.sol';
-import '../utils/Native.sol';
+import "../lib/Native.sol";
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using Address for address payable;
@@ -232,30 +231,12 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         _unpause();
     }
 
-    /// @dev Get event router for a module
-    /// @param moduleId Module identifier
-    /// @return router Event router address or address(0) if not available
-    function _getEventRouter(bytes32 moduleId) internal view returns (address router) {
-        if (address(registry) != address(0)) {
-            router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
-        }
-        return router;
-    }
-
     /// @dev Emit fee collection event
     /// @param moduleId Module identifier
     /// @param token Token address
     /// @param amount Fee amount
     function _emitFeeCollectedEvent(bytes32 moduleId, address token, uint256 amount) internal {
-        address router = _getEventRouter(moduleId);
-        if (router != address(0)) {
-            IEventRouter(router).route(
-                IEventRouter.EventKind.FeeCollected,
-                abi.encode(moduleId, token, amount, uint16(1))
-            );
-        } else {
-            emit FeeCollected(moduleId, token, amount);
-        }
+        emit FeeCollected(moduleId, token, amount);
     }
 
     /// @dev Emit fee withdrawal event
@@ -264,15 +245,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param to Recipient address
     /// @param amount Fee amount
     function _emitFeeWithdrawnEvent(bytes32 moduleId, address token, address to, uint256 amount) internal {
-        address router = _getEventRouter(moduleId);
-        if (router != address(0)) {
-            IEventRouter(router).route(
-                IEventRouter.EventKind.FeeWithdrawn,
-                abi.encode(moduleId, token, to, amount, uint16(1))
-            );
-        } else {
-            emit FeeWithdrawn(moduleId, token, to, amount);
-        }
+        emit FeeWithdrawn(moduleId, token, to, amount);
     }
 
     /// @notice Authorize implementation upgrade - restricted to admin

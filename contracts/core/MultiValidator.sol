@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import './AccessControlCenter.sol';
 import '../errors/Errors.sol';
 import '../interfaces/IMultiValidator.sol';
-import '../interfaces/IEventRouter.sol';
-import '../interfaces/IEventPayload.sol';
 import '../interfaces/CoreDefs.sol';
 import '../interfaces/IRegistry.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -16,6 +14,12 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 /// @dev Used for validating tokens in payment transactions
 
 contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
+    // События для отслеживания изменений статуса токенов
+    event TokenAllowed(address indexed token, bytes32 indexed moduleId);
+    event TokenDenied(address indexed token, bytes32 indexed moduleId);
+
+    // Идентификатор модуля
+    bytes32 public moduleId = keccak256('VALIDATOR');
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -125,35 +129,14 @@ contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
         registry = IRegistry(registryAddress);
     }
 
-    /// @dev Get event router
-    /// @return router Event router address or address(0) if not available
-    function _getEventRouter() internal view returns (address router) {
-        if (address(registry) != address(0)) {
-            router = registry.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
-        }
-        return router;
-    }
-
-    /// @dev Emit token allowed/denied event through EventRouter
+    /// @dev Emit token allowed/denied event directly
     /// @param token Token address
     /// @param status Allowed status
     function _emitTokenEvent(address token, bool status) internal virtual {
-        address router = _getEventRouter();
-        if (router != address(0)) {
-            IEventRouter.EventKind kind = status
-                ? IEventRouter.EventKind.TokenAllowed
-                : IEventRouter.EventKind.TokenDenied;
-
-            IEventPayload.TokenEvent memory eventData = IEventPayload.TokenEvent({
-                tokenAddress: token,
-                fromToken: address(0),
-                toToken: address(0),
-                amount: 0,
-                convertedAmount: 0,
-                version: 1
-            });
-
-            IEventRouter(router).route(kind, abi.encode(eventData));
+        if (status) {
+            emit TokenAllowed(token, moduleId);
+        } else {
+            emit TokenDenied(token, moduleId);
         }
     }
 

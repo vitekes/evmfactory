@@ -6,7 +6,7 @@ import '../interfaces/IRegistry.sol';
 /// @title MockRegistry
 /// @notice Test registry for modular testing
 /// @dev Used only for testing, not for production use
-contract MockRegistry is IRegistry {
+contract MockRegistry {
     // Mapping of modules by ID
     mapping(bytes32 => address) public modules;
     mapping(bytes32 => uint8) public moduleContexts;
@@ -126,14 +126,6 @@ contract MockRegistry is IRegistry {
         return moduleServices[moduleId][serviceAlias];
     }
 
-    /// @notice Gets module service address (compatibility with previous API)
-    /// @param moduleId Module ID
-    /// @param serviceAlias Service name
-    /// @return Service address
-    function getModuleService(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
-        return moduleServices[moduleId][serviceAlias];
-    }
-
     /// @notice Sets new access control contract
     /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyOwner {
@@ -146,5 +138,57 @@ contract MockRegistry is IRegistry {
     /// @return Whether module exists
     function featureExists(bytes32 id) external view returns (bool) {
         return modules[id] != address(0);
+    }
+
+    // Реализация интерфейса IRegistry
+    function registerModule(bytes32 moduleId, string calldata moduleName, address moduleAddress) external {
+        // Implementation not needed for tests
+    }
+
+    function registerModuleService(bytes32 moduleId, bytes32 serviceType, address serviceAddress) external {
+        moduleSrvByBytes[moduleId][serviceType] = serviceAddress;
+    }
+
+    function registerCoreService(bytes32 serviceType, address serviceAddress) external {
+        coreSrvByBytes[serviceType] = serviceAddress;
+    }
+
+    function getModuleAddress(bytes32 moduleId) external view returns (address) {
+        return modules[moduleId];
+    }
+
+    function getModuleInfo(bytes32 moduleId) external view returns (string memory, address, bool) {
+        return ('', modules[moduleId], modules[moduleId] != address(0));
+    }
+
+    function isModuleActive(bytes32 moduleId) external view returns (bool) {
+        return modules[moduleId] != address(0);
+    }
+
+    function setModuleStatus(bytes32 moduleId, bool active) external {
+        // Implementation not needed for tests
+    }
+
+    function getAllModules() external pure returns (bytes32[] memory) {
+        // Implementation not needed for tests
+        return new bytes32[](0);
+    }
+
+    function getAllActiveModules() external pure returns (bytes32[] memory) {
+        // Implementation not needed for tests
+        return new bytes32[](0);
+    }
+
+    function getModulesByNamePrefix(string calldata /* prefix */) external pure returns (bytes32[] memory) {
+        // Implementation not needed for tests
+        return new bytes32[](0);
+    }
+
+    /// @notice Gets module service address (compatibility with previous API)
+    /// @param moduleId Module ID
+    /// @param serviceAlias Service name
+    /// @return Service address
+    function getModuleService(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
+        return moduleServices[moduleId][serviceAlias];
     }
 }

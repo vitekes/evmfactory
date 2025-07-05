@@ -5,8 +5,6 @@ import '../../shared/BaseFactory.sol';
 import './ContestEscrow.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
-import '../../interfaces/IEventRouter.sol';
-import '../../interfaces/IEventPayload.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '../../interfaces/CoreDefs.sol';
@@ -18,6 +16,14 @@ contract ContestFactory is BaseFactory {
     using SafeERC20 for IERC20;
 
     uint256 public defaultContestDuration = 180 days;
+
+    /// @notice Событие создания нового конкурса
+    /// @param contestId Идентификатор конкурса
+    /// @param manager Адрес управляющего конкурсом
+    /// @param category Категория конкурса
+    /// @param metadata Метаданные конкурса
+    /// @param moduleId Идентификатор модуля
+    event ContestCreated(uint256 contestId, address manager, bytes32 category, bytes metadata, bytes32 moduleId);
 
     constructor(address registry, address feeManager) BaseFactory(registry, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
 
@@ -149,16 +155,8 @@ contract ContestFactory is BaseFactory {
             if (afterBal - beforeBal != amount) revert ContestFundingMissing();
         }
 
-        // Send event through EventRouter
-        address router = registry.getModuleServiceByAlias(CoreDefs.CONTEST_MODULE_ID, 'EventRouter');
-        IEventPayload.ContestEvent memory eventData = IEventPayload.ContestEvent({
-            creator: msg.sender, // Creator
-            escrowAddress: escrow, // Escrow contract address
-            deadline: deadline, // Deadline
-            version: 1 // Version
-        });
-        // Отдельно передаем призы, поскольку они сложно структурированы
-        IEventRouter(router).route(IEventRouter.EventKind.ContestCreated, abi.encode(eventData, _prizes));
+        // Отправляем прямое событие
+        emit ContestCreated(tcount, msg.sender, bytes32(0), abi.encode(_prizes), CoreDefs.CONTEST_MODULE_ID);
     }
 
     /// @notice Sets default contest duration

@@ -10,28 +10,15 @@ import './CoreFeeManager.sol';
 import '../errors/Errors.sol';
 import '../lib/SignatureLib.sol';
 import '../interfaces/CoreDefs.sol';
-import '../interfaces/IEventRouter.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import '@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
-import '../utils/Native.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/utils/Pausable.sol';
+import "../lib/Native.sol";
 
-contract PaymentGateway is
-    Initializable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
-    UUPSUpgradeable,
-    IGateway
-{
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
     using Address for address payable;
     using SafeERC20 for IERC20;
     using Native for address;
@@ -80,11 +67,7 @@ contract PaymentGateway is
         _;
     }
 
-    function initialize(address accessControl, address registry_, address feeManager_) public initializer {
-        __ReentrancyGuard_init();
-        __Pausable_init();
-        __UUPSUpgradeable_init();
-
+    constructor(address accessControl, address registry_, address feeManager_) {
         if (accessControl == address(0)) revert ZeroAddress();
         if (registry_ == address(0)) revert ZeroAddress();
         if (feeManager_ == address(0)) revert ZeroAddress();
@@ -117,8 +100,6 @@ contract PaymentGateway is
 
         emit DomainSeparatorUpdated(oldDomainSeparator, newDomainSeparator, block.chainid);
     }
-
-    // getPriceInPreferredCurrency was removed as redundant - use getPriceInCurrency directly
 
     /// @notice Converts amount from one token to another (alias for getPriceInCurrency for interface compatibility)
     /// @param moduleId Module ID
@@ -166,7 +147,8 @@ contract PaymentGateway is
         paymentAmount = IPriceOracle(oracle).convertAmount(normalizedBase, normalizedPayment, baseAmount);
         if (paymentAmount == 0) revert InvalidPrice();
 
-        // Эмиссия событий перенесена в отдельный метод emitPriceConvertedEventExternal
+        // Нельзя эмитировать события в view-функциях
+        // Событие PriceConverted будет эмитироваться только в функциях, изменяющих состояние
 
         // Value is already stored in paymentAmount (named return)
     }
@@ -437,15 +419,7 @@ contract PaymentGateway is
         uint256 baseAmount,
         uint256 paymentAmount
     ) internal {
-        address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
-        if (router != address(0)) {
-            IEventRouter(router).route(
-                IEventRouter.EventKind.PriceConverted,
-                abi.encode(baseToken, paymentToken, baseAmount, paymentAmount, moduleId, uint16(1))
-            );
-        } else {
-            emit PriceConverted(baseToken, paymentToken, baseAmount, paymentAmount, moduleId, 1);
-        }
+        emit PriceConverted(baseToken, paymentToken, baseAmount, paymentAmount, moduleId, 1);
     }
 
     /// @dev Emit payment processed event
@@ -463,20 +437,7 @@ contract PaymentGateway is
         uint256 fee,
         uint256 netAmount
     ) internal {
-        address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
-        if (router != address(0)) {
-            IEventRouter(router).route(
-                IEventRouter.EventKind.PaymentProcessed,
-                abi.encode(payer, token, amount, fee, netAmount, moduleId, uint16(1))
-            );
-        } else {
-            emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId, 1);
-        }
-    }
-
-    /// @dev UUPS upgrade authorization
-    function _authorizeUpgrade(address newImplementation) internal view override onlyAdmin {
-        if (newImplementation == address(0)) revert InvalidImplementation();
+        emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId, 1);
     }
 
     /// @notice Allows contract to receive ETH
@@ -488,6 +449,4 @@ contract PaymentGateway is
     fallback() external payable {
         revert('Use processPayment');
     }
-
-    uint256[45] private __gap; // Reduced from 50 to 45 due to added storage variables
 }

@@ -25,7 +25,6 @@ library CoreDefs {
     bytes32 internal constant SERVICE_VALIDATOR = keccak256('Validator');
     bytes32 internal constant SERVICE_PRICE_ORACLE = keccak256('PriceOracle');
     bytes32 internal constant SERVICE_PERMIT2 = keccak256('Permit2');
-    bytes32 internal constant SERVICE_EVENT_ROUTER = keccak256('EventRouter');
     bytes32 internal constant SERVICE_NFT_MANAGER = keccak256('NFTManager');
 
     // ------------------------------------------------------------------

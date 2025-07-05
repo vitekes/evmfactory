@@ -5,8 +5,6 @@ import '@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol'
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
-import '../interfaces/IEventRouter.sol';
-import '../interfaces/IEventPayload.sol';
 import '../interfaces/IRegistry.sol';
 import '../interfaces/CoreDefs.sol';
 
@@ -73,34 +71,13 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
         registry = IRegistry(registryAddress);
     }
 
-    /// @dev Get event router
-    /// @return router Event router address or address(0) if not available
-    function _getEventRouter() internal view returns (address router) {
-        if (address(registry) != address(0)) {
-            router = registry.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
-        }
-        return router;
-    }
-
-    /// @dev Emit role granted event through EventRouter
+    /// @dev Emit role granted event directly
     /// @param role Role identifier
     /// @param account Account address
     /// @param sender Sender address
     function _emitRoleGrantedEvent(bytes32 role, address account, address sender) internal {
-        // Отправляем через EventRouter если доступен
-        address router = _getEventRouter();
-        if (router != address(0)) {
-            // Для события регистрации пользователя используем структуру ServiceEvent
-            // поскольку основная информация - это роль и аккаунт
-            IEventPayload.ServiceEvent memory eventData = IEventPayload.ServiceEvent({
-                serviceId: role, // Идентификатор роли
-                serviceAddress: account, // Адрес аккаунта
-                moduleId: bytes32(uint256(uint160(sender))), // Преобразуем sender в bytes32
-                version: 1
-            });
-
-            IEventRouter(router).route(IEventRouter.EventKind.UserRegistered, abi.encode(eventData));
-        }
+        // Отправляем прямое событие
+        emit RoleGranted(role, account, sender);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyRole(DEFAULT_ADMIN_ROLE) {
