@@ -57,6 +57,7 @@
    (Do not use `npx test` — it installs an unrelated package.)
 
 5. Run the showcase script to see a complete end-to-end flow:
+This script deploys all demo contracts, registers modules and performs a marketplace sale in multiple currencies.
    ```bash
    npx hardhat run scripts/showcase-marketplace.ts --network localhost
    ```
