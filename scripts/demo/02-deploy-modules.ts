@@ -1,5 +1,6 @@
+import { loadCoreContracts, saveModule } from "./utils/system";
 import { ethers } from 'hardhat';
-import { deployCore, setupCoreConnections, registerModule } from './utils/system';
+import { setupCoreConnections, registerModule } from './utils/system';
 import { deployMarketplaceModule, deploySubscriptionModule, deployContestModule } from './utils/modules';
 
 async function main() {
@@ -9,9 +10,8 @@ async function main() {
   const [admin] = await ethers.getSigners();
 
   // 1. Получаем ядро системы (предполагается, что оно уже развернуто)
-  const coreContracts = await deployCore(); // В реальном сценарии здесь будет загрузка существующих контрактов
+  const coreContracts = await loadCoreContracts();
   await setupCoreConnections(coreContracts);
-
   // 2. Развертывание модуля маркетплейса
   const marketplace = await deployMarketplaceModule(coreContracts);
 
@@ -30,6 +30,7 @@ async function main() {
       'MarketplaceFactory': await marketplace.factory.getAddress()
     }
   });
+  await saveModule(marketplace.moduleId, { MarketplaceFactory: await marketplace.factory.getAddress() });
 
   await registerModule(coreContracts, {
     moduleId: subscription.moduleId,
@@ -40,6 +41,7 @@ async function main() {
     }
   });
 
+  await saveModule(subscription.moduleId, { SubscriptionFactory: await subscription.factory.getAddress() });
   await registerModule(coreContracts, {
     moduleId: contest.moduleId,
     name: contest.name,
@@ -51,6 +53,7 @@ async function main() {
     }
   });
 
+  await saveModule(contest.moduleId, { ContestFactory: await contest.factory.getAddress(), ContestValidator: await contest.validator.getAddress() });
   console.log('\n=== Все модули успешно развернуты и зарегистрированы ===');
   console.log('Перейдите к демонстрационным сценариям для каждого модуля');
 }

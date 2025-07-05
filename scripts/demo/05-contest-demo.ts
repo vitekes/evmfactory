@@ -1,3 +1,5 @@
+import { loadCoreContracts, getModule } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import { executeTransaction } from './utils/contracts';
@@ -7,20 +9,20 @@ async function main() {
 
   // Получаем аккаунты
   const [admin, governor, operator, automation, relayer, organizer, participant1, participant2, winner] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const registry = await ethers.getContractAt('Registry', '0x...'); // Укажите адрес развернутого Registry
-  const moduleId = keccak256(toUtf8Bytes('Contest'));
-
-  // 2. Получаем фабрику конкурсов
-  const factoryAddress = await registry.getModuleServiceByAlias(moduleId, 'ContestFactory');
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const registry = core.registry;
+  const moduleId = keccak256(toUtf8Bytes("Contest"));
+  const module = getModule(moduleId);
+  const factoryAddress = module.ContestFactory;
+  const factory = await ethers.getContractAt("ContestFactory", factoryAddress);
   const factory = await ethers.getContractAt('ContestFactory', factoryAddress);
 
   // 3. Создание нового конкурса
   console.log('\n=== Создание нового конкурса ===');
 
   // Токен для награды
-  const usdcToken = '0x...'; // Адрес USDC токена
+  const usdcToken = config.tokens.usdc;
 
   // Подготовка призов
   const prizeAmount1 = ethers.parseUnits('500', 6); // 500 USDC
@@ -82,14 +84,10 @@ async function main() {
   const receipt = await tx.wait();
   let escrowAddress;
   // Здесь должна быть логика для извлечения адреса эскроу из события
-  // В реальном сценарии мы бы использовали:
-  // escrowAddress = receipt.events[0].args.escrowAddress;
-  escrowAddress = '0x...'; // Для демо-сценария предположим, что мы получили адрес
+  const receipt = await tx.wait();
+  const escrowAddress = receipt.logs[0]?.address;
 
   console.log(`Конкурс создан организатором ${organizer.address} с эскроу ${escrowAddress}`);
-
-  // 4. Получение информации о конкурсе
-  const escrow = await ethers.getContractAt('ContestEscrow', escrowAddress);
 
   const deadline = await escrow.deadline();
   const creator = await escrow.creator();

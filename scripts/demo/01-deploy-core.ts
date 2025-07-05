@@ -1,3 +1,4 @@
+import { saveCoreContracts, saveTokenAddresses } from "./utils/system";
 import { ethers } from 'hardhat';
 import { deployCore, setupCoreConnections, setupRoles, setupTestTokens } from './utils/system';
 
@@ -37,6 +38,8 @@ async function main() {
 
   // 4. Настройка тестовых токенов
   const tokens = await setupTestTokens(coreContracts, governor.address);
+  await saveCoreContracts(coreContracts);
+  await saveTokenAddresses(tokens);
 
   console.log('\n=== Ядро системы успешно развернуто и настроено ===');
   console.log('Перейдите к следующему скрипту для развертывания модулей');

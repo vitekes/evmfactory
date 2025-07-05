@@ -1,3 +1,4 @@
+import { loadDemoConfig, saveDemoConfig } from "./config";
 import { ethers } from 'hardhat';
 import { Contract, keccak256, toUtf8Bytes } from 'ethers';
 import { CoreContracts, SystemRoles, SystemAccounts, ModuleSettings } from './types';
@@ -271,4 +272,49 @@ export async function setupTestTokens(contracts: CoreContracts, governor: string
     dai,
     link
   };
+}
+
+export async function saveCoreContracts(core: CoreContracts) {
+  saveDemoConfig({
+    core: {
+      accessControl: await core.accessControl.getAddress(),
+      registry: await core.registry.getAddress(),
+      eventRouter: await core.eventRouter.getAddress(),
+      feeManager: await core.feeManager.getAddress(),
+      validator: await core.validator.getAddress(),
+      priceOracle: await core.priceOracle.getAddress(),
+      paymentGateway: await core.paymentGateway.getAddress(),
+    },
+  });
+}
+
+export async function loadCoreContracts(): Promise<CoreContracts> {
+  const cfg = loadDemoConfig();
+  if (!cfg.core) throw new Error('Core contracts not found in demo-config.json');
+  return {
+    accessControl: await ethers.getContractAt('AccessControlCenter', cfg.core.accessControl),
+    registry: await ethers.getContractAt('Registry', cfg.core.registry),
+    eventRouter: await ethers.getContractAt('EventRouter', cfg.core.eventRouter),
+    feeManager: await ethers.getContractAt('CoreFeeManager', cfg.core.feeManager),
+    validator: await ethers.getContractAt('MultiValidator', cfg.core.validator),
+    priceOracle: await ethers.getContractAt('ChainlinkPriceOracle', cfg.core.priceOracle),
+    paymentGateway: await ethers.getContractAt('PaymentGateway', cfg.core.paymentGateway),
+  };
+}
+
+export async function saveTokenAddresses(tokens: { [key: string]: Contract }) {
+  const result: any = {};
+  for (const [k, v] of Object.entries(tokens)) {
+    result[k] = await (v as Contract).getAddress();
+  }
+  saveDemoConfig({ tokens: result });
+}
+
+export function saveModule(moduleId: string, services: { [key: string]: string }) {
+  saveDemoConfig({ modules: { [moduleId]: services } });
+}
+
+export function getModule(moduleId: string): any {
+  const cfg = loadDemoConfig();
+  return cfg.modules?.[moduleId];
 }

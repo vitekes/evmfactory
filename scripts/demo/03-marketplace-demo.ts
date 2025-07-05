@@ -1,3 +1,5 @@
+import { loadCoreContracts, getModule } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import { executeTransaction } from './utils/contracts';
@@ -7,22 +9,22 @@ async function main() {
 
   // Получаем аккаунты
   const [admin, governor, operator, automation, relayer, seller, buyer] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const registry = await ethers.getContractAt('Registry', '0x...'); // Укажите адрес развернутого Registry
-  const moduleId = keccak256(toUtf8Bytes('Marketplace'));
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const registry = core.registry;
+  const moduleId = keccak256(toUtf8Bytes("Marketplace"));
 
   // 2. Получаем фабрику маркетплейса
-  const factoryAddress = await registry.getModuleServiceByAlias(moduleId, 'MarketplaceFactory');
-  const factory = await ethers.getContractAt('MarketplaceFactory', factoryAddress);
-
+  const module = getModule(moduleId);
+  const factoryAddress = module.MarketplaceFactory;
+  const factory = await ethers.getContractAt("MarketplaceFactory", factoryAddress);
   // 3. Создание нового листинга на маркетплейсе
   console.log('\n=== Создание нового листинга ===');
 
   // Параметры листинга
   const productSKU = keccak256(toUtf8Bytes('product-1'));
   const priceUSDC = ethers.parseUnits('100', 6); // 100 USDC
-  const usdcToken = '0x...'; // Адрес USDC токена
+  const usdcToken = config.tokens.usdc;
   const metadata = toUtf8Bytes(JSON.stringify({
     title: 'Премиум доступ',
     description: 'Доступ к премиум функциям на 30 дней',

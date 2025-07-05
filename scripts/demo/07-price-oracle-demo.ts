@@ -1,14 +1,12 @@
+import { loadCoreContracts } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { executeTransaction } from './utils/contracts';
 
 async function main() {
-  console.log('=== Демонстрация: Работа с ценовым оракулом ===');
-
-  // Получаем аккаунты
-  const [admin, governor] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const priceOracle = await ethers.getContractAt('ChainlinkPriceOracle', '0x...'); // Укажите адрес развернутого ChainlinkPriceOracle
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const priceOracle = core.priceOracle;
 
   // 2. Разворачиваем тестовые токены и агрегаторы цен
   console.log('\n=== Создание тестовых токенов и агрегаторов цен ===');

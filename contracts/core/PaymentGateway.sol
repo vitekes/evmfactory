@@ -21,7 +21,7 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../utils/Native.sol';
 
-abstract contract PaymentGateway is
+contract PaymentGateway is
     Initializable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,

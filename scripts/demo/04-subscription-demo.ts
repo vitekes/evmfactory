@@ -1,3 +1,5 @@
+import { loadCoreContracts, getModule } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import { executeTransaction } from './utils/contracts';
@@ -5,12 +7,13 @@ import { executeTransaction } from './utils/contracts';
 async function main() {
   console.log('=== Демонстрация: Работа с модулем подписок ===');
 
-  // Получаем аккаунты
-  const [admin, governor, operator, automation, relayer, provider, subscriber] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const registry = await ethers.getContractAt('Registry', '0x...'); // Укажите адрес развернутого Registry
-  const moduleId = keccak256(toUtf8Bytes('SubscriptionManager'));
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const registry = core.registry;
+  const moduleId = keccak256(toUtf8Bytes("SubscriptionManager"));
+  const module = getModule(moduleId);
+  const factoryAddress = module.SubscriptionFactory;
+  const factory = await ethers.getContractAt("SubscriptionFactory", factoryAddress);
 
   // 2. Получаем фабрику подписок
   const factoryAddress = await registry.getModuleServiceByAlias(moduleId, 'SubscriptionFactory');
@@ -22,7 +25,7 @@ async function main() {
   // Параметры плана подписки
   const planId = keccak256(toUtf8Bytes('premium-plan'));
   const monthlyPrice = ethers.parseUnits('10', 6); // 10 USDC в месяц
-  const usdcToken = '0x...'; // Адрес USDC токена
+  const usdcToken = config.tokens.usdc;
   const metadata = toUtf8Bytes(JSON.stringify({
     title: 'Премиум подписка',
     description: 'Полный доступ ко всем функциям сервиса',
