@@ -1,16 +1,15 @@
+import { loadCoreContracts } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { executeTransaction } from './utils/contracts';
 
 async function main() {
   console.log('=== Демонстрация: Работа с валидатором токенов ===');
-
   // Получаем аккаунты
   const [admin, governor, operator] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const validator = await ethers.getContractAt('MultiValidator', '0x...'); // Укажите адрес развернутого MultiValidator
-
-  // 2. Создание новых тестовых токенов
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const validator = core.validator;
   console.log('\n=== Создание тестовых токенов ===');
 
   const TestToken = await ethers.getContractFactory('MockERC20');

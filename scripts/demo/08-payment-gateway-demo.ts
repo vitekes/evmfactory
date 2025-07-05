@@ -1,3 +1,5 @@
+import { loadCoreContracts, getModule } from "./utils/system";
+import { loadDemoConfig } from "./utils/config";
 import { ethers } from 'hardhat';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import { executeTransaction } from './utils/contracts';
@@ -5,18 +7,15 @@ import { executeTransaction } from './utils/contracts';
 async function main() {
   console.log('=== Демонстрация: Работа с платежным шлюзом ===');
 
-  // Получаем аккаунты
-  const [admin, governor, operator, relayer, payer, recipient] = await ethers.getSigners();
-
-  // 1. Получаем ранее развернутые контракты
-  const registry = await ethers.getContractAt('Registry', '0x...'); // Укажите адрес развернутого Registry
-  const SERVICE_PAYMENT_GATEWAY = keccak256(toUtf8Bytes('PaymentGateway'));
+  const config = loadDemoConfig();
+  const core = await loadCoreContracts();
+  const registry = core.registry;
+  const SERVICE_PAYMENT_GATEWAY = keccak256(toUtf8Bytes("PaymentGateway"));
   const paymentGatewayAddress = await registry.getCoreService(SERVICE_PAYMENT_GATEWAY);
-  const paymentGateway = await ethers.getContractAt('PaymentGateway', paymentGatewayAddress);
+  const paymentGateway = await ethers.getContractAt("PaymentGateway", paymentGatewayAddress);
 
-  const validator = await ethers.getContractAt('MultiValidator', '0x...'); // Укажите адрес развернутого MultiValidator
-  const MODULE_ID = keccak256(toUtf8Bytes('Marketplace')); // Используем маркетплейс как пример модуля
-
+  const validator = core.validator;
+  const MODULE_ID = keccak256(toUtf8Bytes("Marketplace"));
   // 2. Создание тестовых токенов
   console.log('\n=== Создание тестовых токенов ===');
 
