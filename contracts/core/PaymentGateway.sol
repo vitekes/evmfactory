@@ -147,8 +147,8 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         paymentAmount = IPriceOracle(oracle).convertAmount(normalizedBase, normalizedPayment, baseAmount);
         if (paymentAmount == 0) revert InvalidPrice();
 
-        // Нельзя эмитировать события в view-функциях
-        // Событие PriceConverted будет эмитироваться только в функциях, изменяющих состояние
+        // Events cannot be emitted in view functions
+        // PriceConverted is emitted only in state-changing functions
 
         // Value is already stored in paymentAmount (named return)
     }
@@ -165,7 +165,7 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
 
         if (normalizedBase == normalizedPayment) return true;
 
-        // Запрос к оракулу
+        // Query the oracle
         address oracle = registry.getModuleServiceByAlias(moduleId, 'PriceOracle');
         return oracle != address(0) && IPriceOracle(oracle).isPairSupported(normalizedBase, normalizedPayment);
     }

@@ -76,7 +76,7 @@ contract AccessControlCenter is Initializable, AccessControlUpgradeable, UUPSUpg
     /// @param account Account address
     /// @param sender Sender address
     function _emitRoleGrantedEvent(bytes32 role, address account, address sender) internal {
-        // Отправляем прямое событие
+        // Emit event directly
         emit RoleGranted(role, account, sender);
     }
 

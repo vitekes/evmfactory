@@ -8,31 +8,31 @@ import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '../errors/Errors.sol';
 
 /// @title Chainlink Price Oracle
-/// @notice Упрощенный оракул цен с использованием Chainlink price feeds
+/// @notice Simple price oracle using Chainlink feeds
 contract ChainlinkPriceOracle is IPriceOracle {
-    /// @notice Контракт управления доступом
+    /// @notice Access control contract
     AccessControlCenter public immutable accessControl;
 
-    /// @notice Максимальный возраст данных цены в секундах
+    /// @notice Maximum allowed price age in seconds
     uint256 public constant MAX_PRICE_AGE = 24 hours;
 
-    /// @notice Адрес прайс-фида Chainlink для каждого токена
+    /// @notice Chainlink price feed address for each token
     mapping(address => address) public priceFeeds;
 
-    /// @notice Базовый токен для каждого прайс-фида
+    /// @notice Base token for each price feed
     mapping(address => address) public baseTokens;
 
-    /// @notice Инициализация оракула
-    /// @param _accessControl Адрес контракта управления доступом
+    /// @notice Oracle constructor
+    /// @param _accessControl Address of AccessControlCenter
     constructor(address _accessControl) {
         if (_accessControl == address(0)) revert InvalidAddress();
         accessControl = AccessControlCenter(_accessControl);
     }
 
-    /// @notice Установить прайс-фид для токена
-    /// @param token Адрес токена
-    /// @param priceFeed Адрес прайс-фида Chainlink
-    /// @param baseToken Адрес базового токена (например, USDC для USD фидов)
+    /// @notice Set the price feed for a token
+    /// @param token Token address
+    /// @param priceFeed Chainlink feed address
+    /// @param baseToken Base token address (e.g. USDC for USD feeds)
     function setPriceFeed(address token, address priceFeed, address baseToken) external {
         if (!accessControl.hasRole(accessControl.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
         if (token == address(0) || priceFeed == address(0) || baseToken == address(0)) revert InvalidAddress();
@@ -41,29 +41,29 @@ contract ChainlinkPriceOracle is IPriceOracle {
         baseTokens[token] = baseToken;
     }
 
-    /// @notice Получить цену для пары токенов
-    /// @param token Токен для получения цены
-    /// @param baseToken Базовый токен для сравнения
-    /// @return price Цена с учетом decimals
-    /// @return decimals Количество десятичных знаков в цене
+    /// @notice Get price for a token pair
+    /// @param token Token to quote
+    /// @param baseToken Base token for comparison
+    /// @return price Price with decimals
+    /// @return decimals Number of decimals in the price
     function getPrice(address token, address baseToken) public view override returns (uint256 price, uint8 decimals) {
-        // Если токены совпадают, возвращаем 1:1
+        // Shortcut for identical tokens
         if (token == baseToken) {
             return (10 ** IERC20Metadata(token).decimals(), IERC20Metadata(token).decimals());
         }
 
-        // Проверяем наличие прямого фида
+        // Check for direct feed
         address directFeed = priceFeeds[token];
         address directBase = baseTokens[token];
 
-        // Проверяем поддержку пары
+        // Validate pair support
         if (directFeed == address(0) || directBase != baseToken) revert UnsupportedPair();
 
-        // Получаем данные из Chainlink
+        // Get data from Chainlink
         AggregatorV3Interface feed = AggregatorV3Interface(directFeed);
         (uint80 roundId, int256 answer, , uint256 updatedAt, uint80 answeredInRound) = feed.latestRoundData();
 
-        // Проверяем корректность данных
+        // Verify data validity
         if (answer <= 0) revert InvalidPrice();
         if (updatedAt < block.timestamp - MAX_PRICE_AGE) revert StalePrice();
         if (answeredInRound < roundId) revert StalePrice();
@@ -71,42 +71,42 @@ contract ChainlinkPriceOracle is IPriceOracle {
         return (uint256(answer), feed.decimals());
     }
 
-    /// @notice Конвертировать сумму из одного токена в другой
-    /// @param fromToken Исходный токен
-    /// @param toToken Целевой токен
-    /// @param amount Сумма для конвертации
-    /// @return convertedAmount Сумма в целевом токене
+    /// @notice Convert amount from one token to another
+    /// @param fromToken Source token
+    /// @param toToken Target token
+    /// @param amount Amount to convert
+    /// @return convertedAmount Amount in target token
     function convertAmount(
         address fromToken,
         address toToken,
         uint256 amount
     ) public view override returns (uint256 convertedAmount) {
-        // Если токены совпадают, возвращаем исходную сумму
+        // Shortcut for identical tokens
         if (fromToken == toToken) return amount;
 
-        // Получаем общий базовый токен
+        // Get common base token
         address fromBase = baseTokens[fromToken];
         address toBase = baseTokens[toToken];
 
-        // Проверяем совместимость базовых токенов
+        // Validate base token compatibility
         if (fromBase == address(0) || toBase == address(0) || fromBase != toBase) revert UnsupportedPair();
 
-        // Получаем цены и информацию о decimals
+        // Fetch prices and decimals
         (uint256 fromPrice, uint8 fromDecimals) = getPrice(fromToken, fromBase);
         (uint256 toPrice, uint8 toDecimals) = getPrice(toToken, fromBase);
         uint8 fromTokenDecimals = IERC20Metadata(fromToken).decimals();
         uint8 toTokenDecimals = IERC20Metadata(toToken).decimals();
 
-        // Конвертируем через базовый токен
+        // Convert through base token
         uint256 baseAmount = (amount * fromPrice) / (10 ** fromDecimals);
         uint256 adjustedForDecimals = (baseAmount * (10 ** toTokenDecimals)) / (10 ** fromTokenDecimals);
         return (adjustedForDecimals * (10 ** toDecimals)) / toPrice;
     }
 
-    /// @notice Проверить поддержку пары токенов
-    /// @param token Токен для проверки
-    /// @param baseToken Базовый токен для проверки
-    /// @return supported True, если пара поддерживается
+    /// @notice Check if a token pair is supported
+    /// @param token Token to check
+    /// @param baseToken Base token to check against
+    /// @return supported True if the pair is supported
     function isPairSupported(address token, address baseToken) external view override returns (bool) {
         if (token == baseToken) return true;
         address feed = priceFeeds[token];
@@ -114,34 +114,34 @@ contract ChainlinkPriceOracle is IPriceOracle {
         return feed != address(0) && tokenBase == baseToken;
     }
 
-    /// @notice Расширенная конвертация с поддержкой fallback через промежуточный токен
-    /// @param fromToken Исходный токен
-    /// @param toToken Целевой токен
-    /// @param intermediateToken Промежуточный токен для конвертации
-    /// @param amount Сумма для конвертации
-    /// @return Сумма в целевом токене
+    /// @notice Extended conversion with a fallback via an intermediate token
+    /// @param fromToken Source token
+    /// @param toToken Target token
+    /// @param intermediateToken Intermediate token for conversion
+    /// @param amount Amount to convert
+    /// @return Amount in the target token
     function convertAmountWithIntermediateToken(
         address fromToken,
         address toToken,
         address intermediateToken,
         uint256 amount
     ) external view returns (uint256) {
-        // Для идентичных токенов
+        // Shortcut for identical tokens
         if (fromToken == toToken) return amount;
 
-        // Проверяем валидность промежуточного токена
+        // Validate intermediate token
         if (intermediateToken == address(0)) revert InvalidAddress();
 
-        // Пробуем прямую конвертацию
+        // Try direct conversion first
         try this.convertAmount(fromToken, toToken, amount) returns (uint256 result) {
             return result;
         } catch {
-            // Конвертируем через промежуточный токен
+            // Fallback to intermediate token
             return _convertViaIntermediateToken(fromToken, toToken, intermediateToken, amount);
         }
     }
 
-    /// @dev Вспомогательная функция для конвертации через промежуточный токен
+    /// @dev Helper to convert via an intermediate token
     function _convertViaIntermediateToken(
         address fromToken,
         address toToken,

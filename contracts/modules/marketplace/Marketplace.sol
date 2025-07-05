@@ -14,7 +14,7 @@ import '../../interfaces/CoreDefs.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
-// Определение интерфейсов для событий
+// Event payload helper
 interface IEventPayload {
     struct MarketplaceEvent {
         bytes32 sku;
@@ -35,7 +35,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
-    // Системные контракты
+    // Core contracts
     IRegistry public immutable registry;
     bytes32 public immutable MODULE_ID;
     IGateway public immutable paymentGateway;
@@ -43,12 +43,12 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     // EIP-712 domain separator
     bytes32 public immutable DOMAIN_SEPARATOR;
 
-    // Контроль использования подписей
+    // Listing signature tracking
     mapping(bytes32 => mapping(address => bool)) public consumed;
     mapping(bytes32 => uint256) public minSaltBySku;
     mapping(bytes32 => bool) public revokedListings;
 
-    // События для мониторинга маркетплейса
+    // Marketplace events
     event MarketplaceSale(
         bytes32 indexed sku,
         address indexed seller,
@@ -82,7 +82,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         MODULE_ID = moduleId;
         paymentGateway = IGateway(_paymentGateway);
 
-        // Создаем EIP-712 domain separator для подписей
+        // Create EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
@@ -92,31 +92,31 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         );
     }
 
-    /// @notice Универсальный метод покупки товара по офф-чейн листингу
-    /// @param listing Структура листинга
-    /// @param sellerSignature Подпись продавца
-    /// @param paymentToken Предпочитаемый токен для оплаты (0 для использования валюты листинга)
-    /// @param maxPaymentAmount Максимальная сумма, которую готов заплатить пользователь (для защиты от изменения курса)
+    /// @notice Purchase an item based on an off-chain listing
+    /// @param listing Listing structure
+    /// @param sellerSignature Seller signature
+    /// @param paymentToken Preferred payment token (0 to use listing currency)
+    /// @param maxPaymentAmount Maximum allowed payment amount
     function buy(
         SignatureLib.Listing calldata listing,
         bytes calldata sellerSignature,
         address paymentToken,
         uint256 maxPaymentAmount
     ) external nonReentrant {
-        // Базовые проверки перед дорогими операциями
+        // Cheap checks before expensive operations
         if (listing.price == 0) revert InvalidArgument();
         if (listing.seller == address(0)) revert ZeroAddress();
 
-        // Вычисляем хэш листинга один раз и переиспользуем
+        // Compute listing hash once
         bytes32 buyListingHash = hashListing(listing);
 
-        // Проверка валидности листинга (включает проверку подписи последним шагом)
+        // Validate listing (signature checked last)
         _validateListing(listing, sellerSignature, buyListingHash);
 
-        // Отмечаем листинг как использованный для этого покупателя
+        // Mark listing as consumed for this buyer
         consumed[buyListingHash][msg.sender] = true;
 
-        // Определяем токен и сумму для платежа (дешевая операция)
+        // Determine token and amount for payment
         address actualPaymentToken = paymentToken == address(0) ? listing.token : paymentToken;
         uint256 paymentAmount = listing.price;
 
@@ -173,7 +173,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             IERC20(actualPaymentToken).safeTransfer(seller, netAmount);
         }
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit MarketplaceSale(
             listing.sku,
             listing.seller,
@@ -187,34 +187,34 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         );
     }
 
-    /// @notice Получение цены в предпочитаемой пользователем валюте
-    /// @param listing Структура листинга
-    /// @param preferredCurrency Предпочитаемая валюта пользователя
-    /// @return price Цена в выбранной валюте
+    /// @notice Get item price in a preferred currency
+    /// @param listing Listing data
+    /// @param preferredCurrency Preferred payment token
+    /// @return price Price in the requested currency
     function getPriceInPreferredCurrency(
         SignatureLib.Listing calldata listing,
         address preferredCurrency
     ) external view returns (uint256 price) {
-        // Если валюта та же, что указана в листинге, возвращаем исходную цену
+        // Shortcut if currency matches listing token
         if (listing.token == preferredCurrency) {
             return listing.price;
         }
 
-        // Иначе получаем цену в предпочитаемой валюте
+        // Otherwise convert using PaymentGateway
         return paymentGateway.convertAmount(MODULE_ID, listing.token, preferredCurrency, listing.price);
     }
 
-    /// @notice Проверка валидности листинга
-    /// @param listing Структура листинга
-    /// @param skuOnly Проверять только SKU, без проверки конкретного листинга
-    /// @return valid Валидность листинга
+    /// @notice Validate listing parameters
+    /// @param listing Listing data
+    /// @param skuOnly Skip full validation if true
+    /// @return valid Listing validity
     function isListingValid(SignatureLib.Listing calldata listing, bool skuOnly) external view returns (bool valid) {
-        // Проверка срока действия
+        // Check expiry
         if (listing.expiry > 0 && listing.expiry < block.timestamp) {
             return false;
         }
 
-        // Проверка соли (версии) для SKU
+        // Check salt for SKU
         if (listing.salt < minSaltBySku[listing.sku]) {
             return false;
         }
@@ -223,13 +223,13 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             return true;
         }
 
-        // Проверка отзыва конкретного листинга
+        // Check specific listing revocation
         bytes32 listingHash = hashListing(listing);
         if (revokedListings[listingHash]) {
             return false;
         }
 
-        // Проверка поддержки текущей сети
+        // Check current chain support
         bool chainSupported = false;
         for (uint256 i = 0; i < listing.chainIds.length; i++) {
             if (listing.chainIds[i] == block.chainid) {
@@ -241,30 +241,30 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         return chainSupported;
     }
 
-    /// @notice Отзыв всех листингов с определенным SKU до указанной соли
-    /// @param sku SKU товара
-    /// @param minSalt Минимальная соль (все листинги с меньшей солью будут отозваны)
+    /// @notice Revoke all listings with a given SKU up to the provided salt
+    /// @param sku Item SKU
+    /// @param minSalt Minimum salt (listings with lower salt are revoked)
     function revokeBySku(bytes32 sku, uint256 minSalt) external {
         minSaltBySku[sku] = minSalt;
 
-        // Отправляем прямое событие
+        // Emit event directly
         emit ListingRevoked(sku, msg.sender, address(0), 0, address(0), 0, block.timestamp, bytes32(0), MODULE_ID);
     }
 
-    /// @notice Отзыв конкретного листинга
-    /// @param listing Структура листинга
-    /// @param sellerSignature Подпись продавца
+    /// @notice Revoke a specific listing
+    /// @param listing Listing data
+    /// @param sellerSignature Seller signature
     function revokeListing(SignatureLib.Listing calldata listing, bytes calldata sellerSignature) external {
-        // Сначала проверяем дешевые условия
+        // Basic checks first
         if (listing.seller == address(0)) revert ZeroAddress();
 
-        // Проверяем, не является ли вызывающий адрес продавцом (самый дешевый путь)
+        // Skip signature if caller is the seller
         if (msg.sender == listing.seller) {
-            // Если вызывает продавец, можно отозвать без проверки подписи
+            // Seller can revoke without signature check
             bytes32 currentListingHash = hashListing(listing);
             revokedListings[currentListingHash] = true;
 
-            // Эмитируем прямое событие
+            // Emit event directly
             emit ListingRevoked(
                 listing.sku,
                 listing.seller,
@@ -278,17 +278,17 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             );
         }
 
-        // Если вызывает не продавец, необходима проверка подписи
+        // If caller is not the seller verify signature
         bytes32 listingHash = hashListing(listing);
 
-        // Проверяем подпись
+        // Verify signature
         if (sellerSignature.length == 0) revert InvalidSignature();
         address signer = ECDSA.recover(listingHash, sellerSignature);
         if (signer != listing.seller) {
             revert InvalidSignature();
         }
 
-        // Отзываем листинг
+        // Revoke listing
         revokedListings[listingHash] = true;
 
         emit ListingRevoked(
@@ -304,18 +304,18 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         );
     }
 
-    /// @notice Хэширование листинга для проверки подписи
-    /// @param listing Структура листинга
-    /// @return Хэш листинга с доменом
+    /// @notice Hash listing according to EIP-712
+    /// @param listing Listing data
+    /// @return Listing hash with domain separator
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
         bytes32 listingTypeHash = keccak256(
             'Listing(bytes32 sku,address seller,uint256 price,address token,uint256 salt,uint256 expiry,uint256[] chainIds)'
         );
 
-        // Вычисляем хэш массива chainIds отдельно
+        // Hash chainIds array separately
         bytes32 chainIdsHash = keccak256(abi.encodePacked(listing.chainIds));
 
-        // Вычисляем структурированный хэш сообщения по EIP-712
+        // Build EIP-712 struct hash
         bytes32 structHash = keccak256(
             abi.encode(
                 listingTypeHash,
@@ -329,39 +329,39 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             )
         );
 
-        // Финальный хэш для подписи
+        // Final digest for signature
         return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
     }
 
-    /// @dev Проверка валидности листинга
+    /// @dev Validate listing parameters
     function _validateListing(
         SignatureLib.Listing calldata listing,
         bytes calldata sellerSignature,
         bytes32 listingHash
     ) internal view {
-        // Оптимизированная последовательность проверок - начинаем с самых дешевых
+        // Optimized validation sequence - start with cheap checks
 
-        // 1. Сначала проверяем, не использован ли листинг этим покупателем (дешевая операция)
+        // 1. Ensure listing not consumed by this buyer
         if (consumed[listingHash][msg.sender]) {
             revert AlreadyPurchased();
         }
 
-        // 2. Проверка срока действия (дешевая операция с легким доступом к хранилищу)
+        // 2. Check expiry
         if (listing.expiry > 0 && listing.expiry < block.timestamp) {
             revert Expired();
         }
 
-        // 3. Проверка отзыва всех листингов с этим SKU (дешевая операция с одним доступом к хранилищу)
+        // 3. Check global SKU revocation
         if (listing.salt < minSaltBySku[listing.sku]) {
             revert Expired();
         }
 
-        // 4. Проверка отзыва конкретного листинга (одно обращение к хранилищу)
+        // 4. Check specific listing revocation status
         if (revokedListings[listingHash]) {
             revert Expired();
         }
 
-        // 5. Проверка поддержки текущей сети (оптимизированный цикл)
+        // 5. Ensure current chain is supported
         uint256 chainsLen = listing.chainIds.length;
         bool chainSupported = false;
         for (uint256 i = 0; i < chainsLen; i++) {
@@ -374,7 +374,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
             revert InvalidChain();
         }
 
-        // 6. Проверка подписи (самая дорогая операция - выполняем в последнюю очередь)
+        // 6. Verify signature last (most expensive)
         if (ECDSA.recover(listingHash, sellerSignature) != listing.seller) {
             revert InvalidSignature();
         }

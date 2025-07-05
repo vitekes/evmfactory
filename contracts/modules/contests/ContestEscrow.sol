@@ -71,10 +71,10 @@ contract ContestEscrow is ReentrancyGuard {
         if (_winners.length != prizes.length) revert WrongWinnersCount();
 
         if (winners.length == 0) {
-            // Сохраняем массив победителей при первом вызове
+            // Store winners on first call
             winners = _winners;
         } else {
-            // Проверка, что массив победителей не изменился при повторных вызовах
+            // Ensure winners array is not changed on subsequent calls
             for (uint256 i = 0; i < winners.length && i < _winners.length; i++) {
                 if (winners[i] != _winners[i]) revert InvalidParameters();
             }
@@ -85,11 +85,11 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 end = start + maxWinnersPerTx;
         if (end > prizes.length) end = prizes.length;
 
-        // Флаг finalized будет установлен в конце функции, если все призы обработаны
+        // finalized flag is set at the end when all prizes processed
 
         for (uint256 i = start; i < end; ) {
             PrizeInfo memory p = prizes[i];
-            // Проверка валидности адреса победителя
+            // Validate winner address
             if (winners[i] == address(0)) revert ZeroAddress();
 
             if (p.prizeType == PrizeType.MONETARY) {
@@ -98,7 +98,7 @@ contract ContestEscrow is ReentrancyGuard {
                 IERC20(p.token).safeTransfer(winners[i], amount);
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
-                emit PromoPrizeIssued(uint8(i), winners[i], p.uri); // Единое событие для неденежных призов
+                emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
             }
             unchecked {
                 ++i;
@@ -119,7 +119,7 @@ contract ContestEscrow is ReentrancyGuard {
         }
 
         if (processedWinners == prizes.length) {
-            // Только сейчас устанавливаем флаг финализации, когда все призы обработаны
+            // Set finalized flag only after all prizes are processed
             finalized = true;
 
             address nft = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);
@@ -133,14 +133,13 @@ contract ContestEscrow is ReentrancyGuard {
     }
 
     /// @notice Cancel the contest and return all funds to the creator
-    /// @notice Отменить конкурс и вернуть все средства создателю
     function cancel() external onlyCreator {
         if (finalized) revert ContestAlreadyFinalized();
 
-        // Устанавливаем флаг финализации до внешних вызовов (CEI паттерн)
+        // Set finalized before external calls (CEI pattern)
         finalized = true;
 
-        // Возвращаем все денежные призы создателю
+        // Return all monetary prizes to the creator
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
@@ -148,7 +147,7 @@ contract ContestEscrow is ReentrancyGuard {
             }
         }
 
-        // Возвращаем остаток пула для компенсации газа
+        // Return remaining gas pool
         if (gasPool > 0) {
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
@@ -169,38 +168,38 @@ contract ContestEscrow is ReentrancyGuard {
         return winners.length;
     }
 
-    /// @notice Рассчитывает сумму приза по убывающей схеме
-    /// @dev Сумма приза зависит от позиции (ранга) победителя
-    /// @param amount Общая сумма приза
-    /// @param idx Индекс победителя
-    /// @return Расчитанная сумма приза для данного победителя
+    /// @notice Calculate descending prize amount
+    /// @dev Amount depends on winner rank
+    /// @param amount Total prize amount
+    /// @param idx Winner index
+    /// @return Prize amount for this winner
     function _computeDescending(uint256 amount, uint8 idx) internal view returns (uint256) {
         uint256 n = prizes.length;
 
-        // Защита от переполнения при большом количестве призов
+        // Prevent overflow with many prizes
         if (n > type(uint128).max) revert Overflow();
 
-        // Если индекс больше или равен количеству призов, возвращаем 0
+        // Return zero if index exceeds number of prizes
         if (idx >= n) return 0;
 
         uint256 rankWeight = n - idx;
         uint256 sumWeights = (n * (n + 1)) / 2;
 
-        // Защита от деления на ноль
+        // Prevent division by zero
         if (sumWeights == 0) revert InvalidDistribution();
 
         return (amount * rankWeight) / sumWeights;
     }
 
-    /// @notice Аварийное изъятие средств, если конкурс не был финализирован вовремя
+    /// @notice Emergency withdrawal if the contest was not finalized in time
     function emergencyWithdraw() external onlyCreator nonReentrant {
         if (finalized) revert ContestAlreadyFinalized();
         if (block.timestamp <= deadline + GRACE_PERIOD) revert GracePeriodNotExpired();
 
-        // Устанавливаем флаг финализации до внешних вызовов (CEI паттерн)
+        // Set finalized before external calls (CEI pattern)
         finalized = true;
 
-        // Возвращаем все денежные призы создателю
+        // Return all monetary prizes to the creator
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
@@ -208,13 +207,13 @@ contract ContestEscrow is ReentrancyGuard {
             }
         }
 
-        // Возвращаем остаток пула для компенсации газа
+        // Return remaining gas pool
         if (gasPool > 0) {
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }
 
-        // Событие аварийного изъятия эмитируется напрямую
+        // Emergency withdrawal event emitted directly
 
         emit EmergencyWithdraw(creator, block.timestamp);
     }
