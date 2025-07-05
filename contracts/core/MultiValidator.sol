@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import './AccessControlCenter.sol';
+import '../interfaces/ICoreKernel.sol';
 import '../errors/Errors.sol';
 import '../interfaces/IMultiValidator.sol';
 import '../interfaces/IEventRouter.sol';
 import '../interfaces/IEventPayload.sol';
 import '../interfaces/CoreDefs.sol';
-import '../interfaces/IRegistry.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
@@ -20,42 +19,37 @@ contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
     constructor() {
         _disableInitializers();
     }
-    AccessControlCenter public access;
-    IRegistry public registry;
+    ICoreKernel public core;
 
     // token => allowed
     mapping(address => bool) public allowed;
 
     modifier onlyGovernor() {
-        if (!access.hasRole(access.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
+        if (!core.hasRole(core.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
         _;
     }
 
     modifier onlyAdmin() {
-        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+        if (!core.hasRole(core.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
     /// @notice Initialize the token validator
-    /// @param acl Address of the access control contract (AccessControlCenter)
+    /// @param acl Address of the CoreKernel contract
     function initialize(address acl) external initializer {
         __UUPSUpgradeable_init();
         if (acl == address(0)) revert ZeroAddress();
-        access = AccessControlCenter(acl);
+        core = ICoreKernel(acl);
         // Roles should be granted externally by admin
     }
 
     /// @notice Initialize the token validator
-    /// @param acl Address of the access control contract (AccessControlCenter)
-    /// @param registryAddress Address of the registry contract
+    /// @param acl Address of the CoreKernel contract
+    /// @param registryAddress Unused legacy parameter
     function initialize(address acl, address registryAddress) public initializer {
         __UUPSUpgradeable_init();
         if (acl == address(0)) revert ZeroAddress();
-        access = AccessControlCenter(acl);
-
-        if (registryAddress != address(0)) {
-            registry = IRegistry(registryAddress);
-        }
+        core = ICoreKernel(acl);
         // Roles should be granted externally by admin
     }
 
@@ -111,27 +105,17 @@ contract MultiValidator is Initializable, UUPSUpgradeable, IMultiValidator {
         return true;
     }
 
-    /// @notice Replace the AccessControlCenter contract
+    /// @notice Replace the CoreKernel contract
     /// @param newAccess New contract address
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
-        access = AccessControlCenter(newAccess);
-    }
-
-    /// @notice Set registry address
-    /// @param registryAddress New registry address
-    function setRegistry(address registryAddress) external onlyAdmin {
-        if (registryAddress == address(0)) revert ZeroAddress();
-        registry = IRegistry(registryAddress);
+        core = ICoreKernel(newAccess);
     }
 
     /// @dev Get event router
     /// @return router Event router address or address(0) if not available
     function _getEventRouter() internal view returns (address router) {
-        if (address(registry) != address(0)) {
-            router = registry.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
-        }
-        return router;
+        router = core.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
     }
 
     /// @dev Emit token allowed/denied event through EventRouter

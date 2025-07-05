@@ -3,22 +3,20 @@ pragma solidity ^0.8.28;
 
 import '../interfaces/IPriceOracle.sol';
 import '../interfaces/AggregatorV3Interface.sol';
-import '../core/AccessControlCenter.sol';
+import '../core/CoreKernel.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '../errors/Errors.sol';
 import '../interfaces/IEventRouter.sol';
 import '../interfaces/IEventPayload.sol';
-import '../interfaces/IRegistry.sol';
+import '../interfaces/ICoreKernel.sol';
 import '../interfaces/CoreDefs.sol';
 
 /// @title Chainlink Price Oracle
 /// @notice Provides price data using Chainlink price feeds
 contract ChainlinkPriceOracle is IPriceOracle {
     /// @notice Address of the access control contract
-    AccessControlCenter public immutable accessControl;
+    ICoreKernel public immutable core;
 
-    /// @notice Registry contract reference
-    IRegistry public registry;
 
     /// @notice Maximum age of price data in seconds
     uint256 public constant MAX_PRICE_AGE = 24 hours;
@@ -29,32 +27,17 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @notice Base token for each price feed
     mapping(address => address) public baseTokens;
 
-    /// @notice Initialize the oracle with access control
-    /// @param _accessControl Address of the access control contract
-    /// @param _registry Address of the registry contract
-    constructor(address _accessControl, address _registry) {
-        if (_accessControl == address(0)) revert InvalidAddress();
-        accessControl = AccessControlCenter(_accessControl);
-
-        if (_registry != address(0)) {
-            registry = IRegistry(_registry);
-        }
-    }
-
-    /// @notice Set registry address
-    /// @param _registry New registry address
-    function setRegistry(address _registry) external {
-        if (!accessControl.hasRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
-        if (_registry == address(0)) revert InvalidAddress();
-        registry = IRegistry(_registry);
+    /// @notice Initialize the oracle with core kernel address
+    /// @param _core Address of the CoreKernel contract
+    constructor(address _core, address _unused) {
+        if (_core == address(0)) revert InvalidAddress();
+        core = ICoreKernel(_core);
     }
 
     /// @dev Get event router
     /// @return router Event router address or address(0) if not available
     function _getEventRouter() internal view returns (address router) {
-        if (address(registry) != address(0)) {
-            router = registry.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
-        }
+        router = core.getCoreService(CoreDefs.SERVICE_EVENT_ROUTER);
         return router;
     }
 
@@ -63,7 +46,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param priceFeed Chainlink price feed address
     /// @param baseToken Base token address (e.g. USDC for USD feeds)
     function setPriceFeed(address token, address priceFeed, address baseToken) external {
-        if (!accessControl.hasRole(accessControl.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
+        if (!core.hasRole(core.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
         if (token == address(0) || priceFeed == address(0) || baseToken == address(0)) revert InvalidAddress();
 
         priceFeeds[token] = priceFeed;
@@ -119,7 +102,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param amount Исходная сумма
     /// @param convertedAmount Конвертированная сумма
     function emitConversionEvent(address fromToken, address toToken, uint256 amount, uint256 convertedAmount) external {
-        if (!accessControl.hasRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+        if (!core.hasRole(core.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         address eventRouter = _getEventRouter();
         if (eventRouter != address(0)) {
             IEventPayload.TokenEvent memory eventData = IEventPayload.TokenEvent({
