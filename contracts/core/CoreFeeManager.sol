@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import './CoreKernel.sol';
+import './AccessControlCenter.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -12,7 +12,7 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
 import '../interfaces/CoreDefs.sol';
 import '../interfaces/IEventRouter.sol';
-import '../interfaces/ICoreKernel.sol';
+import '../interfaces/IRegistry.sol';
 import '../utils/Native.sol';
 
 contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
@@ -28,7 +28,8 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @dev Maximum fee in basis points (10000 = 100%)
     uint256 public constant MAX_FEE_BPS = 1000; // 10%
 
-    ICoreKernel public core;
+    AccessControlCenter public access;
+    IRegistry public registry;
 
     /// @notice moduleId => token => fee % (in basis points: 100 = 1%)
     mapping(bytes32 => mapping(address => uint16)) public percentFee;
@@ -46,25 +47,29 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     event FeeWithdrawn(bytes32 indexed moduleId, address indexed token, address to, uint256 amount);
 
     modifier onlyFeatureOwner() {
-        if (!core.hasRole(core.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
+        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        if (!core.hasRole(core.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
         _;
     }
 
     /// @notice Initialize the fee manager
-    /// @param accessControl Address of the CoreKernel contract
-    /// @param registryAddress Unused legacy parameter
+    /// @param accessControl Address of AccessControlCenter
+    /// @param registryAddress Address of Registry
     function initialize(address accessControl, address registryAddress) public initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
 
         if (accessControl == address(0)) revert ZeroAddress();
-        core = ICoreKernel(accessControl);
+        access = AccessControlCenter(accessControl);
+
+        if (registryAddress != address(0)) {
+            registry = IRegistry(registryAddress);
+        }
     }
 
     /// @notice Calculate and collect fee
@@ -203,11 +208,18 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         return feeAmount > maxFee ? maxFee : feeAmount;
     }
 
-    /// @notice Replace the CoreKernel contract
-    /// @param newAccess Address of the new CoreKernel
+    /// @notice Replace the AccessControlCenter contract
+    /// @param newAccess Address of the new AccessControlCenter
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
-        core = ICoreKernel(newAccess);
+        access = AccessControlCenter(newAccess);
+    }
+
+    /// @notice Set the registry contract address
+    /// @param newRegistry Address of the new Registry
+    function setRegistry(address newRegistry) external onlyAdmin {
+        if (newRegistry == address(0)) revert InvalidAddress();
+        registry = IRegistry(newRegistry);
     }
 
     /// @notice Pause fee collection
@@ -224,7 +236,10 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param moduleId Module identifier
     /// @return router Event router address or address(0) if not available
     function _getEventRouter(bytes32 moduleId) internal view returns (address router) {
-        router = core.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
+        if (address(registry) != address(0)) {
+            router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
+        }
+        return router;
     }
 
     /// @dev Emit fee collection event

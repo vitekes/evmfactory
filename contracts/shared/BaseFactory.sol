@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../interfaces/ICoreKernel.sol';
+import '../interfaces/IRegistry.sol';
+import '../interfaces/IAccessControlCenter.sol';
 import '../errors/Errors.sol';
 import './CloneFactory.sol';
 import '../interfaces/CoreDefs.sol';
@@ -9,7 +10,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../interfaces/IGateway.sol';
 
 abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
-    ICoreKernel public immutable registry;
+    IRegistry public immutable registry;
     address public immutable paymentGateway;
     bytes32 public immutable MODULE_ID;
 
@@ -20,7 +21,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         if (_paymentGateway == address(0)) revert ZeroAddress();
         if (moduleId == bytes32(0)) revert InvalidAddress();
 
-        registry = ICoreKernel(_registry);
+        registry = IRegistry(_registry);
         paymentGateway = _paymentGateway;
         MODULE_ID = moduleId;
 
@@ -48,7 +49,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
     bytes32 private constant ACL_SERVICE = CoreDefs.SERVICE_ACCESS_CONTROL;
 
     modifier onlyFactoryAdmin() {
-        ICoreKernel acl = ICoreKernel(registry.getCoreService(ACL_SERVICE));
+        IAccessControlCenter acl = IAccessControlCenter(registry.getCoreService(ACL_SERVICE));
         if (!acl.hasRole(FACTORY_ADMIN, msg.sender)) revert NotFactoryAdmin();
         _;
     }

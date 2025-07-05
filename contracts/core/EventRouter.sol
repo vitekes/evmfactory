@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../interfaces/ICoreKernel.sol';
+import './AccessControlCenter.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
@@ -16,7 +16,7 @@ contract EventRouter is Initializable, UUPSUpgradeable, IEventRouter {
         _disableInitializers();
     }
 
-    ICoreKernel public access;
+    AccessControlCenter public access;
 
     /// @notice Структура для хранения маршрутизированного события
     struct RoutedEvent {
@@ -30,11 +30,11 @@ contract EventRouter is Initializable, UUPSUpgradeable, IEventRouter {
     event EventRouted(EventKind indexed kind, bytes payload);
 
     /// @notice Initialize the event router
-    /// @param accessControl Address of CoreKernel
+    /// @param accessControl Address of AccessControlCenter
     function initialize(address accessControl) public initializer {
         __UUPSUpgradeable_init();
         if (accessControl == address(0)) revert ZeroAddress();
-        access = ICoreKernel(accessControl);
+        access = AccessControlCenter(accessControl);
     }
 
     /// @notice Route an event from a module
