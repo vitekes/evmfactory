@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../interfaces/ICoreKernel.sol';
+import '../../interfaces/IRegistry.sol';
 import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
+import '../../interfaces/IAccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
 import '../../interfaces/IEventRouter.sol';
 import '../../interfaces/IEventPayload.sol';
@@ -22,7 +23,7 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     using ECDSA for bytes32;
 
     // Системные контракты
-    ICoreKernel public immutable registry;
+    IRegistry public immutable registry;
     bytes32 public immutable MODULE_ID;
     IGateway public immutable paymentGateway;
 
@@ -40,8 +41,8 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
         address _registry,
         address _paymentGateway,
         bytes32 moduleId
-    ) AccessManaged(ICoreKernel(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
-        registry = ICoreKernel(_registry);
+    ) AccessManaged(IRegistry(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
+        registry = IRegistry(_registry);
         MODULE_ID = moduleId;
         paymentGateway = IGateway(_paymentGateway);
 
