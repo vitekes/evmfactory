@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/Registry.sol';
+import '../../interfaces/ICoreKernel.sol';
 import '../../interfaces/IGateway.sol';
 import '../../interfaces/IPriceOracle.sol';
 import '../../interfaces/IEventRouter.sol';
-import '../../core/AccessControlCenter.sol';
 import '../../shared/AccessManaged.sol';
 import '../../interfaces/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
@@ -25,7 +24,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     using ECDSA for bytes32;
 
     /// @notice Core registry used for service discovery
-    Registry public immutable registry;
+    ICoreKernel public immutable registry;
     /// @notice Identifier of the module within the registry
     bytes32 public immutable MODULE_ID;
 
@@ -71,11 +70,11 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         address _registry,
         address paymentGateway,
         bytes32 moduleId
-    ) AccessManaged(Registry(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
+    ) AccessManaged(ICoreKernel(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
         // Проверка наличия платежного шлюза (проверяем только валидность адреса,
         // сам объект будет получен через registry при необходимости)
         if (paymentGateway == address(0)) revert InvalidAddress();
-        registry = Registry(_registry);
+        registry = ICoreKernel(_registry);
         MODULE_ID = moduleId;
 
         // Инициализируем DOMAIN_SEPARATOR как immutable переменную
@@ -256,7 +255,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
 
     /// @dev Restricts calls to automation addresses configured in ACL
     modifier onlyAutomation() {
-        AccessControlCenter acl = AccessControlCenter(registry.getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL));
+        ICoreKernel acl = ICoreKernel(registry.getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL));
         if (!acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender)) revert NotAutomation();
         _;
     }
@@ -326,7 +325,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
 
     /// @notice Sets the maximum batch charge limit
     /// @param newLimit New limit value (0 to disable)
-    function setBatchLimit(uint16 newLimit) external onlyRole(AccessControlCenter(_ACC).GOVERNOR_ROLE()) {
+    function setBatchLimit(uint16 newLimit) external onlyRole(ICoreKernel(_ACC).GOVERNOR_ROLE()) {
         batchLimit = newLimit;
     }
 

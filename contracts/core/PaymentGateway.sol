@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import './AccessControlCenter.sol';
-import '../interfaces/IRegistry.sol';
+import '../interfaces/ICoreKernel.sol';
 import '../interfaces/IMultiValidator.sol';
 import '../interfaces/IPriceOracle.sol';
 import '../interfaces/IGateway.sol';
@@ -39,8 +38,7 @@ contract PaymentGateway is
     /// @dev Maximum fee in basis points (10000 = 100%)
     uint256 public constant MAX_FEE_BPS = 1000; // 10%
 
-    AccessControlCenter public access;
-    IRegistry public registry;
+    ICoreKernel public access;
     CoreFeeManager public feeManager;
 
     // Per-module nonces to prevent signature reuse across modules
@@ -89,8 +87,7 @@ contract PaymentGateway is
         if (registry_ == address(0)) revert ZeroAddress();
         if (feeManager_ == address(0)) revert ZeroAddress();
 
-        access = AccessControlCenter(accessControl);
-        registry = IRegistry(registry_);
+        access = ICoreKernel(accessControl);
         feeManager = CoreFeeManager(feeManager_);
 
         _updateDomainSeparator();
@@ -159,7 +156,7 @@ contract PaymentGateway is
         }
 
         // Get price oracle
-        address oracle = registry.getModuleServiceByAlias(moduleId, 'PriceOracle');
+        address oracle = access.getModuleServiceByAlias(moduleId, 'PriceOracle');
         if (oracle == address(0)) revert PriceFeedNotFound();
 
         // Get price value in another currency from oracle
@@ -184,7 +181,7 @@ contract PaymentGateway is
         if (normalizedBase == normalizedPayment) return true;
 
         // Запрос к оракулу
-        address oracle = registry.getModuleServiceByAlias(moduleId, 'PriceOracle');
+        address oracle = access.getModuleServiceByAlias(moduleId, 'PriceOracle');
         return oracle != address(0) && IPriceOracle(oracle).isPairSupported(normalizedBase, normalizedPayment);
     }
 
@@ -217,7 +214,7 @@ contract PaymentGateway is
         // Check token validity (natively supported or validator allowed)
         if (!token.isNative()) {
             // Only validate non-native tokens through MultiValidator
-            address val = registry.getModuleServiceByAlias(moduleId, 'Validator');
+            address val = access.getModuleServiceByAlias(moduleId, 'Validator');
             if (val == address(0)) revert ValidatorNotFound();
             if (!IMultiValidator(val).isAllowed(token)) revert NotAllowedToken();
         }
@@ -375,7 +372,7 @@ contract PaymentGateway is
 
     function setRegistry(address newRegistry) external onlyAdmin {
         if (newRegistry == address(0)) revert InvalidAddress();
-        registry = IRegistry(newRegistry);
+        access.setCoreService(CoreDefs.SERVICE_REGISTRY, newRegistry);
     }
 
     function setFeeManager(address newManager) external onlyAdmin {
@@ -385,7 +382,7 @@ contract PaymentGateway is
 
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
-        access = AccessControlCenter(newAccess);
+        access = ICoreKernel(newAccess);
     }
 
     /// @notice Withdraws accumulated native currency fees to specified address
@@ -437,7 +434,7 @@ contract PaymentGateway is
         uint256 baseAmount,
         uint256 paymentAmount
     ) internal {
-        address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
+        address router = access.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
         if (router != address(0)) {
             IEventRouter(router).route(
                 IEventRouter.EventKind.PriceConverted,
@@ -463,7 +460,7 @@ contract PaymentGateway is
         uint256 fee,
         uint256 netAmount
     ) internal {
-        address router = registry.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
+        address router = access.getModuleService(moduleId, CoreDefs.SERVICE_EVENT_ROUTER);
         if (router != address(0)) {
             IEventRouter(router).route(
                 IEventRouter.EventKind.PaymentProcessed,
