@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../interfaces/IRegistry.sol';
-import '../../interfaces/IGateway.sol';
-import '../../interfaces/IPriceOracle.sol';
-import '../../interfaces/IAccessControlCenter.sol';
-import '../../shared/AccessManaged.sol';
+import '../../core/interfaces/ICoreSystem.sol';
+import '../../payments/interfaces/IGateway.sol';
+import '../../payments/interfaces/IPriceOracle.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '../../lib/SignatureLib.sol';
-import '../../interfaces/CoreDefs.sol';
+import '../../shared/CoreDefs.sol';
 import '../../errors/Errors.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
+import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 // Event payload helper
@@ -31,12 +33,43 @@ interface IEventPayload {
 
 /// @title Marketplace
 /// @notice Marketplace working only with off-chain listings via signatures
-contract Marketplace is AccessManaged, ReentrancyGuard {
+contract Marketplace is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
+    // Core system reference
+    ICoreSystem public immutable core;
+
+    /// @notice Убеждается, что вызывающий имеет роль администратора
+    modifier onlyAdmin() {
+        if (!core.hasRole(0x00, msg.sender))
+            revert NotAdmin();
+        _;
+    }
+
+    /// @notice Убеждается, что вызывающий имеет роль владельца фичи
+    modifier onlyFeatureOwner() {
+        bytes32 role = CoreDefs.FEATURE_OWNER_ROLE;
+        if (!core.hasRole(role, msg.sender))
+            revert NotFeatureOwner();
+        _;
+    }
+
+    /// @notice Убеждается, что вызывающий имеет роль оператора
+    modifier onlyOperator() {
+        bytes32 role = CoreDefs.OPERATOR_ROLE;
+        if (!core.hasRole(role, msg.sender))
+            revert NotOperator();
+        _;
+    }
+
+    /// @notice Проверяет наличие определенной роли
+    modifier onlyRole(bytes32 role) {
+        if (!core.hasRole(role, msg.sender)) revert Forbidden();
+        _;
+    }
+
     // Core contracts
-    IRegistry public immutable registry;
     bytes32 public immutable MODULE_ID;
     IGateway public immutable paymentGateway;
 
@@ -74,11 +107,14 @@ contract Marketplace is AccessManaged, ReentrancyGuard {
     );
 
     constructor(
-        address _registry,
+        address _core,
         address _paymentGateway,
         bytes32 moduleId
-    ) AccessManaged(IRegistry(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
-        registry = IRegistry(_registry);
+    ) {
+        if (_core == address(0)) revert ZeroAddress();
+        if (_paymentGateway == address(0)) revert ZeroAddress();
+
+        core = ICoreSystem(_core);
         MODULE_ID = moduleId;
         paymentGateway = IGateway(_paymentGateway);
 

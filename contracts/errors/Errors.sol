@@ -1,85 +1,111 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// Common errors
+// Общие ошибки
 error ZeroAddress();
 error InvalidAddress();
+error InvalidAmount();
+error InvalidParameter();
+error NotAuthorized();
+error FeeTooHigh();
+error FeeExceedsAmount();
+error InvalidImplementation();
+error InvalidSignature();
+
+// Ошибки управления доступом
 error NotAdmin();
 error NotFeatureOwner();
-error NotOwner();
-error NotAuthorized();
+error NotOperator();
+error NotRelayer();
 error NotFactoryAdmin();
 error NotGovernor();
 error NotSeller();
 error Unauthorized();
-error InvalidFee();
-error InvalidImplementation();
-error InvalidAmount();
-error InvalidState();
-error InvalidArgument();
+error NotOwner();
+error Forbidden();
+error NotAutomation();
+error NotModule();
 
-// Token-related errors
+// Ошибки реестра
+error InvalidServiceName();
+error ServiceAlreadyRegistered();
+error ServiceNotFound();
+error InvalidModule();
+error ModuleNotRegistered();
+
+// Ошибки токенов и платежей
+error NothingToWithdraw();
+error InsufficientBalance();
+error RefundDisabled();
 error NotAllowedToken();
-error UnsupportedPair();
+error ValidatorNotFound();
 error PriceFeedNotFound();
 error InvalidPrice();
-error ValidatorNotFound();
+error InvalidDecimals();
+error InvalidPriceFeed();
+error AmountZero();
+error UnsupportedPair();
+error PaymentGatewayNotRegistered();
+error PriceZero();
+error TokenDuplicated();
+error TokenAlreadyAllowed();
+error TokenNotAllowed();
+error PaymentTokenNotSupported();
+error PriceNotSet();
+error StalePrice();
 
-// Signature errors
-error InvalidSignature();
+// Ошибки валидации
+error InvalidFee();
+error InvalidState();
+error InvalidArgument();
+error InvalidParameters();
+error InvalidBounds();
+error InvalidKind();
+error InvalidTemplateId();
+error InvalidEventKind();
+
+// Ошибки подписи и транзакций
 error Expired();
 error InvalidChain();
+error PermitFailed();
+error LimitExceeded();
+error ExceedsRefundLimit();
+error BatchTooLarge();
+error LengthMismatch();
+error Overflow();
+error GasZero();
+
+// Ошибки рынка
 error AlreadyPurchased();
 error PriceExceedsMaximum();
+error NotListed();
+error NotCreator();
+error NotTemplateAdmin();
+error NotDue();
+error NoPlan();
+error InitFailed();
 
-// Contest errors
+// Ошибки конкурсов
+error EscrowExpired();
+error ContestNotActive();
+error DeadlineInPast();
+error DeadlineNotReached();
+error NoWinners();
+error PrizeNotSet();
+error InvalidPrizeDistribution();
+error DuplicateWinner();
 error InvalidPrizeData();
 error InvalidPrizeData_ZeroAmount();
 error InvalidPrizeData_InvalidPromoSettings();
 error InvalidPrizeData_UnsupportedType();
 error InvalidDistribution();
 error ContestFundingMissing();
+error ContestAlreadyFinalized();
+error WrongWinnersCount();
 
-// Payment errors
-error PaymentGatewayNotRegistered();
-error Forbidden();
-error LimitExceeded();
-error InvalidTemplateId();
-error InvalidBounds();
-error PriceZero();
-error NotAutomation();
-error NotModule();
-error NotListed();
-error NotCreator();
-error NotTemplateAdmin();
-error InvalidKind();
-error Overflow();
-error AmountZero();
-error BatchTooLarge();
-error FeeExceedsAmount();
-error FeeTooHigh();
-error GasZero();
-error InitFailed();
-error LengthMismatch();
-error ModuleNotRegistered();
-error NoPlan();
-error NotDue();
-error NothingToWithdraw();
-error PermitFailed();
-error RefundDisabled();
+// Прочие ошибки
 error SbtNonTransferable();
 error NotFound();
-error ExceedsRefundLimit();
-error InsufficientBalance();
 error CommitmentInvalid();
 error AlreadyCommitted();
 error GracePeriodNotExpired();
-error TokenDuplicated();
-error ContestAlreadyFinalized();
-error WrongWinnersCount();
-error InvalidParameters();
-error StalePrice();
-error PaymentTokenNotSupported();
-error PriceNotSet();
-error InvalidServiceName();
-error InvalidEventKind();

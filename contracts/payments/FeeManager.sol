@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import './AccessControlCenter.sol';
+import '../core/interfaces/ICoreSystem.sol';
+import './interfaces/IFeeManager.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -10,11 +11,10 @@ import '@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 import '../errors/Errors.sol';
-import '../interfaces/CoreDefs.sol';
-import '../interfaces/IRegistry.sol';
 import '../lib/Native.sol';
+import '../shared/CoreDefs.sol';
 
-contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+abstract contract FeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable, IFeeManager {
     using Address for address payable;
     using SafeERC20 for IERC20;
     using Native for address;
@@ -27,8 +27,8 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @dev Maximum fee in basis points (10000 = 100%)
     uint256 public constant MAX_FEE_BPS = 1000; // 10%
 
-    AccessControlCenter public access;
-    IRegistry public registry;
+    ICoreSystem public access;
+    ICoreSystem public registry;
 
     /// @notice moduleId => token => fee % (in basis points: 100 = 1%)
     mapping(bytes32 => mapping(address => uint16)) public percentFee;
@@ -46,12 +46,13 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     event FeeWithdrawn(bytes32 indexed moduleId, address indexed token, address to, uint256 amount);
 
     modifier onlyFeatureOwner() {
-        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
+        bytes32 role = keccak256('FEATURE_OWNER_ROLE');
+        if (!access.hasRole(role, msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+        if (!access.hasRole(0x00, msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -64,10 +65,10 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
         __UUPSUpgradeable_init();
 
         if (accessControl == address(0)) revert ZeroAddress();
-        access = AccessControlCenter(accessControl);
+        access = ICoreSystem(accessControl);
 
         if (registryAddress != address(0)) {
-            registry = IRegistry(registryAddress);
+            registry = ICoreSystem(registryAddress);
         }
     }
 
@@ -133,7 +134,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param moduleId Module identifier
     /// @param token Fee token
     /// @param feeBps Fee in basis points
-    function setPercentFee(bytes32 moduleId, address token, uint16 feeBps) external onlyFeatureOwner {
+    function setPercentFee(bytes32 moduleId, address token, uint16 feeBps) external override onlyFeatureOwner {
         if (feeBps > 10_000) revert FeeTooHigh();
         percentFee[moduleId][token] = feeBps;
     }
@@ -142,7 +143,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param moduleId Module identifier
     /// @param token Fee token
     /// @param feeAmount Fixed amount of fee tokens
-    function setFixedFee(bytes32 moduleId, address token, uint256 feeAmount) external onlyFeatureOwner {
+    function setFixedFee(bytes32 moduleId, address token, uint256 feeAmount) external override onlyFeatureOwner {
         fixedFee[moduleId][token] = feeAmount;
     }
 
@@ -159,7 +160,7 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param token Token address (0x0 or ETH_SENTINEL for native currency)
     /// @param amount Payment amount
     /// @return feeAmount Calculated fee amount
-    function calculateFee(bytes32 moduleId, address token, uint256 amount) external view returns (uint256) {
+    function calculateFee(bytes32 moduleId, address token, uint256 amount) external view override returns (uint256) {
         return _calculateFeeInternal(moduleId, token, amount, msg.sender);
     }
 
@@ -211,14 +212,14 @@ contract CoreFeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUp
     /// @param newAccess Address of the new AccessControlCenter
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
-        access = AccessControlCenter(newAccess);
+        access = ICoreSystem(newAccess);
     }
 
     /// @notice Set the registry contract address
     /// @param newRegistry Address of the new Registry
     function setRegistry(address newRegistry) external onlyAdmin {
         if (newRegistry == address(0)) revert InvalidAddress();
-        registry = IRegistry(newRegistry);
+        registry = ICoreSystem(newRegistry);
     }
 
     /// @notice Pause fee collection

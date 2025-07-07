@@ -1,99 +1,100 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../interfaces/IRegistry.sol';
-import '../interfaces/IAccessControlCenter.sol';
+import '../core/interfaces/ICoreSystem.sol';
+import '../payments/interfaces/IGateway.sol';
 import '../errors/Errors.sol';
-import './CloneFactory.sol';
-import '../interfaces/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '../interfaces/IGateway.sol';
+import './CloneFactory.sol';
+import '../shared/CoreDefs.sol';
 
+/// @title BaseFactory
+/// @notice Базовый контракт для фабрик, создающих экземпляры различных модулей
+/// @dev Предоставляет общую функциональность для всех фабрик
 abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
-    IRegistry public immutable registry;
+    /// @notice Ссылка на ядро системы
+    ICoreSystem public immutable core;
+
+    /// @notice Ссылка на шлюз платежей
     address public immutable paymentGateway;
+
+    /// @notice Идентификатор модуля в системе
     bytes32 public immutable MODULE_ID;
 
-    bytes32 public constant FACTORY_ADMIN = keccak256('FACTORY_ADMIN');
+    /// @notice Счетчик для дополнительной энтропии
+    uint256 private _instanceCounter;
 
-    constructor(address _registry, address _paymentGateway, bytes32 moduleId) {
-        if (_registry == address(0)) revert ZeroAddress();
-        if (_paymentGateway == address(0)) revert ZeroAddress();
+    /// @notice Инициализирует базовую фабрику
+    /// @param _core Адрес ядра системы
+    /// @param _paymentGateway Адрес платежного шлюза
+    /// @param moduleId Идентификатор модуля
+    constructor(address _core, address _paymentGateway, bytes32 moduleId) {
+        if (_core == address(0)) revert InvalidAddress();
+        if (_paymentGateway == address(0)) revert InvalidAddress();
         if (moduleId == bytes32(0)) revert InvalidAddress();
 
-        registry = IRegistry(_registry);
+        core = ICoreSystem(_core);
         paymentGateway = _paymentGateway;
         MODULE_ID = moduleId;
 
-        // Check if module is registered in registry
-        // If not, services will be linked later outside the constructor
-        try registry.getFeature(moduleId) returns (address, uint8) {
-            // If module is registered, register payment gateway
-            bool success = false;
-            try registry.setModuleServiceAlias(moduleId, 'PaymentGateway', _paymentGateway) {
-                success = true;
-            } catch Error(string memory /* reason */) {
-                // In real contract we could add logging via event
-                // emit RegistryError(reason);
+        // Проверка, зарегистрирован ли модуль
+        try core.getFeature(moduleId) returns (address, uint8) {
+            // Если модуль зарегистрирован, регистрируем платежный шлюз
+            try core.setModuleServiceAlias(moduleId, "PaymentGateway", _paymentGateway) {
+                // успешно
+            } catch {
+                // обработка ошибок может быть добавлена через события
             }
-        } catch Error(string memory /* reason */) {
-            // In real contract we could add logging via event
-            // emit FeatureNotFound(reason);
         } catch {
-            // Handle other exceptions
-            // emit UnknownRegistryError();
+            // модуль будет зарегистрирован позже
         }
     }
 
-    // Constant for ACL service identifier
-    bytes32 private constant ACL_SERVICE = CoreDefs.SERVICE_ACCESS_CONTROL;
-
+    /// @notice Убеждается, что вызывающий имеет права администратора фабрики
     modifier onlyFactoryAdmin() {
-        IAccessControlCenter acl = IAccessControlCenter(registry.getCoreService(ACL_SERVICE));
-        if (!acl.hasRole(FACTORY_ADMIN, msg.sender)) revert NotFactoryAdmin();
+        bytes32 FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
+        if (!core.hasRole(FEATURE_OWNER_ROLE, msg.sender) &&
+        !core.hasRole(0x00, msg.sender)) {
+            revert NotFeatureOwner();
+        }
         _;
     }
 
-    /// @dev Copies service from main module to instance if service exists
-    /// @param instanceId Instance ID
-    /// @param serviceName Service name
-    /// @return Address of copied service or address(0) if service doesn't exist
+    /// @dev Копирует сервис из основного модуля в экземпляр, если сервис существует
+    /// @param instanceId Идентификатор экземпляра
+    /// @param serviceName Имя сервиса
+    /// @return Адрес скопированного сервиса или address(0), если сервиса не существует
     function _copyServiceIfExists(bytes32 instanceId, string memory serviceName) internal returns (address) {
-        // Check input parameters validity
+        // Проверка параметров
         if (instanceId == bytes32(0)) revert InvalidAddress();
         if (bytes(serviceName).length == 0) revert InvalidServiceName();
 
-        // Get service and immediately check for 0
-        address service = registry.getModuleServiceByAlias(MODULE_ID, serviceName);
+        // Получаем сервис и сразу проверяем на 0
+        address service = core.getModuleServiceByAlias(MODULE_ID, serviceName);
         if (service != address(0)) {
-            // Call registry only when actually needed
-            registry.setModuleServiceAlias(instanceId, serviceName, service);
+            // Вызываем core только когда это действительно необходимо
+            core.setModuleServiceAlias(instanceId, serviceName, service);
         }
         return service;
     }
 
-    // Counter for additional entropy
-    uint256 private _instanceCounter;
-
-    /// @dev Creates a unique identifier for a new module instance
-    /// @param prefix Prefix for identifier (e.g., module name)
-    /// @return Unique identifier for the module instance
-
+    /// @notice Генерирует уникальный идентификатор для экземпляра
+    /// @param prefix Префикс для идентификатора
+    /// @return Уникальный идентификатор
     function _generateInstanceId(string memory prefix) internal returns (bytes32) {
-        // Increment counter for additional entropy
+        // Увеличиваем счетчик для дополнительной энтропии
         _instanceCounter++;
 
-        // Optimized version with enhanced entropy
-        return
-            keccak256(
-                abi.encodePacked(
-                    bytes32(bytes(prefix)), // Fixed size 32 bytes saves gas
-                    uint160(address(this)), // Directly use uint160
-                    block.timestamp,
-                    block.prevrandao,
-                    _instanceCounter, // Add incrementing counter
-                    blockhash(block.number - 1) // Use previous block hash for additional entropy
-                )
-            );
+        // Оптимизированная версия с улучшенной энтропией
+        return keccak256(
+            abi.encodePacked(
+                bytes32(bytes(prefix)), // Фиксированный размер 32 байта экономит газ
+                uint160(address(this)), // Напрямую используем uint160
+                block.timestamp,
+                block.prevrandao,
+                _instanceCounter, // Добавляем инкрементирующийся счетчик
+                blockhash(block.number - 1) // Используем хэш предыдущего блока для дополнительной энтропии
+            )
+        );
     }
 }

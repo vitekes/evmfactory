@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/Registry.sol';
-import '../../interfaces/IGateway.sol';
-import '../../interfaces/IPriceOracle.sol';
-import '../../core/AccessControlCenter.sol';
-import '../../shared/AccessManaged.sol';
-import '../../interfaces/IPermit2.sol';
+import '../../core/interfaces/ICoreSystem.sol';
+import '../../payments/interfaces/IGateway.sol';
+import '../../payments/interfaces/IPriceOracle.sol';
+import '../../external/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
-import '../../interfaces/CoreDefs.sol';
+import '../../shared/CoreDefs.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -19,13 +17,67 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
 /// @dev Uses PaymentGateway (IGateway) for payment processing and token conversion
-contract SubscriptionManager is AccessManaged, ReentrancyGuard {
+contract SubscriptionManager is ReentrancyGuard {
+    // Core system reference
+    ICoreSystem public immutable core;
+
+    /// @notice Убеждается, что вызывающий имеет роль администратора
+    modifier onlyAdmin() {
+        if (!core.hasRole(0x00, msg.sender))
+            revert NotAdmin();
+        _;
+    }
+
+    /// @notice Убеждается, что вызывающий имеет роль владельца фичи
+    modifier onlyFeatureOwner() {
+        bytes32 role = CoreDefs.FEATURE_OWNER_ROLE;
+        if (!core.hasRole(role, msg.sender))
+            revert NotFeatureOwner();
+        _;
+    }
+
+    /// @notice Убеждается, что вызывающий имеет роль оператора
+    modifier onlyOperator() {
+        bytes32 role = CoreDefs.OPERATOR_ROLE;
+        if (!core.hasRole(role, msg.sender))
+            revert NotOperator();
+        _;
+    }
+
+    /// @notice Проверяет наличие определенной роли
+    modifier onlyRole(bytes32 role) {
+        if (!core.hasRole(role, msg.sender)) revert Forbidden();
+        _;
+    }
+
+    /// @notice Проверяет, является ли аккаунт оператором
+    /// @param account Проверяемый адрес
+    /// @return Является ли аккаунт оператором
+    function isOperator(address account) external view returns (bool) {
+        return core.isOperator(account);
+    }
+
+    /// @notice Получает список операторов
+    /// @return Массив адресов операторов
+    function getOperators() external view returns (address[] memory) {
+        return core.getOperators();
+    }
+
+    /// @notice Назначает роль оператора указанному адресу
+    /// @param account Адрес, которому будет назначена роль
+    function grantOperatorRole(address account) external onlyAdmin {
+        core.grantOperatorRole(account);
+    }
+
+    /// @notice Отзывает роль оператора у указанного адреса
+    /// @param account Адрес, у которого будет отозвана роль
+    function revokeOperatorRole(address account) external onlyAdmin {
+        core.revokeOperatorRole(account);
+    }
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
-    /// @notice Core registry used for service discovery
-    Registry public immutable registry;
-    /// @notice Identifier of the module within the registry
+    /// @notice Identifier of the module within the core system
     bytes32 public immutable MODULE_ID;
 
     /// @notice Subscription data for a user
@@ -86,17 +138,19 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
     event SubscriptionCancelled(uint256 subscriptionId, bytes32 moduleId);
 
     /// @notice Initializes the subscription manager and registers services
-    /// @param _registry Address of the core Registry contract
+    /// @param _core Address of the CoreSystem contract
     /// @param paymentGateway Address of the payment gateway implementing IGateway
     /// @param moduleId Unique module identifier
     constructor(
-        address _registry,
+        address _core,
         address paymentGateway,
         bytes32 moduleId
-    ) AccessManaged(Registry(_registry).getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL)) {
-        // Check gateway address validity (actual instance fetched from registry)
+    ) {
+        // Check inputs validity
+        if (_core == address(0)) revert ZeroAddress();
         if (paymentGateway == address(0)) revert InvalidAddress();
-        registry = Registry(_registry);
+
+        core = ICoreSystem(_core);
         MODULE_ID = moduleId;
 
         // Initialize DOMAIN_SEPARATOR as immutable value
@@ -155,7 +209,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         }
 
         // Ensure gateway is registered before heavy logic
-        address gatewayAddress = registry.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
+        address gatewayAddress = core.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
         IGateway gateway = IGateway(gatewayAddress);
 
@@ -207,7 +261,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         if (!chainAllowed) revert InvalidChain();
 
         // Ensure payment gateway is registered
-        if (registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0))
+        if (core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0))
             revert PaymentGatewayNotRegistered();
 
         // Compute plan hash before signature check
@@ -227,11 +281,11 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
                 permitSig,
                 (uint256, uint8, bytes32, bytes32)
             );
-            address paymentGateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+            address paymentGateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
             try IERC20Permit(paymentToken).permit(msg.sender, paymentGateway, paymentAmount, deadline, v, r, s) {
                 // ok
             } catch {
-                address permit2 = registry.getModuleServiceByAlias(MODULE_ID, 'Permit2');
+                address permit2 = core.getModuleServiceByAlias(MODULE_ID, 'Permit2');
                 bytes memory data = abi.encodeWithSelector(
                     IPermit2.permitTransferFrom.selector,
                     IPermit2.PermitTransferFrom({
@@ -249,7 +303,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         }
 
         // Get gateway address for payment
-        address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
@@ -271,8 +325,8 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
 
     /// @dev Restricts calls to automation addresses configured in ACL
     modifier onlyAutomation() {
-        AccessControlCenter acl = AccessControlCenter(registry.getCoreService(CoreDefs.SERVICE_ACCESS_CONTROL));
-        if (!acl.hasRole(acl.AUTOMATION_ROLE(), msg.sender)) revert NotAutomation();
+        bytes32 role = keccak256('AUTOMATION_ROLE');
+        if (!core.hasRole(role, msg.sender)) revert NotAutomation();
         _;
     }
 
@@ -297,7 +351,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
 
         // Get gateway address for payment
-        address gateway = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
@@ -328,7 +382,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
 
     /// @notice Sets the maximum batch charge limit
     /// @param newLimit New limit value (0 to disable)
-    function setBatchLimit(uint16 newLimit) external onlyRole(AccessControlCenter(_ACC).GOVERNOR_ROLE()) {
+    function setBatchLimit(uint16 newLimit) external onlyRole(keccak256('GOVERNOR_ROLE')) {
         batchLimit = newLimit;
     }
 
@@ -362,7 +416,7 @@ contract SubscriptionManager is AccessManaged, ReentrancyGuard {
         }
 
         // Convert using PaymentGateway
-        address gatewayAddress = registry.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gatewayAddress = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
 
         IGateway paymentGateway = IGateway(gatewayAddress);

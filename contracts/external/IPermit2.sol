@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-
 interface IPermit2 {
     struct TokenPermissions {
         address token;

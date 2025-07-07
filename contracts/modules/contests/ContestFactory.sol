@@ -7,7 +7,7 @@ import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '../../interfaces/CoreDefs.sol';
+import '../../shared/CoreDefs.sol';
 
 /// @title ContestFactory
 /// @notice Factory for creating contests and managing their initial funding
@@ -82,7 +82,7 @@ contract ContestFactory is BaseFactory {
         ContestEscrow esc = new ContestEscrow(
             msg.sender,
             _prizes,
-            address(registry),
+                address(core),
             gasPoolAmount,
             paymentGateway,
             deadline

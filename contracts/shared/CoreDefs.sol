@@ -16,7 +16,7 @@ library CoreDefs {
     // ------------------------------------------------------------------
     bytes32 internal constant SERVICE_ACCESS_CONTROL = keccak256('AccessControlCenter');
     bytes32 internal constant SERVICE_REGISTRY = keccak256('Registry');
-    bytes32 internal constant SERVICE_FEE_MANAGER = keccak256('CoreFeeManager');
+    bytes32 internal constant SERVICE_FEE_MANAGER = keccak256('FeeManager');
     bytes32 internal constant SERVICE_PAYMENT_GATEWAY = keccak256('PaymentGateway');
 
     // ------------------------------------------------------------------
@@ -26,6 +26,16 @@ library CoreDefs {
     bytes32 internal constant SERVICE_PRICE_ORACLE = keccak256('PriceOracle');
     bytes32 internal constant SERVICE_PERMIT2 = keccak256('Permit2');
     bytes32 internal constant SERVICE_NFT_MANAGER = keccak256('NFTManager');
+
+    // ------------------------------------------------------------------
+    // Access control roles
+    // ------------------------------------------------------------------
+    bytes32 internal constant FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
+    bytes32 internal constant OPERATOR_ROLE = keccak256('OPERATOR_ROLE');
+    bytes32 internal constant RELAYER_ROLE = keccak256('RELAYER_ROLE');
+    bytes32 internal constant MODULE_ROLE = keccak256('MODULE_ROLE');
+    bytes32 internal constant AUTOMATION_ROLE = keccak256('AUTOMATION_ROLE');
+    bytes32 internal constant GOVERNOR_ROLE = keccak256('GOVERNOR_ROLE');
 
     // ------------------------------------------------------------------
     // Common time constants

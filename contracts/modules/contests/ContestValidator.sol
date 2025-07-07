@@ -1,29 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/AccessControlCenter.sol';
+import '../../core/interfaces/ICoreSystem.sol';
 import '../../errors/Errors.sol';
-import '../../interfaces/ITokenValidator.sol';
+import '../../payments/interfaces/ITokenValidator.sol';
 import './interfaces/IContestValidator.sol';
 import './shared/PrizeInfo.sol';
+import '../../shared/CoreDefs.sol';
 
 /// @title ContestValidator
 /// @notice Basic validator for Contest prizes
 contract ContestValidator is IContestValidator {
-    AccessControlCenter public immutable access;
+    ICoreSystem public immutable core;
     ITokenValidator public tokenValidator;
 
-    constructor(address _access, address _tokenValidator) {
+    constructor(address _core, address _tokenValidator) {
         // Check for zero addresses during initialization
-        if (_access == address(0) || _tokenValidator == address(0)) revert ZeroAddress();
+        if (_core == address(0) || _tokenValidator == address(0)) revert ZeroAddress();
 
         // Initialize immutable variable
-        access = AccessControlCenter(_access);
+        core = ICoreSystem(_core);
         tokenValidator = ITokenValidator(_tokenValidator);
     }
 
     modifier onlyGovernor() {
-        if (!access.hasRole(access.GOVERNOR_ROLE(), msg.sender)) revert NotGovernor();
+        if (!core.hasRole(CoreDefs.GOVERNOR_ROLE, msg.sender)) revert NotGovernor();
         _;
     }
 
@@ -68,7 +69,7 @@ contract ContestValidator is IContestValidator {
     }
 
     function isTokenAllowed(address token) public view override returns (bool) {
-        return tokenValidator.isAllowed(token);
+        return tokenValidator.isTokenAllowed(token);
     }
 
     /// @notice Checks validity of prize distribution scheme

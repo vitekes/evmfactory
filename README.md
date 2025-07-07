@@ -63,11 +63,75 @@ This script deploys all demo contracts, registers modules and performs a marketp
    ```
 
 ## Deployment order
+# Blockchain Payment and Governance System
 
+Система для управления платежами и доступом в блокчейн-проектах с интеграцией различных модулей.
+
+### Упрощенный процесс деплоя системы
+
+В проекте используется улучшенная архитектура с объединенным контрактом `CoreSystem`, который решает проблему циклической зависимости между компонентами. Вы можете использовать скрипт `deploy-core.ts` для автоматизированного деплоя:
+
+```bash
+npx hardhat run scripts/deploy/deploy-core.ts --network localhost
+```
+
+Или использовать полный демонстрационный скрипт, который разворачивает все компоненты системы:
+
+```bash
+npx hardhat run scripts/demos/deploy-showcase-full.ts --network localhost
+```
+
+## Архитектура ядра
+
+Ядро системы состоит из следующих компонентов:
+
+- **CoreSystem** - объединенная система управления доступом и регистрации компонентов
+- **FeeManager** - менеджер комиссий для транзакций
+- **PaymentGateway** - шлюз для обработки платежей
+- **TokenValidator** - валидатор токенов для платежей
+
+## Начало работы
+
+### Установка зависимостей
+
+```bash
+npm install
+```
+
+### Компиляция контрактов
+
+```bash
+npx hardhat compile
+```
+
+### Запуск тестов
+
+```bash
+npx hardhat test
+```
+
+### Деплой ядра системы
+
+```bash
+npx hardhat run --network localhost scripts/deploy/deploy-core.ts
+```
+
+## Демо-скрипты
+
+Проект содержит демонстрационные скрипты в каталоге `scripts/demo`:
+
+```bash
+# Отчет по расходу газа
+npx hardhat run --network localhost scripts/demo/gas-report-demo.ts
+```
+
+## Документация
+
+Полная документация доступна в каталоге `docs/`.
 The Ignition modules deploy contracts in the following sequence:
 
-1. **CoreModule** – deploys `AccessControlCenter`, `Registry`, `CoreFeeManager`,
-   `PaymentGateway`, `MultiValidator`, `MarketplaceFactory` and a `ChainlinkPriceOracle` (or `MockPriceFeed` for testing).
+1. **CoreModule** – deploys `CoreSystem`, `FeeManager`,
+   `PaymentGateway`, `TokenValidator`, `MarketplaceFactory` and a `ChainlinkPriceOracle` (or `MockPriceFeed` for testing).
    The marketplace module is registered along with validator and gateway services.
 2. **LocalDeploy** – in addition to the core contracts it deploys a test ERC-20
    token and the contest module (`ContestFactory` with its validator) for local
@@ -108,10 +172,10 @@ For detailed information, see:
 
 ## Deployment notes
 
-After deploying the core `PaymentGateway` contract, make sure to register it in the `Registry` for each module:
+After deploying the core `PaymentGateway` contract, make sure to register it in the `CoreSystem` for each module:
 
 ```solidity
-registry.setModuleServiceAlias(MODULE_ID, "PaymentGateway", gatewayAddress);
+coreSystem.setModuleServiceAlias(MODULE_ID, "PaymentGateway", gatewayAddress)
 ```
 
 Without this step modules won't be able to discover the gateway service.
@@ -120,18 +184,18 @@ Without this step modules won't be able to discover the gateway service.
 
 1. Создайте смарт‑контракты модуля и необходимые сервисы.
 2. Задеплойте их в сеть и получите `moduleId`.
-3. Зарегистрируйте модуль в `Registry`:
+3. Зарегистрируйте модуль в `CoreSystem`:
    ```solidity
-   registry.registerFeature(moduleId, moduleAddress, 1);
+   coreSystem.registerFeature(moduleId, moduleAddress, 1);
    ```
 4. Установите алиасы сервисов, например `PaymentGateway`:
    ```solidity
-   registry.setModuleServiceAlias(moduleId, "PaymentGateway", gatewayAddress);
+   coreSystem.setModuleServiceAlias(moduleId, "PaymentGateway", gatewayAddress);
    ```
 
 ```mermaid
 graph TD
-    A(Deploy contracts) --> B{Register in Registry}
+    A(Deploy contracts) --> B{Register in CoreSystem}
     B --> C[Set service aliases]
     C --> D[Module ready]
 ```

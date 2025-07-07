@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import './AccessControlCenter.sol';
-import '../interfaces/IRegistry.sol';
-import '../interfaces/ITokenValidator.sol';
-import '../interfaces/IPriceOracle.sol';
-import '../interfaces/IGateway.sol';
-import './CoreFeeManager.sol';
+import '../core/interfaces/ICoreSystem.sol';
+import './interfaces/ITokenValidator.sol';
+import './interfaces/IPriceOracle.sol';
+import './interfaces/IGateway.sol';
+import './interfaces/IFeeManager.sol';
+import './FeeManager.sol';
 import '../errors/Errors.sol';
+import '../lib/Native.sol';
 import '../lib/SignatureLib.sol';
-import '../interfaces/CoreDefs.sol';
+import '../shared/CoreDefs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/Pausable.sol';
-import '../lib/Native.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
-contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
+abstract contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
     using Address for address payable;
     using SafeERC20 for IERC20;
     using Native for address;
@@ -26,9 +27,9 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
     /// @dev Maximum fee in basis points (10000 = 100%)
     uint256 public constant MAX_FEE_BPS = 1000; // 10%
 
-    AccessControlCenter public access;
-    IRegistry public registry;
-    CoreFeeManager public feeManager;
+    ICoreSystem public access;
+    ICoreSystem public registry;
+    FeeManager public feeManager;
 
     // Per-module nonces to prevent signature reuse across modules
     mapping(address => mapping(bytes32 => uint256)) public nonces;
@@ -58,12 +59,20 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
     event DomainSeparatorUpdated(bytes32 oldDomainSeparator, bytes32 newDomainSeparator, uint256 chainId);
 
     modifier onlyFeatureOwner() {
-        if (!access.hasRole(access.FEATURE_OWNER_ROLE(), msg.sender)) revert NotFeatureOwner();
+        bytes32 role = keccak256('FEATURE_OWNER_ROLE');
+        if (!access.hasRole(role, msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     modifier onlyAdmin() {
-        if (!access.hasRole(access.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+        bytes32 admin_role = 0x00; // DEFAULT_ADMIN_ROLE константа
+        if (!access.hasRole(admin_role, msg.sender)) revert NotAdmin();
+        _;
+    }
+
+    modifier onlyOperator() {
+        bytes32 role = keccak256('OPERATOR_ROLE');
+        if (!access.hasRole(role, msg.sender)) revert NotOperator();
         _;
     }
 
@@ -72,9 +81,9 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         if (registry_ == address(0)) revert ZeroAddress();
         if (feeManager_ == address(0)) revert ZeroAddress();
 
-        access = AccessControlCenter(accessControl);
-        registry = IRegistry(registry_);
-        feeManager = CoreFeeManager(feeManager_);
+        access = ICoreSystem(accessControl);
+        registry = ICoreSystem(registry_);
+        feeManager = FeeManager(feeManager_);
 
         _updateDomainSeparator();
     }
@@ -201,15 +210,15 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
             // Only validate non-native tokens through TokenValidator.sol
             address val = registry.getModuleServiceByAlias(moduleId, 'Validator');
             if (val == address(0)) revert ValidatorNotFound();
-            if (!ITokenValidator(val).isAllowed(token)) revert NotAllowedToken();
+            if (!ITokenValidator(val).isTokenAllowed(token)) revert NotAllowedToken();
         }
 
         // Verify signature only if not a direct payment and not a trusted service
         // (most expensive operation is performed last and only when necessary)
         if (
             !isDirectPayment &&
-            !access.hasRole(access.AUTOMATION_ROLE(), msg.sender) &&
-            !access.hasRole(access.RELAYER_ROLE(), msg.sender)
+            !access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) &&
+            !access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)
         ) {
             _verifyPaymentSignature(moduleId, token, payer, amount, signature);
         }
@@ -259,7 +268,7 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         if (payer == msg.sender) return;
 
         // Check if sender has required roles
-        if (access.hasRole(access.AUTOMATION_ROLE(), msg.sender) || access.hasRole(access.RELAYER_ROLE(), msg.sender)) {
+        if (access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) || access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)) {
             return;
         }
 
@@ -356,17 +365,17 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
 
     function setRegistry(address newRegistry) external onlyAdmin {
         if (newRegistry == address(0)) revert InvalidAddress();
-        registry = IRegistry(newRegistry);
+        registry = ICoreSystem(newRegistry);
     }
 
     function setFeeManager(address newManager) external onlyAdmin {
         if (newManager == address(0)) revert InvalidAddress();
-        feeManager = CoreFeeManager(newManager);
+        feeManager = FeeManager(newManager);
     }
 
     function setAccessControl(address newAccess) external onlyAdmin {
         if (newAccess == address(0)) revert InvalidAddress();
-        access = AccessControlCenter(newAccess);
+        access = ICoreSystem(newAccess);
     }
 
     /// @notice Withdraws accumulated native currency fees to specified address
@@ -395,13 +404,27 @@ contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         _unpause();
     }
 
+    /// @notice Allows operator to set module fee
+    /// @param moduleId Module identifier
+    /// @param feeBps Fee in basis points
+    /// @param fixedAmount Fixed fee amount
+    function setModuleFee(bytes32 moduleId, uint16 feeBps, uint256 fixedAmount) external onlyOperator {
+        if (moduleId == bytes32(0)) revert InvalidModule();
+        if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
+
+        // Устанавливаем комиссию для всех типов токенов
+        // Используем ETH_SENTINEL для нативной валюты
+        feeManager.setPercentFee(moduleId, Native.ETH_SENTINEL, feeBps);
+        feeManager.setFixedFee(moduleId, Native.ETH_SENTINEL, fixedAmount);
+    }
+
     /// @dev Get fee amount for payment
     /// @param moduleId Module identifier
     /// @param token Token address (ETH_SENTINEL for native)
     /// @param amount Gross payment amount
     /// @return feeAmount Total fee amount
     function _calculateFee(bytes32 moduleId, address token, uint256 amount) internal view returns (uint256 feeAmount) {
-        // Delegate fee calculation to CoreFeeManager for unified logic
+        // Delegate fee calculation to FeeManager for unified logic
         return feeManager.calculateFee(moduleId, token, amount);
     }
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import '../../shared/BaseFactory.sol';
 import './Marketplace.sol';
-import '../../interfaces/CoreDefs.sol';
+import '../../shared/CoreDefs.sol';
 
 contract MarketplaceFactory is BaseFactory {
     event MarketplaceCreated(address indexed creator, address marketplace);
@@ -23,18 +23,18 @@ contract MarketplaceFactory is BaseFactory {
         bytes32 instanceId = _generateInstanceId('Marketplace');
 
         // Регистрируем новый экземпляр
-        registry.registerFeature(instanceId, address(this), 1);
+        core.registerFeature(instanceId, address(this), 1);
 
         // Настраиваем сервисы для экземпляра
         _copyServiceIfExists(instanceId, 'Validator');
         _copyServiceIfExists(instanceId, 'PriceOracle');
-        registry.setModuleServiceAlias(instanceId, 'PaymentGateway', paymentGateway);
+        core.setModuleServiceAlias(instanceId, 'PaymentGateway', paymentGateway);
 
         // Создаем маркетплейс
-        m = address(new Marketplace(address(registry), paymentGateway, instanceId));
+        m = address(new Marketplace(address(core), paymentGateway, instanceId));
 
         // Обновляем адрес экземпляра в реестре
-        registry.upgradeFeature(instanceId, m);
+        core.upgradeFeature(instanceId, m);
 
         emit MarketplaceCreated(msg.sender, m);
     }
