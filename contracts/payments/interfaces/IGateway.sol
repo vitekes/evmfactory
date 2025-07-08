@@ -31,7 +31,7 @@ interface IGateway {
         address paymentToken,
         uint256 baseAmount
     ) external view returns (uint256 paymentAmount);
-// SPDX-License-Identifier: MIT
+    // SPDX-License-Identifier: MIT
 
     /// @notice Checks if a token pair is supported by the oracle
     /// @param moduleId Module identifier
@@ -62,20 +62,12 @@ interface IGateway {
     /// @param token Token being used for payment
     /// @param amount Gross amount
     /// @return netAmount Net amount after fees
-    function getNetAmount(
-        bytes32 moduleId,
-        address token,
-        uint256 amount
-    ) external view returns (uint256 netAmount);
+    function getNetAmount(bytes32 moduleId, address token, uint256 amount) external view returns (uint256 netAmount);
 
     /// @notice Get the fee amount for a given payment
     /// @param moduleId Module identifier
     /// @param token Token being used for payment
     /// @param amount Gross amount
     /// @return feeAmount Fee amount
-    function getFeeAmount(
-        bytes32 moduleId,
-        address token,
-        uint256 amount
-    ) external view returns (uint256 feeAmount);
+    function getFeeAmount(bytes32 moduleId, address token, uint256 amount) external view returns (uint256 feeAmount);
 }

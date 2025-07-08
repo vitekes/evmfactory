@@ -14,7 +14,13 @@ import '../errors/Errors.sol';
 import '../lib/Native.sol';
 import '../shared/CoreDefs.sol';
 
-abstract contract FeeManager is Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable, IFeeManager {
+abstract contract FeeManager is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable,
+    IFeeManager
+{
     using Address for address payable;
     using SafeERC20 for IERC20;
     using Native for address;

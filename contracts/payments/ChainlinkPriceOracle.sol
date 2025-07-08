@@ -34,14 +34,12 @@ contract ChainlinkPriceOracle is IPriceOracle {
     }
 
     modifier onlyOperator() {
-        if (!core.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender)) 
-            revert NotOperator();
+        if (!core.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender)) revert NotOperator();
         _;
     }
 
     modifier onlyAdmin() {
-        if (!core.hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) 
-            revert NotAdmin();
+        if (!core.hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotAdmin();
         _;
     }
 
@@ -79,11 +77,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param quoteToken Quote token address
     /// @param amount Amount to convert
     /// @return The amount in quote token
-    function convertAmount(
-        address baseToken,
-        address quoteToken,
-        uint256 amount
-    ) external view returns (uint256) {
+    function convertAmount(address baseToken, address quoteToken, uint256 amount) external view returns (uint256) {
         if (amount == 0) return 0;
         if (baseToken == quoteToken) return amount;
 
@@ -109,8 +103,8 @@ contract ChainlinkPriceOracle is IPriceOracle {
         }
 
         // Calculate conversion: (amount * basePrice / quotePrice) adjusted for decimals
-        uint256 valueInUSD = (amount * uint256(basePrice)) / 10**uint256(FEED_DECIMALS);
-        uint256 convertedAmount = (valueInUSD * 10**uint256(FEED_DECIMALS)) / uint256(quotePrice);
+        uint256 valueInUSD = (amount * uint256(basePrice)) / 10 ** uint256(FEED_DECIMALS);
+        uint256 convertedAmount = (valueInUSD * 10 ** uint256(FEED_DECIMALS)) / uint256(quotePrice);
 
         // Adjust for token decimals
         return _adjustDecimals(convertedAmount, baseToken, quoteToken);
@@ -142,11 +136,7 @@ contract ChainlinkPriceOracle is IPriceOracle {
     /// @param fromToken From token address
     /// @param toToken To token address
     /// @return Adjusted amount
-    function _adjustDecimals(
-        uint256 amount,
-        address fromToken,
-        address toToken
-    ) internal pure returns (uint256) {
+    function _adjustDecimals(uint256 amount, address fromToken, address toToken) internal pure returns (uint256) {
         uint8 fromDecimals = _getDecimals(fromToken);
         uint8 toDecimals = _getDecimals(toToken);
 
@@ -154,10 +144,10 @@ contract ChainlinkPriceOracle is IPriceOracle {
 
         if (fromDecimals > toDecimals) {
             // Scale down
-            return amount / (10**(fromDecimals - toDecimals));
+            return amount / (10 ** (fromDecimals - toDecimals));
         } else {
             // Scale up
-            return amount * (10**(toDecimals - fromDecimals));
+            return amount * (10 ** (toDecimals - fromDecimals));
         }
     }
 

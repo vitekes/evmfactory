@@ -42,24 +42,21 @@ contract Marketplace is ReentrancyGuard {
 
     /// @notice Убеждается, что вызывающий имеет роль администратора
     modifier onlyAdmin() {
-        if (!core.hasRole(0x00, msg.sender))
-            revert NotAdmin();
+        if (!core.hasRole(0x00, msg.sender)) revert NotAdmin();
         _;
     }
 
     /// @notice Убеждается, что вызывающий имеет роль владельца фичи
     modifier onlyFeatureOwner() {
         bytes32 role = CoreDefs.FEATURE_OWNER_ROLE;
-        if (!core.hasRole(role, msg.sender))
-            revert NotFeatureOwner();
+        if (!core.hasRole(role, msg.sender)) revert NotFeatureOwner();
         _;
     }
 
     /// @notice Убеждается, что вызывающий имеет роль оператора
     modifier onlyOperator() {
         bytes32 role = CoreDefs.OPERATOR_ROLE;
-        if (!core.hasRole(role, msg.sender))
-            revert NotOperator();
+        if (!core.hasRole(role, msg.sender)) revert NotOperator();
         _;
     }
 
@@ -106,11 +103,7 @@ contract Marketplace is ReentrancyGuard {
         bytes32 moduleId
     );
 
-    constructor(
-        address _core,
-        address _paymentGateway,
-        bytes32 moduleId
-    ) {
+    constructor(address _core, address _paymentGateway, bytes32 moduleId) {
         if (_core == address(0)) revert ZeroAddress();
         if (_paymentGateway == address(0)) revert ZeroAddress();
 

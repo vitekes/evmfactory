@@ -40,7 +40,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         // Проверка, зарегистрирован ли модуль
         try core.getFeature(moduleId) returns (address, uint8) {
             // Если модуль зарегистрирован, регистрируем платежный шлюз
-            try core.setModuleServiceAlias(moduleId, "PaymentGateway", _paymentGateway) {
+            try core.setModuleServiceAlias(moduleId, 'PaymentGateway', _paymentGateway) {
                 // успешно
             } catch {
                 // обработка ошибок может быть добавлена через события
@@ -53,8 +53,7 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
     /// @notice Убеждается, что вызывающий имеет права администратора фабрики
     modifier onlyFactoryAdmin() {
         bytes32 FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
-        if (!core.hasRole(FEATURE_OWNER_ROLE, msg.sender) &&
-        !core.hasRole(0x00, msg.sender)) {
+        if (!core.hasRole(FEATURE_OWNER_ROLE, msg.sender) && !core.hasRole(0x00, msg.sender)) {
             revert NotFeatureOwner();
         }
         _;
@@ -86,15 +85,16 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         _instanceCounter++;
 
         // Оптимизированная версия с улучшенной энтропией
-        return keccak256(
-            abi.encodePacked(
-                bytes32(bytes(prefix)), // Фиксированный размер 32 байта экономит газ
-                uint160(address(this)), // Напрямую используем uint160
-                block.timestamp,
-                block.prevrandao,
-                _instanceCounter, // Добавляем инкрементирующийся счетчик
-                blockhash(block.number - 1) // Используем хэш предыдущего блока для дополнительной энтропии
-            )
-        );
+        return
+            keccak256(
+                abi.encodePacked(
+                    bytes32(bytes(prefix)), // Фиксированный размер 32 байта экономит газ
+                    uint160(address(this)), // Напрямую используем uint160
+                    block.timestamp,
+                    block.prevrandao,
+                    _instanceCounter, // Добавляем инкрементирующийся счетчик
+                    blockhash(block.number - 1) // Используем хэш предыдущего блока для дополнительной энтропии
+                )
+            );
     }
 }

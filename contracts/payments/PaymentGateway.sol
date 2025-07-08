@@ -268,7 +268,10 @@ abstract contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
         if (payer == msg.sender) return;
 
         // Check if sender has required roles
-        if (access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) || access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)) {
+        if (
+            access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) ||
+            access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)
+        ) {
             return;
         }
 

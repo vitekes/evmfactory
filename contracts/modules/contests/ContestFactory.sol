@@ -82,7 +82,7 @@ contract ContestFactory is BaseFactory {
         ContestEscrow esc = new ContestEscrow(
             msg.sender,
             _prizes,
-                address(core),
+            address(core),
             gasPoolAmount,
             paymentGateway,
             deadline

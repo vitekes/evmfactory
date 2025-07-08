@@ -13,10 +13,10 @@ import './interfaces/ICoreSystem.sol';
 contract CoreSystem is ICoreSystem {
     // Роли системы
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
-    bytes32 public constant FEATURE_OWNER_ROLE = keccak256("FEATURE_OWNER_ROLE");
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-    bytes32 public constant AUTOMATION_ROLE = keccak256("AUTOMATION_ROLE");
-    bytes32 public constant GOVERNOR_ROLE = keccak256("GOVERNOR_ROLE");
+    bytes32 public constant FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
+    bytes32 public constant OPERATOR_ROLE = keccak256('OPERATOR_ROLE');
+    bytes32 public constant AUTOMATION_ROLE = keccak256('AUTOMATION_ROLE');
+    bytes32 public constant GOVERNOR_ROLE = keccak256('GOVERNOR_ROLE');
 
     // Структуры для хранения компонентов
     struct Feature {
@@ -40,7 +40,12 @@ contract CoreSystem is ICoreSystem {
     event ServiceRegistered(bytes32 indexed serviceId, address serviceAddress, bytes32 moduleId);
     event ModuleRegistered(bytes32 indexed moduleId, string serviceAlias, address serviceAddress);
     event FeatureRegistered(bytes32 indexed featureId, address implementation, uint8 context);
-    event FeatureUpgraded(bytes32 indexed featureId, address oldImplementation, address newImplementation, uint8 context);
+    event FeatureUpgraded(
+        bytes32 indexed featureId,
+        address oldImplementation,
+        address newImplementation,
+        uint8 context
+    );
 
     constructor(address admin) {
         if (admin == address(0)) revert InvalidAddress();
@@ -178,7 +183,11 @@ contract CoreSystem is ICoreSystem {
         return moduleServices[moduleId][serviceId];
     }
 
-    function setModuleServiceAlias(bytes32 moduleId, string calldata serviceAlias, address addr) external override onlyFeatureOwner {
+    function setModuleServiceAlias(
+        bytes32 moduleId,
+        string calldata serviceAlias,
+        address addr
+    ) external override onlyFeatureOwner {
         if (!features[moduleId].exists) revert ModuleNotRegistered();
         if (addr == address(0)) revert InvalidAddress();
         bytes32 serviceId = keccak256(bytes(serviceAlias));
@@ -187,14 +196,21 @@ contract CoreSystem is ICoreSystem {
         emit ModuleRegistered(moduleId, serviceAlias, addr);
     }
 
-    function setModuleServiceAliasOperator(bytes32 moduleId, string calldata serviceAlias, address addr) external override onlyOperator {
+    function setModuleServiceAliasOperator(
+        bytes32 moduleId,
+        string calldata serviceAlias,
+        address addr
+    ) external override onlyOperator {
         bytes32 serviceId = keccak256(bytes(serviceAlias));
         if (!features[moduleId].exists) revert ModuleNotRegistered();
         moduleServices[moduleId][serviceId] = addr;
         emit ModuleRegistered(moduleId, serviceAlias, addr);
     }
 
-    function getModuleServiceByAlias(bytes32 moduleId, string calldata serviceAlias) external view override returns (address) {
+    function getModuleServiceByAlias(
+        bytes32 moduleId,
+        string calldata serviceAlias
+    ) external view override returns (address) {
         return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
     }
 }

@@ -41,14 +41,12 @@ contract TokenValidator is Initializable, UUPSUpgradeable, ITokenValidator {
     }
 
     modifier onlyAdmin() {
-        if (!coreSystem.hasRole(0x00, msg.sender))
-            revert NotAdmin();
+        if (!coreSystem.hasRole(0x00, msg.sender)) revert NotAdmin();
         _;
     }
 
     modifier onlyOperator() {
-        if (!coreSystem.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender))
-            revert NotOperator();
+        if (!coreSystem.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender)) revert NotOperator();
         _;
     }
 

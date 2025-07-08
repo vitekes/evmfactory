@@ -23,7 +23,7 @@ library Native {
     /// @param amount Сумма для отправки
     /// @return Успешность отправки
     function sendValue(address payable recipient, uint256 amount) internal returns (bool) {
-        (bool success, ) = recipient.call{value: amount}("");
+        (bool success, ) = recipient.call{value: amount}('');
         return success;
     }
 }
