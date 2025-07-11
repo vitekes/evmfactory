@@ -169,8 +169,8 @@ contract DiscountProcessor is BaseProcessor {
             (bool signatureValid, uint16 discountPercent) = validateDiscountSignature(
                 discountHash,
                 signature,
-                context.moduleId,
-                context.sender
+                context.packed.moduleId,
+                context.packed.sender
             );
 
             if (signatureValid && !usedSignatures[discountHash]) {
@@ -178,12 +178,12 @@ contract DiscountProcessor is BaseProcessor {
                 usedSignatures[discountHash] = true;
 
                 // Вычисляем скидку
-                discountAmount = (context.processedAmount * uint256(discountPercent)) / 10000;
+                discountAmount = (uint256(context.packed.processedAmount) * uint256(discountPercent)) / 10000;
 
                 emit SignatureDiscountApplied(
-                    context.moduleId,
-                    context.sender,
-                    context.processedAmount,
+                    context.packed.moduleId,
+                    context.packed.sender,
+                    uint256(context.packed.processedAmount),
                     discountAmount,
                     discountHash
                 );
@@ -193,20 +193,20 @@ contract DiscountProcessor is BaseProcessor {
         // Если не применена скидка по подписи, ищем подходящее правило скидки
         if (discountAmount == 0) {
             (discountAmount, appliedRuleId) = findBestDiscount(
-                context.moduleId,
-                context.token,
-                context.processedAmount,
-                context.sender
+                context.packed.moduleId,
+                context.packed.token,
+                uint256(context.packed.processedAmount),
+                context.packed.sender
             );
 
             if (discountAmount > 0) {
                 emit DiscountApplied(
-                    context.moduleId,
-                    context.token,
+                    context.packed.moduleId,
+                    context.packed.token,
                     appliedRuleId,
-                    context.processedAmount,
+                    uint256(context.packed.processedAmount),
                     discountAmount,
-                    context.sender
+                    context.packed.sender
                 );
             }
         }
@@ -218,17 +218,17 @@ contract DiscountProcessor is BaseProcessor {
         }
 
         // Проверяем, что скидка не превышает сумму платежа
-        if (discountAmount >= context.processedAmount) {
-            discountAmount = context.processedAmount - 1; // Оставляем хотя бы 1 единицу
+        if (discountAmount >= uint256(context.packed.processedAmount)) {
+            discountAmount = uint256(context.packed.processedAmount) - 1; // Оставляем хотя бы 1 единицу
         }
 
         // Применяем скидку
-        context.discountAmount += discountAmount;
-        context.discountPercent = uint16((discountAmount * 10000) / context.originalAmount); // Запоминаем процент от исходной суммы
-        context.processedAmount -= discountAmount;
+        context.results.discountAmount += uint64(discountAmount);
+        context.results.discountPercent = uint16((discountAmount * 10000) / uint256(context.packed.originalAmount));
+        context.packed.processedAmount = uint128(uint256(context.packed.processedAmount) - discountAmount);
 
         // Обновляем состояние
-        context.state = PaymentContextLibrary.ProcessingState.APPLYING_DISCOUNT;
+        context.packed.state = uint8(PaymentContextLibrary.ProcessingState.APPLYING_DISCOUNT);
 
         // Добавляем запись о процессоре
         context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.MODIFIED));
@@ -266,10 +266,10 @@ contract DiscountProcessor is BaseProcessor {
         }
 
         // Проверяем наличие правил скидки для модуля и токена
-        bytes32[] memory rules = moduleDiscountRules[context.moduleId];
+        bytes32[] memory rules = moduleDiscountRules[context.packed.moduleId];
         for (uint256 i = 0; i < rules.length; i++) {
-            DiscountRule memory rule = discountRules[context.moduleId][context.token][rules[i]];
-            if (rule.active && block.timestamp <= rule.validUntil && context.processedAmount >= rule.minAmount) {
+            DiscountRule memory rule = discountRules[context.packed.moduleId][context.packed.token][rules[i]];
+            if (rule.active && block.timestamp <= rule.validUntil && uint256(context.packed.processedAmount) >= rule.minAmount) {
                 return true;
             }
         }

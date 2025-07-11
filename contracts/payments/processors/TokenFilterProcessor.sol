@@ -64,19 +64,19 @@ contract TokenFilterProcessor is BaseProcessor {
 
         // Если разрешен обход фильтрации, пропускаем проверку
         if (allowOverride) {
-            context.state = PaymentContextLibrary.ProcessingState.VALIDATING;
+            context.packed.state = uint8(PaymentContextLibrary.ProcessingState.VALIDATING);
             context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.SKIPPED));
             return (ProcessResult.SKIPPED, abi.encode(context));
         }
 
         // Проверяем, разрешен ли токен для данного модуля
-        if (!isTokenAllowed(context.moduleId, context.token)) {
+        if (!isTokenAllowed(context.packed.moduleId, context.packed.token)) {
             // Если токен не разрешен, платеж отклоняется
             return (ProcessResult.FAILED, _createError(context, 'Token not allowed'));
         }
 
         // Токен разрешен, обновляем состояние и продолжаем обработку
-        context.state = PaymentContextLibrary.ProcessingState.VALIDATING;
+        context.packed.state = uint8(PaymentContextLibrary.ProcessingState.VALIDATING);
         context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.SUCCESS));
 
         return (ProcessResult.SUCCESS, abi.encode(context));

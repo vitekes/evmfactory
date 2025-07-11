@@ -103,12 +103,17 @@ contract OracleProcessor is BaseProcessor {
         }
 
         // Проверяем, что у нас есть актуальные цены для обоих токенов
-        if (!isPriceValid(context.moduleId, context.token) || !isPriceValid(context.moduleId, targetToken)) {
+        if (!isPriceValid(context.packed.moduleId, context.packed.token) || !isPriceValid(context.packed.moduleId, targetToken)) {
             return (ProcessResult.FAILED, _createError(context, 'Price data not available or outdated'));
         }
 
         // Конвертируем сумму из исходного токена в целевой
-        uint256 convertedAmount = convertAmount(context.moduleId, context.token, targetToken, context.processedAmount);
+        uint256 convertedAmount = convertAmount(
+            context.packed.moduleId,
+            context.packed.token,
+            targetToken,
+            uint256(context.packed.processedAmount)
+        );
 
         // Если конвертированная сумма равна 0, платеж неудачен
         if (convertedAmount == 0) {
@@ -116,18 +121,18 @@ contract OracleProcessor is BaseProcessor {
         }
 
         // Обновляем контекст с новым токеном и суммой
-        address originalToken = context.token;
-        uint256 originalAmount = context.processedAmount;
+        address originalToken = context.packed.token;
+        uint256 originalAmount = uint256(context.packed.processedAmount);
 
-        context.token = targetToken;
-        context.processedAmount = convertedAmount;
-        context.state = PaymentContextLibrary.ProcessingState.CONVERTING;
+        context.packed.token = targetToken;
+        context.packed.processedAmount = uint128(convertedAmount);
+        context.packed.state = uint8(PaymentContextLibrary.ProcessingState.CONVERTING);
 
         // Добавляем результат обработки
         context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.MODIFIED));
 
         // Эмитим событие о конвертации
-        emit PriceConverted(context.moduleId, originalToken, targetToken, originalAmount, convertedAmount);
+        emit PriceConverted(context.packed.moduleId, originalToken, targetToken, originalAmount, convertedAmount);
 
         return (ProcessResult.MODIFIED, abi.encode(context));
     }
@@ -146,11 +151,11 @@ contract OracleProcessor is BaseProcessor {
         // Пробуем найти метаданные для Oracle процессора
         try this.extractOracleMetadata(context.metadata) returns (bool needsConversion, address targetToken) {
             // Процессор применим, если требуется конвертация и токены различаются
-            return needsConversion && targetToken != context.token;
+            return needsConversion && targetToken != context.packed.token;
         } catch {
             // Пробуем старый формат для обратной совместимости
             try abi.decode(context.metadata, (bool, address)) returns (bool needsConversion, address targetToken) {
-                return needsConversion && targetToken != context.token;
+                return needsConversion && targetToken != context.packed.token;
             } catch {
                 // Если декодирование не удалось, значит метаданные имеют другой формат
                 return false;
