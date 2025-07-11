@@ -1,10 +1,10 @@
 # Architecture
 
-This project consists of a small core with optional modules that extend the base functionality. All modules share the same `AccessControlCenter` for role management and a `Registry` for service discovery.
+This project consists of a small core with optional modules that extend the base functionality. All contracts rely on a single `CoreSystem` for role management and service discovery.
 
 ## Core contracts
 
-- **AccessControlCenter** – centralized RBAC and permissions.
+- **CoreSystem** – centralized RBAC and service registry.
 - **Registry** – registry of modules and shared services.
 - **CoreFeeManager** – collects protocol and module fees.
 - **PaymentGateway** – handles all user payments.
