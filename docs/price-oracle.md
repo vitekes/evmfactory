@@ -74,7 +74,7 @@ subscriptionManager.subscribeWithToken(plan, merchantSignature, permitSignature,
 const priceOracleFactory = await PriceOracleFactory.deploy(registry.address, ethers.ZeroAddress);
 
 // Регистрируем фабрику в Registry
-const MODULE_ID = ethers.keccak256(ethers.toUtf8Bytes("PriceOracle"));
+const MODULE_ID = ethers.keccak256(ethers.toUtf8Bytes("OracleProcessor.sol"));
 await registry.registerFeature(MODULE_ID, priceOracleFactory.address, 1);
 
 // Создаем экземпляр Oracle

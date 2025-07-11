@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/interfaces/ICoreSystem.sol';
-import '../../shared/NFTManager.sol';
+import '../../core/CoreSystem.sol';
+import '../../core/NFTManager.sol';
 import '../../errors/Errors.sol';
 import './shared/PrizeInfo.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -14,7 +14,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 contract ContestEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    ICoreSystem public immutable core;
+    CoreSystem public immutable core;
     address public immutable creator;
     PrizeInfo[] public prizes;
     address[] public winners;
@@ -53,7 +53,7 @@ contract ContestEscrow is ReentrancyGuard {
         assert(msg.sender != _creator);
         if (_coreSystem == address(0)) revert ZeroAddress();
         if (_commissionToken == address(0)) revert ZeroAddress();
-        core = ICoreSystem(_coreSystem);
+        core = CoreSystem(_coreSystem);
         creator = _creator;
         commissionToken = _commissionToken;
         gasPool = _gasPool;
@@ -122,7 +122,7 @@ contract ContestEscrow is ReentrancyGuard {
             // Set finalized flag only after all prizes are processed
             finalized = true;
 
-            address nft = core.getModuleService(MODULE_ID, CoreDefs.SERVICE_NFT_MANAGER);
+            address nft = core.getService(MODULE_ID, 'NFTManager');
             if (nft != address(0)) {
                 string[] memory uris = new string[](winners.length);
                 NFTManager(nft).mintBatch(winners, uris, false);

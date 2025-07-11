@@ -1,477 +1,473 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../core/interfaces/ICoreSystem.sol';
-import './interfaces/ITokenValidator.sol';
-import './interfaces/IPriceOracle.sol';
-import './interfaces/IGateway.sol';
-import './interfaces/IFeeManager.sol';
-import './FeeManager.sol';
-import '../errors/Errors.sol';
-import '../lib/Native.sol';
-import '../lib/SignatureLib.sol';
-import '../shared/CoreDefs.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/utils/Address.sol';
-import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '@openzeppelin/contracts/utils/Pausable.sol';
-import '@openzeppelin/contracts/access/AccessControl.sol';
+import "./interfaces/IGateway.sol";
+import "./interfaces/IProcessorRegistry.sol";
+import "./interfaces/IPaymentProcessor.sol";
+import "./PaymentContextLibrary.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-abstract contract PaymentGateway is ReentrancyGuard, Pausable, IGateway {
-    using Address for address payable;
+/// @title PaymentGateway
+/// @notice Платежный шлюз для маршрутизации платежей через цепочку процессоров
+/// @dev Основная задача - координация обработки платежей через различные процессоры
+contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    using Native for address;
+    using PaymentContextLibrary for PaymentContextLibrary.PaymentContext;
 
-    /// @dev Maximum fee in basis points (10000 = 100%)
-    uint256 public constant MAX_FEE_BPS = 1000; // 10%
+    // Constants
+    bytes32 public constant PAYMENT_ADMIN_ROLE = keccak256("PAYMENT_ADMIN_ROLE");
+    bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256("PROCESSOR_MANAGER_ROLE");
 
-    ICoreSystem public access;
-    ICoreSystem public registry;
-    FeeManager public feeManager;
+    // Имя и версия компонента
+    string private constant GATEWAY_NAME = "PaymentGateway";
+    string private constant GATEWAY_VERSION = "1.0.0";
 
-    // Per-module nonces to prevent signature reuse across modules
-    mapping(address => mapping(bytes32 => uint256)) public nonces;
+    // State variables
+    address public immutable coreSystem;
+    address public immutable processorRegistry;
 
-    // Domain separator for EIP-712 signatures
-    bytes32 public DOMAIN_SEPARATOR;
+    // Processor configuration for modules
+    mapping(bytes32 => address[]) public moduleProcessors;
+    mapping(bytes32 => mapping(string => bool)) public moduleProcessorConfig;
 
+    // Отслеживание платежей
+    mapping(bytes32 => PaymentResult) public paymentResults;
+
+    // Events
     event PaymentProcessed(
-        address indexed payer,
+        bytes32 indexed moduleId,
+        bytes32 indexed paymentId,
         address indexed token,
-        uint256 grossAmount,
-        uint256 fee,
+        address payer,
+        uint256 amount,
         uint256 netAmount,
-        bytes32 moduleId,
-        uint16 version
+        PaymentResult result
     );
+    event ProcessorAdded(address indexed processor, uint256 position);
+    event ProcessorConfigured(bytes32 indexed moduleId, string processorName, bool enabled);
 
-    event PriceConverted(
-        address indexed baseToken,
-        address indexed paymentToken,
-        uint256 baseAmount,
-        uint256 paymentAmount,
-        bytes32 moduleId,
-        uint16 version
-    );
+    /**
+     * @dev Конструктор шлюза
+     * @param _coreSystem Адрес системы ядра
+     * @param _processorRegistry Адрес реестра процессоров
+     */
+    constructor(
+        address _coreSystem,
+        address _processorRegistry
+    ) {
+        require(_coreSystem != address(0), "PaymentGateway: core system is zero address");
+        require(_processorRegistry != address(0), "PaymentGateway: processor registry is zero address");
 
-    event DomainSeparatorUpdated(bytes32 oldDomainSeparator, bytes32 newDomainSeparator, uint256 chainId);
+        coreSystem = _coreSystem;
+        processorRegistry = _processorRegistry;
 
-    modifier onlyFeatureOwner() {
-        bytes32 role = keccak256('FEATURE_OWNER_ROLE');
-        if (!access.hasRole(role, msg.sender)) revert NotFeatureOwner();
-        _;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAYMENT_ADMIN_ROLE, msg.sender);
+        _grantRole(PROCESSOR_MANAGER_ROLE, msg.sender);
     }
 
-    modifier onlyAdmin() {
-        bytes32 admin_role = 0x00; // DEFAULT_ADMIN_ROLE константа
-        if (!access.hasRole(admin_role, msg.sender)) revert NotAdmin();
-        _;
-    }
-
-    modifier onlyOperator() {
-        bytes32 role = keccak256('OPERATOR_ROLE');
-        if (!access.hasRole(role, msg.sender)) revert NotOperator();
-        _;
-    }
-
-    constructor(address accessControl, address registry_, address feeManager_) {
-        if (accessControl == address(0)) revert ZeroAddress();
-        if (registry_ == address(0)) revert ZeroAddress();
-        if (feeManager_ == address(0)) revert ZeroAddress();
-
-        access = ICoreSystem(accessControl);
-        registry = ICoreSystem(registry_);
-        feeManager = FeeManager(feeManager_);
-
-        _updateDomainSeparator();
-    }
-
-    /// @notice Updates domain separator if chain ID changes
-    /// @dev Called during initialization and can be called manually after chain forks
-    function updateDomainSeparator() external onlyAdmin {
-        _updateDomainSeparator();
-    }
-
-    /// @dev Internal function to update domain separator
-    function _updateDomainSeparator() internal {
-        bytes32 oldDomainSeparator = DOMAIN_SEPARATOR;
-        bytes32 newDomainSeparator = keccak256(
-            abi.encode(
-                keccak256('EIP712Domain(uint256 chainId,address verifyingContract)'),
-                block.chainid,
-                address(this)
-            )
-        );
-
-        DOMAIN_SEPARATOR = newDomainSeparator;
-
-        emit DomainSeparatorUpdated(oldDomainSeparator, newDomainSeparator, block.chainid);
-    }
-
-    /// @notice Converts amount from one token to another (alias for getPriceInCurrency for interface compatibility)
-    /// @param moduleId Module ID
-    /// @param baseToken Base token (0x0 or ETH_SENTINEL for native currency)
-    /// @param paymentToken Payment token (0x0 or ETH_SENTINEL for native currency)
-    /// @param baseAmount Amount in base token
-    /// @return paymentAmount Amount in payment token
-    function convertAmount(
-        bytes32 moduleId,
-        address baseToken,
-        address paymentToken,
-        uint256 baseAmount
-    ) external view returns (uint256 paymentAmount) {
-        return getPriceInCurrency(moduleId, baseToken, paymentToken, baseAmount);
-    }
-
-    /// @notice Gets the price in specified currency with detailed validation
-    /// @param moduleId Module ID
-    /// @param baseToken Base token (0x0 or ETH_SENTINEL for native currency)
-    /// @param paymentToken Payment token (0x0 or ETH_SENTINEL for native currency)
-    /// @param baseAmount Amount in base token
-    /// @return paymentAmount Amount in payment token
-    function getPriceInCurrency(
-        bytes32 moduleId,
-        address baseToken,
-        address paymentToken,
-        uint256 baseAmount
-    ) public view returns (uint256 paymentAmount) {
-        if (baseAmount == 0) return 0;
-
-        // Normalize native currency addresses to ETH_SENTINEL for consistency
-        address normalizedBase = baseToken.isNative() ? Native.ETH_SENTINEL : baseToken;
-        address normalizedPayment = paymentToken.isNative() ? Native.ETH_SENTINEL : paymentToken;
-
-        // If tokens are identical after normalization, no conversion required
-        if (normalizedBase == normalizedPayment) {
-            return baseAmount;
-        }
-
-        // Get price oracle
-        address oracle = registry.getModuleServiceByAlias(moduleId, 'PriceOracle');
-        if (oracle == address(0)) revert PriceFeedNotFound();
-
-        // Get price value in another currency from oracle
-        paymentAmount = IPriceOracle(oracle).convertAmount(normalizedBase, normalizedPayment, baseAmount);
-        if (paymentAmount == 0) revert InvalidPrice();
-
-        // Events cannot be emitted in view functions
-        // PriceConverted is emitted only in state-changing functions
-
-        // Value is already stored in paymentAmount (named return)
-    }
-
-    /// @notice Checks if a token pair is supported by the oracle
-    /// @param moduleId Module identifier
-    /// @param baseToken Base token (0x0 or ETH_SENTINEL for native currency)
-    /// @param paymentToken Payment token (0x0 or ETH_SENTINEL for native currency)
-    /// @return supported Whether the pair is supported
-    function isPairSupported(bytes32 moduleId, address baseToken, address paymentToken) external view returns (bool) {
-        // Normalize and check if tokens are identical
-        address normalizedBase = baseToken.isNative() ? Native.ETH_SENTINEL : baseToken;
-        address normalizedPayment = paymentToken.isNative() ? Native.ETH_SENTINEL : paymentToken;
-
-        if (normalizedBase == normalizedPayment) return true;
-
-        // Query the oracle
-        address oracle = registry.getModuleServiceByAlias(moduleId, 'PriceOracle');
-        return oracle != address(0) && IPriceOracle(oracle).isPairSupported(normalizedBase, normalizedPayment);
-    }
-
-    /// @notice Process payment with specified token
-    /// @param moduleId Module identifier
-    /// @param token Payment token address (0x0 or ETH_SENTINEL for native currency)
-    /// @param payer Payer address
-    /// @param amount Payment amount
-    /// @param signature Signature for payment authorization on behalf of user (if required)
-    /// @return netAmount Net amount after fee deduction
+    /**
+     * @notice Обработать платеж
+     * @param moduleId Идентификатор модуля
+     * @param token Адрес токена (address(0) для нативной валюты)
+     * @param payer Адрес плательщика
+     * @param amount Сумма платежа
+     * @param signature Подпись, если требуется
+     * @return netAmount Чистая сумма после вычета комиссий
+     */
     function processPayment(
         bytes32 moduleId,
         address token,
         address payer,
         uint256 amount,
-        bytes calldata signature
-    ) external payable onlyFeatureOwner nonReentrant whenNotPaused returns (uint256 netAmount) {
-        // Preliminary checks to save gas
-        if (amount == 0) revert InvalidAmount();
-        if (payer == address(0)) revert ZeroAddress();
+        bytes memory signature
+    ) external payable override nonReentrant returns (uint256 netAmount) {
+        // Базовые проверки
+        require(amount > 0, "PaymentGateway: zero amount");
 
-        // Quick authorization check for direct calls on user's behalf (cheapest path)
-        bool isDirectPayment = payer == msg.sender;
-
-        // If not a direct payment, perform more expensive authorization checks
-        if (!isDirectPayment) {
-            _checkPaymentAuthorization(payer);
-        }
-
-        // Check token validity (natively supported or validator allowed)
-        if (!token.isNative()) {
-            // Only validate non-native tokens through TokenValidator.sol
-            address val = registry.getModuleServiceByAlias(moduleId, 'Validator');
-            if (val == address(0)) revert ValidatorNotFound();
-            if (!ITokenValidator(val).isTokenAllowed(token)) revert NotAllowedToken();
-        }
-
-        // Verify signature only if not a direct payment and not a trusted service
-        // (most expensive operation is performed last and only when necessary)
-        if (
-            !isDirectPayment &&
-            !access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) &&
-            !access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)
-        ) {
-            _verifyPaymentSignature(moduleId, token, payer, amount, signature);
-        }
-
-        // Process payment and fee
-        uint256 fee;
-        (netAmount, fee) = _executePayment(moduleId, token, payer, amount);
-
-        _emitPaymentProcessedEvent(moduleId, payer, token, amount, fee, netAmount);
-    }
-
-    /// @dev Verifies signature for payment authorization
-    function _verifyPaymentSignature(
-        bytes32 moduleId,
-        address token,
-        address payer,
-        uint256 amount,
-        bytes calldata signature
-    ) internal {
-        // This function is called only if none of the auto-skip conditions are met
-        // Check signature length before hash calculation (gas saving)
-        if (signature.length == 0) revert InvalidSignature();
-
-        // Get current nonce but don't update it until signature verification
-        // Use module-specific nonce to prevent signature reuse across modules
-        uint256 currentNonce = nonces[payer][moduleId];
-
-        // Verify EIP-712 signature
-        bytes32 digest = SignatureLib.hashProcessPayment(
-            DOMAIN_SEPARATOR,
-            payer,
-            moduleId,
-            token,
-            amount,
-            currentNonce,
-            block.chainid
-        );
-        if (ECDSA.recover(digest, signature) != payer) revert InvalidSignature();
-
-        // Update nonce only after successful signature verification
-        nonces[payer][moduleId] = currentNonce + 1;
-    }
-
-    /// @dev Checks authorization for payments on behalf of user
-    function _checkPaymentAuthorization(address payer) internal view {
-        // Direct payment is always authorized
-        if (payer == msg.sender) return;
-
-        // Check if sender has required roles
-        if (
-            access.hasRole(keccak256('AUTOMATION_ROLE'), msg.sender) ||
-            access.hasRole(keccak256('RELAYER_ROLE'), msg.sender)
-        ) {
-            return;
-        }
-
-        revert NotAuthorized();
-    }
-
-    /// @dev Executes payment and calculates fee
-    /// @param moduleId Module identifier
-    /// @param token Payment token address
-    /// @param payer Payer address
-    /// @param amount Payment amount
-    /// @return netAmount Net amount after fee deduction
-    /// @return fee Fee amount collected
-    function _executePayment(
-        bytes32 moduleId,
-        address token,
-        address payer,
-        uint256 amount
-    ) internal returns (uint256 netAmount, uint256 fee) {
-        // Check if token is native currency
-        if (token.isNative()) {
-            return _executeNativePayment(moduleId, payer, amount);
+        // Проверка нативной валюты
+        bool isNativeToken = token == address(0);
+        if (isNativeToken) {
+            require(msg.value >= amount, "PaymentGateway: insufficient value");
         } else {
-            return _executeERC20Payment(moduleId, token, payer, amount);
+            // Перевод токенов от плательщика к шлюзу
+            IERC20(token).safeTransferFrom(payer, address(this), amount);
         }
+
+        // Создаем контекст платежа с использованием библиотеки
+        PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
+            moduleId,
+            payer,              // Отправитель
+            address(0),        // Получатель будет определен процессорами
+            token,             // Токен платежа
+            amount,            // Сумма платежа
+            PaymentContextLibrary.PaymentOperation.PAYMENT, // Тип операции
+            signature.length > 0 ? signature : new bytes(0) // Метаданные (подпись, если есть)
+        );
+
+        // Запускаем обработку через цепочку процессоров
+        bytes32 paymentId;
+        (netAmount, paymentId) = _processPaymentThroughProcessors(context, isNativeToken);
+
+        // Сохраняем результат в истории платежей
+        paymentResults[paymentId] = PaymentResult.SUCCESS;
+
+        // Генерируем событие о успешной обработке платежа
+        emit PaymentProcessed(
+            moduleId,
+            paymentId,
+            token,
+            payer,
+            amount,
+            netAmount,
+            PaymentResult.SUCCESS
+        );
+
+        return netAmount;
     }
 
-    /// @dev Processes payment with native currency (ETH)
-    function _executeNativePayment(
+    /**
+     * @dev Внутренний метод для обработки платежа через цепочку процессоров
+     * @param context Контекст платежа
+     * @param isNativeToken Флаг нативной валюты
+     * @return netAmount Чистая сумма
+     * @return paymentId Идентификатор платежа
+     */
+    function _processPaymentThroughProcessors(
+        PaymentContextLibrary.PaymentContext memory context,
+        bool isNativeToken
+    ) internal returns (uint256 netAmount, bytes32 paymentId) {
+        bytes32 moduleId = context.packed.moduleId;
+        address token = context.packed.token;
+        uint256 amount = context.packed.originalAmount;
+
+        // Получаем цепочку процессоров для модуля
+        address[] memory processors = moduleProcessors[moduleId];
+        bytes memory contextBytes = abi.encode(context);
+
+        // Проходим по всем процессорам в цепочке
+        for (uint256 i = 0; i < processors.length; i++) {
+            address processor = processors[i];
+            if (processor == address(0)) continue;
+
+            string memory processorName = IPaymentProcessor(processor).getName();
+            if (!moduleProcessorConfig[moduleId][processorName]) continue;
+
+            // Проверяем применимость процессора
+            if (!IPaymentProcessor(processor).isApplicable(contextBytes)) continue;
+
+            // Обрабатываем контекст процессором
+            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) =
+                                    IPaymentProcessor(processor).process(contextBytes);
+
+            // Обрабатываем ошибки процессора
+            if (result == IPaymentProcessor.ProcessResult.FAILED) {
+                context = abi.decode(updatedContext, (PaymentContextLibrary.PaymentContext));
+                revert(context.results.errorMessage);
+            }
+
+            // Обновляем контекст для следующего процессора
+            contextBytes = updatedContext;
+        }
+
+        // Декодируем финальный контекст
+        context = abi.decode(contextBytes, (PaymentContextLibrary.PaymentContext));
+
+        // Проверяем успешность обработки
+        if (!context.packed.success) {
+            revert(context.results.errorMessage);
+        }
+
+        // Рассчитываем чистую сумму
+        netAmount = amount - context.results.feeAmount;
+        paymentId = context.results.paymentId;
+
+        // Переводим комиссию, если необходимо
+        if (context.results.feeAmount > 0 && context.packed.recipient != address(0)) {
+            if (isNativeToken) {
+                payable(context.packed.recipient).transfer(context.results.feeAmount);
+            } else {
+                IERC20(token).safeTransfer(context.packed.recipient, context.results.feeAmount);
+            }
+        }
+
+        return (netAmount, paymentId);
+    }
+
+    /**
+     * @notice Метод-делегат для конвертации суммы из одной валюты в другую
+     * @dev Делегирует вызов соответствующему процессору конвертации (OracleProcessor)
+     * @param moduleId Идентификатор модуля
+     * @param fromToken Токен источник
+     * @param toToken Токен назначения
+     * @param amount Сумма для конвертации
+     * @return convertedAmount Сконвертированная сумма
+     */
+    function convertAmount(
         bytes32 moduleId,
-        address payer,
+        address fromToken,
+        address toToken,
         uint256 amount
-    ) internal returns (uint256 netAmount, uint256 fee) {
-        // Verify sufficient ETH was sent
-        if (msg.value < amount) revert InsufficientBalance();
+    ) external view override returns (uint256 convertedAmount) {
+        // Получаем список процессоров для модуля
+        address[] memory processors = moduleProcessors[moduleId];
 
-        // Calculate fee based on fee manager settings
-        fee = _calculateFee(moduleId, Native.ETH_SENTINEL, amount);
+        // Ищем процессор конвертации (OracleProcessor)
+        for (uint256 i = 0; i < processors.length; i++) {
+            address processor = processors[i];
+            if (processor == address(0)) continue;
 
-        // Validate fee doesn't exceed MAX_FEE_BPS (10%)
-        if (fee * 10000 > amount * MAX_FEE_BPS) revert FeeTooHigh();
-
-        // Calculate net amount
-        netAmount = amount - fee;
-
-        // Refund excess ETH if necessary
-        uint256 excess = msg.value - amount;
-        if (excess > 0) {
-            (bool refundSuccess, ) = payable(payer).call{value: excess}('');
-            if (!refundSuccess) revert RefundDisabled();
+            // Проверяем, что это OracleProcessor по имени
+            try IPaymentProcessor(processor).getName() returns (string memory name) {
+                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked("OracleProcessor"))) {
+                    // Делегируем вызов процессору конвертации
+                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (uint256 result) {
+                        return result;
+                    } catch {
+                        // Если произошла ошибка, продолжаем поиск других процессоров
+                    }
+                }
+            } catch {
+                // Если произошла ошибка при получении имени, продолжаем
+            }
         }
 
-        return (netAmount, fee);
+        // Если подходящий процессор не найден, возвращаем исходную сумму
+        return amount;
     }
 
-    /// @dev Processes payment with ERC20 token
-    function _executeERC20Payment(
+    /**
+     * @notice Делегирующий метод для проверки поддержки пары токенов
+     * @dev Делегирует вызов TokenFilterProcessor
+     * @param moduleId Идентификатор модуля
+     * @param fromToken Токен источник
+     * @param toToken Токен назначения
+     * @return isSupported Поддерживается ли пара
+     */
+    function isPairSupported(
         bytes32 moduleId,
-        address token,
-        address payer,
-        uint256 amount
-    ) internal returns (uint256 netAmount, uint256 fee) {
-        // Cache addresses and objects to reduce gas costs on SLOAD
-        IERC20 tokenContract = IERC20(token);
-        address self = address(this);
-        address caller = msg.sender;
-        address feeManagerAddr = address(feeManager);
-
-        // Transfer tokens from payer to this contract
-        tokenContract.safeTransferFrom(payer, self, amount);
-
-        // Calculate fee using the local calculation method for consistency
-        fee = _calculateFee(moduleId, token, amount);
-
-        // If fee is greater than zero, collect it using the fee manager
-        if (fee > 0) {
-            tokenContract.forceApprove(feeManagerAddr, fee);
-            feeManager.depositFee(moduleId, token, fee);
-
-            // Reset approval after use
-            tokenContract.forceApprove(feeManagerAddr, 0);
+        address fromToken,
+        address toToken
+    ) external view override returns (bool isSupported) {
+        // Получаем процессор фильтрации токенов из реестра
+        try IProcessorRegistry(processorRegistry).getProcessorByName("TokenFilter") returns (address tokenFilter) {
+            if (tokenFilter != address(0)) {
+                // Делегируем вызов процессору фильтрации токенов
+                try IPaymentProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
+                    return result;
+                } catch {
+                    // Если произошла ошибка, возвращаем true (упрощенная версия)
+                }
+            }
+        } catch {
+            // Если произошла ошибка при получении процессора, возвращаем true
         }
 
-        // Calculate net amount and execute transfer
-        netAmount = amount - fee;
+        return true;
+    }
 
-        // Transfer net amount to caller
-        if (netAmount > 0) {
-            tokenContract.safeTransfer(caller, netAmount);
+    /**
+     * @notice Делегирующий метод для получения списка поддерживаемых токенов
+     * @dev Делегирует вызов TokenFilterProcessor
+     * @param moduleId Идентификатор модуля
+     * @return tokens Список поддерживаемых токенов
+     */
+    function getSupportedTokens(bytes32 moduleId) external view override returns (address[] memory tokens) {
+        // Получаем процессор фильтрации токенов из реестра
+        try IProcessorRegistry(processorRegistry).getProcessorByName("TokenFilter") returns (address tokenFilter) {
+            if (tokenFilter != address(0)) {
+                // Делегируем вызов процессору фильтрации токенов
+                try IPaymentProcessor(tokenFilter).getAllowedTokens(moduleId) returns (address[] memory result) {
+                    return result;
+                } catch {
+                    // Если произошла ошибка, возвращаем упрощенный список
+                }
+            }
+        } catch {
+            // Если произошла ошибка при получении процессора, возвращаем упрощенный список
         }
 
-        return (netAmount, fee);
+        // Упрощенная версия - всегда содержит нативную валюту
+        address[] memory defaultTokens = new address[](1);
+        defaultTokens[0] = address(0);
+        return defaultTokens;
     }
 
-    function setRegistry(address newRegistry) external onlyAdmin {
-        if (newRegistry == address(0)) revert InvalidAddress();
-        registry = ICoreSystem(newRegistry);
+    /**
+     * @notice Добавить процессор в шлюз
+     * @param processor Адрес процессора
+     * @param position Позиция в цепочке (0 - в конец)
+     * @return success Успешность операции
+     */
+    function addProcessor(
+        address processor,
+        uint256 position
+    ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success){
+        require(processor != address(0), "PaymentGateway: processor is zero address");
+
+        // Проверяем, что процессор соответствует интерфейсу
+        require(
+            IPaymentProcessor(processor).getVersion().length > 0,
+            "PaymentGateway: invalid processor"
+        );
+
+        // Добавляем процессор в реестр, если это новый процессор
+        IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
+        string memory processorName = IPaymentProcessor(processor).getName();
+
+        if (registry.getProcessorByName(processorName) == address(0)) {
+            registry.registerProcessor(processor, position);
+        }
+
+        emit ProcessorAdded(processor, position);
+        return true;
     }
 
-    function setFeeManager(address newManager) external onlyAdmin {
-        if (newManager == address(0)) revert InvalidAddress();
-        feeManager = FeeManager(newManager);
-    }
-
-    function setAccessControl(address newAccess) external onlyAdmin {
-        if (newAccess == address(0)) revert InvalidAddress();
-        access = ICoreSystem(newAccess);
-    }
-
-    /// @notice Withdraws accumulated native currency fees to specified address
-    /// @param to Address to send fees to
-    /// @param amount Amount to withdraw (0 for all)
-    function withdrawNativeFees(address to, uint256 amount) external onlyAdmin nonReentrant {
-        if (to == address(0)) revert ZeroAddress();
-
-        // Default to withdraw all available balance
-        uint256 withdrawAmount = amount == 0 ? address(this).balance : amount;
-
-        // Check there are funds to withdraw
-        if (withdrawAmount == 0) revert NothingToWithdraw();
-        if (withdrawAmount > address(this).balance) revert InsufficientBalance();
-
-        // Transfer fees
-        (bool success, ) = payable(to).call{value: withdrawAmount}('');
-        if (!success) revert RefundDisabled();
-    }
-
-    function pause() external onlyAdmin {
-        _pause();
-    }
-
-    function unpause() external onlyAdmin {
-        _unpause();
-    }
-
-    /// @notice Allows operator to set module fee
-    /// @param moduleId Module identifier
-    /// @param feeBps Fee in basis points
-    /// @param fixedAmount Fixed fee amount
-    function setModuleFee(bytes32 moduleId, uint16 feeBps, uint256 fixedAmount) external onlyOperator {
-        if (moduleId == bytes32(0)) revert InvalidModule();
-        if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
-
-        // Устанавливаем комиссию для всех типов токенов
-        // Используем ETH_SENTINEL для нативной валюты
-        feeManager.setPercentFee(moduleId, Native.ETH_SENTINEL, feeBps);
-        feeManager.setFixedFee(moduleId, Native.ETH_SENTINEL, fixedAmount);
-    }
-
-    /// @dev Get fee amount for payment
-    /// @param moduleId Module identifier
-    /// @param token Token address (ETH_SENTINEL for native)
-    /// @param amount Gross payment amount
-    /// @return feeAmount Total fee amount
-    function _calculateFee(bytes32 moduleId, address token, uint256 amount) internal view returns (uint256 feeAmount) {
-        // Delegate fee calculation to FeeManager for unified logic
-        return feeManager.calculateFee(moduleId, token, amount);
-    }
-
-    /// @dev Emit price conversion event
-    /// @param moduleId Module identifier
-    /// @param baseToken Base token
-    /// @param paymentToken Payment token
-    /// @param baseAmount Amount in base token
-    /// @param paymentAmount Amount in payment token
-    function _emitPriceConvertedEvent(
+    /**
+     * @notice Настроить процессор для модуля
+     * @param moduleId Идентификатор модуля
+     * @param processorName Имя процессора
+     * @param enabled Включен/выключен
+     * @param configData Дополнительные данные для настройки
+     * @return success Успешность операции
+     */
+    function configureProcessor(
         bytes32 moduleId,
-        address baseToken,
-        address paymentToken,
-        uint256 baseAmount,
-        uint256 paymentAmount
-    ) internal {
-        emit PriceConverted(baseToken, paymentToken, baseAmount, paymentAmount, moduleId, 1);
+        string memory processorName,
+        bool enabled,
+        bytes memory configData
+    ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success) {
+        // Получаем адрес процессора из реестра
+        IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
+        address processor = registry.getProcessorByName(processorName);
+        require(processor != address(0), "PaymentGateway: processor not found");
+
+        // Устанавливаем конфигурацию для модуля
+        moduleProcessorConfig[moduleId][processorName] = enabled;
+
+        // Проверяем, есть ли процессор в списке для модуля
+        bool found = false;
+        address[] storage processors = moduleProcessors[moduleId];
+        for (uint256 i = 0; i < processors.length; i++) {
+            if (processors[i] == processor) {
+                found = true;
+                break;
+            }
+        }
+
+        // Если процессора нет в списке, добавляем его
+        if (!found) {
+            processors.push(processor);
+        }
+
+        // Настраиваем процессор
+        if (configData.length > 0) {
+            IPaymentProcessor(processor).configure(moduleId, configData);
+        }
+
+        emit ProcessorConfigured(moduleId, processorName, enabled);
+        return true;
     }
 
-    /// @dev Emit payment processed event
-    /// @param moduleId Module identifier
-    /// @param payer Payer address
-    /// @param token Token address
-    /// @param amount Total payment amount
-    /// @param fee Fee amount
-    /// @param netAmount Net amount after fee deduction
-    function _emitPaymentProcessedEvent(
-        bytes32 moduleId,
-        address payer,
-        address token,
-        uint256 amount,
-        uint256 fee,
-        uint256 netAmount
-    ) internal {
-        emit PaymentProcessed(payer, token, amount, fee, netAmount, moduleId, 1);
+    /**
+     * @notice Получить список процессоров для модуля
+     * @param moduleId Идентификатор модуля
+     * @return processors Список процессоров
+     */
+    function getProcessors(bytes32 moduleId) external view override returns (address[] memory processors){
+        return moduleProcessors[moduleId];
     }
 
-    /// @notice Allows contract to receive ETH
-    receive() external payable {
-        // Silent accept
+    /**
+     * @notice Получить имя компонента
+     * @return name Имя компонента
+     */
+    function getName() external pure override returns (string memory name) {
+        return GATEWAY_NAME;
     }
 
-    /// @notice Fallback function, rejects direct ETH sends without calldata
-    fallback() external payable {
-        revert('Use processPayment');
+    /**
+     * @notice Получить версию компонента
+     * @return version Версия компонента
+     */
+    function getVersion() external pure override returns (string memory version) {
+        return GATEWAY_VERSION;
     }
+
+    /**
+     * @notice Проверить, активен ли шлюз для модуля
+     * @param moduleId Идентификатор модуля
+     * @return enabled Активен ли шлюз
+     */
+    function isEnabled(bytes32 moduleId) external view override returns (bool enabled) {
+        // Шлюз активен, если для модуля зарегистрирован хотя бы один процессор
+        return moduleProcessors[moduleId].length > 0;
+    }
+
+//    /**
+//     * @notice Обработать платеж с произвольными данными
+//     * @param moduleId Идентификатор модуля
+//     * @param paymentData Данные платежа
+//     * @return result Результат обработки
+//     * @return paymentId Идентификатор платежа
+//     */
+//    function processPaymentWithData(
+//        bytes32 moduleId,
+//        bytes calldata paymentData
+//    ) external override nonReentrant returns (PaymentResult result, bytes32 paymentId) {
+//        try {
+//            // Создаем контекст платежа напрямую из произвольных данных
+//            PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
+//                moduleId,
+//                msg.sender,          // По умолчанию отправитель - вызывающий контракт
+//                address(0),         // Получатель будет определен процессорами
+//                address(0),         // Токен будет определен из paymentData
+//                0,                  // Сумма будет определена из paymentData
+//                PaymentContextLibrary.PaymentOperation.PAYMENT,
+//                paymentData          // Данные для обработки процессорами
+//            );
+//
+//            // Запускаем обработку через цепочку процессоров
+//            // Флаг нативной валюты будет определен процессорами
+//            uint256 netAmount;
+//            (netAmount, paymentId) = _processPaymentThroughProcessors(context, false);
+//
+//            // Сохраняем результат платежа
+//            result = PaymentResult.SUCCESS;
+//            paymentResults[paymentId] = result;
+//
+//            return (result, paymentId);
+//        } catch Error(string memory reason) {
+//            // Обработка ошибки с сообщением
+//            result = PaymentResult.FAILED;
+//            return (result, bytes32(0));
+//        } catch {
+//            // Обработка ошибки без сообщения
+//            result = PaymentResult.FAILED;
+//            return (result, bytes32(0));
+//        }
+//    }
+
+    /**
+     * @notice Получить статус платежа
+     * @param paymentId Идентификатор платежа
+     * @return status Статус платежа
+     */
+    function getPaymentStatus(bytes32 paymentId) external view override returns (PaymentResult status) {
+        // Возвращаем сохраненный статус платежа
+        PaymentResult result = paymentResults[paymentId];
+
+        // Если статус не найден, возвращаем FAILED
+        if (result == PaymentResult(0)) {
+            return PaymentResult.FAILED;
+        }
+
+        return result;
+    }
+
+    // Функция для получения оплаты в нативной валюте
+    receive() external payable {}
 }

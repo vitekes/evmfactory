@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../core/interfaces/ICoreSystem.sol';
+import '../core/CoreSystem.sol';
 import '../payments/interfaces/IGateway.sol';
 import '../errors/Errors.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import './CloneFactory.sol';
-import '../shared/CoreDefs.sol';
+import './CoreDefs.sol';
 
 /// @title BaseFactory
 /// @notice Базовый контракт для фабрик, создающих экземпляры различных модулей
 /// @dev Предоставляет общую функциональность для всех фабрик
 abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
     /// @notice Ссылка на ядро системы
-    ICoreSystem public immutable core;
+    CoreSystem public immutable core;
 
     /// @notice Ссылка на шлюз платежей
     address public immutable paymentGateway;
@@ -33,14 +33,14 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         if (_paymentGateway == address(0)) revert InvalidAddress();
         if (moduleId == bytes32(0)) revert InvalidAddress();
 
-        core = ICoreSystem(_core);
+        core = CoreSystem(_core);
         paymentGateway = _paymentGateway;
         MODULE_ID = moduleId;
 
         // Проверка, зарегистрирован ли модуль
         try core.getFeature(moduleId) returns (address, uint8) {
             // Если модуль зарегистрирован, регистрируем платежный шлюз
-            try core.setModuleServiceAlias(moduleId, 'PaymentGateway', _paymentGateway) {
+            try core.setService(moduleId, 'PaymentGateway', _paymentGateway) {
                 // успешно
             } catch {
                 // обработка ошибок может быть добавлена через события
@@ -69,10 +69,10 @@ abstract contract BaseFactory is CloneFactory, ReentrancyGuard {
         if (bytes(serviceName).length == 0) revert InvalidServiceName();
 
         // Получаем сервис и сразу проверяем на 0
-        address service = core.getModuleServiceByAlias(MODULE_ID, serviceName);
+        address service = core.getService(MODULE_ID, serviceName);
         if (service != address(0)) {
             // Вызываем core только когда это действительно необходимо
-            core.setModuleServiceAlias(instanceId, serviceName, service);
+            core.setService(instanceId, serviceName, service);
         }
         return service;
     }

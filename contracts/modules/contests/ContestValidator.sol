@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/interfaces/ICoreSystem.sol';
+import '../../core/CoreSystem.sol';
 import '../../errors/Errors.sol';
 import '../../payments/interfaces/ITokenValidator.sol';
 import './interfaces/IContestValidator.sol';
 import './shared/PrizeInfo.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 
 /// @title ContestValidator
 /// @notice Basic validator for Contest prizes
 contract ContestValidator is IContestValidator {
-    ICoreSystem public immutable core;
+    CoreSystem public immutable core;
     ITokenValidator public tokenValidator;
 
     constructor(address _core, address _tokenValidator) {
@@ -19,7 +19,7 @@ contract ContestValidator is IContestValidator {
         if (_core == address(0) || _tokenValidator == address(0)) revert ZeroAddress();
 
         // Initialize immutable variable
-        core = ICoreSystem(_core);
+        core = CoreSystem(_core);
         tokenValidator = ITokenValidator(_tokenValidator);
     }
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../shared/BaseFactory.sol';
+import '../../core/BaseFactory.sol';
 import './SubscriptionManager.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 import '../../payments/interfaces/IGateway.sol';
-import '../../core/interfaces/ICoreSystem.sol';
+import '../../core/CoreSystem.sol';
 
 /// @title SubscriptionManagerFactory
 /// @notice Factory for creating subscription manager instances
@@ -39,17 +39,17 @@ contract SubscriptionManagerFactory is BaseFactory {
         // Copy services in batch, combining operations
         {
             // Use block to limit scope of temporary variables
-            core.setModuleServiceAlias(instanceId, 'PaymentGateway', gateway);
+            core.setService(instanceId, 'PaymentGateway', gateway);
 
             // Cache services and copy them only if they exist
-            address validator = core.getModuleServiceByAlias(CoreDefs.SUBSCRIPTION_MODULE_ID, 'Validator');
+            address validator = core.getService(CoreDefs.SUBSCRIPTION_MODULE_ID, 'Validator');
             if (validator != address(0)) {
-                core.setModuleServiceAlias(instanceId, 'Validator', validator);
+                core.setService(instanceId, 'Validator', validator);
             }
 
-            address oracle = core.getModuleServiceByAlias(CoreDefs.SUBSCRIPTION_MODULE_ID, 'PriceOracle');
+            address oracle = core.getService(CoreDefs.SUBSCRIPTION_MODULE_ID, 'PriceOracle');
             if (oracle != address(0)) {
-                core.setModuleServiceAlias(instanceId, 'PriceOracle', oracle);
+                core.setService(instanceId, 'PriceOracle', oracle);
             }
         }
 

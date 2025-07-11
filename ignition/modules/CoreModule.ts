@@ -19,7 +19,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
     ethers.toUtf8Bytes("Validator")
   );
   const PRICE_ORACLE_SERVICE = ethers.keccak256(
-    ethers.toUtf8Bytes("PriceOracle")
+    ethers.toUtf8Bytes("OracleProcessor.sol")
   );
   const MARKETPLACE_ID = ethers.keccak256(ethers.toUtf8Bytes("Marketplace"));
 
@@ -49,7 +49,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
   m.call(registry, "setModuleService", [MARKETPLACE_ID, VALIDATOR_SERVICE, tokenValidator]);
   m.call(registry, "setModuleService", [MARKETPLACE_ID, PRICE_ORACLE_SERVICE, priceOracle]);
   m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "Validator", tokenValidator]);
-  m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "PriceOracle", priceOracle]);
+  m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "OracleProcessor.sol", priceOracle]);
   m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "PaymentGateway", gateway]);
 
   return {

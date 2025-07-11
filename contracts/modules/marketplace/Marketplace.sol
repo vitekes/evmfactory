@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/interfaces/ICoreSystem.sol';
+import '../../core/CoreSystem.sol';
 import '../../payments/interfaces/IGateway.sol';
 import '../../payments/interfaces/IPriceOracle.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '../../lib/SignatureLib.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -31,6 +31,22 @@ interface IEventPayload {
     }
 }
 
+// Интерфейс менеджера скидок
+interface IDiscountManager {
+    struct Discount {
+        uint16 discountPercent;
+        uint64 startTime;
+        uint64 endTime;
+        bool active;
+    }
+
+    function getDiscount(bytes32 sku) external view returns (Discount memory discount);
+
+    function isDiscountActive(bytes32 sku) external view returns (bool isActive, uint16 percent);
+
+    function getDiscountedPrice(bytes32 sku, uint256 originalPrice) external view returns (uint256 discountedPrice);
+}
+
 /// @title Marketplace
 /// @notice Marketplace working only with off-chain listings via signatures
 contract Marketplace is ReentrancyGuard {
@@ -38,35 +54,8 @@ contract Marketplace is ReentrancyGuard {
     using ECDSA for bytes32;
 
     // Core system reference
-    ICoreSystem public immutable core;
+    CoreSystem public immutable core;
 
-    /// @notice Убеждается, что вызывающий имеет роль администратора
-    modifier onlyAdmin() {
-        if (!core.hasRole(0x00, msg.sender)) revert NotAdmin();
-        _;
-    }
-
-    /// @notice Убеждается, что вызывающий имеет роль владельца фичи
-    modifier onlyFeatureOwner() {
-        bytes32 role = CoreDefs.FEATURE_OWNER_ROLE;
-        if (!core.hasRole(role, msg.sender)) revert NotFeatureOwner();
-        _;
-    }
-
-    /// @notice Убеждается, что вызывающий имеет роль оператора
-    modifier onlyOperator() {
-        bytes32 role = CoreDefs.OPERATOR_ROLE;
-        if (!core.hasRole(role, msg.sender)) revert NotOperator();
-        _;
-    }
-
-    /// @notice Проверяет наличие определенной роли
-    modifier onlyRole(bytes32 role) {
-        if (!core.hasRole(role, msg.sender)) revert Forbidden();
-        _;
-    }
-
-    // Core contracts
     bytes32 public immutable MODULE_ID;
     IGateway public immutable paymentGateway;
 
@@ -77,6 +66,17 @@ contract Marketplace is ReentrancyGuard {
     mapping(bytes32 => mapping(address => bool)) public consumed;
     mapping(bytes32 => uint256) public minSaltBySku;
     mapping(bytes32 => bool) public revokedListings;
+
+    // Временные скидки для SKU
+    struct Discount {
+        uint16 discountPercent; // 0-10000, где 10000 = 100%
+        uint64 startTime;
+        uint64 endTime;
+        bool active;
+    }
+
+    // Активные скидки по SKU
+    mapping(bytes32 => Discount) public skuDiscounts;
 
     // Marketplace events
     event MarketplaceSale(
@@ -103,11 +103,22 @@ contract Marketplace is ReentrancyGuard {
         bytes32 moduleId
     );
 
+    event DiscountSet(
+        bytes32 indexed sku,
+        uint16 discountPercent,
+        uint64 startTime,
+        uint64 endTime,
+        address indexed setter,
+        bytes32 moduleId
+    );
+
+    event DiscountRemoved(bytes32 indexed sku, address indexed remover, bytes32 moduleId);
+
     constructor(address _core, address _paymentGateway, bytes32 moduleId) {
         if (_core == address(0)) revert ZeroAddress();
         if (_paymentGateway == address(0)) revert ZeroAddress();
 
-        core = ICoreSystem(_core);
+        core = CoreSystem(_core);
         MODULE_ID = moduleId;
         paymentGateway = IGateway(_paymentGateway);
 
@@ -131,7 +142,7 @@ contract Marketplace is ReentrancyGuard {
         bytes calldata sellerSignature,
         address paymentToken,
         uint256 maxPaymentAmount
-    ) external nonReentrant {
+    ) external payable nonReentrant {
         // Cheap checks before expensive operations
         if (listing.price == 0) revert InvalidArgument();
         if (listing.seller == address(0)) revert ZeroAddress();
@@ -147,7 +158,34 @@ contract Marketplace is ReentrancyGuard {
 
         // Determine token and amount for payment
         address actualPaymentToken = paymentToken == address(0) ? listing.token : paymentToken;
-        uint256 paymentAmount = listing.price;
+
+        // Определение итоговой цены с учетом скидок
+        uint256 finalPrice = listing.price;
+
+        // Проверка системы скидок
+        address discountManager = core.getService(MODULE_ID, 'DiscountManager');
+        if (discountManager != address(0)) {
+            // Применяем динамическую скидку из менеджера скидок, если она больше встроенной в листинг
+            try IDiscountManager(discountManager).getDiscountedPrice(listing.sku, listing.price) returns (
+                uint256 discountedPrice
+            ) {
+                if (discountedPrice < finalPrice) {
+                    finalPrice = discountedPrice;
+                }
+            } catch {
+                // Если вызов не удался, используем скидку из листинга
+            }
+        }
+
+        // Применяем скидку из листинга, если она указана
+        if (listing.discountPercent > 0) {
+            uint256 discountedPrice = (listing.price * (10000 - listing.discountPercent)) / 10000;
+            if (discountedPrice < finalPrice) {
+                finalPrice = discountedPrice;
+            }
+        }
+
+        uint256 paymentAmount = finalPrice;
 
         // Convert amount if payment token differs from listing token
         if (actualPaymentToken != listing.token) {
@@ -337,29 +375,8 @@ contract Marketplace is ReentrancyGuard {
     /// @param listing Listing data
     /// @return Listing hash with domain separator
     function hashListing(SignatureLib.Listing calldata listing) public view returns (bytes32) {
-        bytes32 listingTypeHash = keccak256(
-            'Listing(bytes32 sku,address seller,uint256 price,address token,uint256 salt,uint256 expiry,uint256[] chainIds)'
-        );
-
-        // Hash chainIds array separately
-        bytes32 chainIdsHash = keccak256(abi.encodePacked(listing.chainIds));
-
-        // Build EIP-712 struct hash
-        bytes32 structHash = keccak256(
-            abi.encode(
-                listingTypeHash,
-                listing.sku,
-                listing.seller,
-                listing.price,
-                listing.token,
-                listing.salt,
-                listing.expiry,
-                chainIdsHash
-            )
-        );
-
-        // Final digest for signature
-        return keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, structHash));
+        // Используем реализацию из SignatureLib для согласованности
+        return SignatureLib.hashListing(listing, DOMAIN_SEPARATOR);
     }
 
     /// @dev Validate listing parameters
@@ -375,7 +392,7 @@ contract Marketplace is ReentrancyGuard {
             revert AlreadyPurchased();
         }
 
-        // 2. Check expiry
+        // 2. Check expiry (0 = бессрочный листинг)
         if (listing.expiry > 0 && listing.expiry < block.timestamp) {
             revert Expired();
         }

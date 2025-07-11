@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../shared/BaseFactory.sol';
+import '../../core/BaseFactory.sol';
 import './ContestEscrow.sol';
 import './shared/PrizeInfo.sol';
 import './interfaces/IContestValidator.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 
 /// @title ContestFactory
 /// @notice Factory for creating contests and managing their initial funding

@@ -11,21 +11,7 @@ library CoreDefs {
     bytes32 internal constant SUBSCRIPTION_MODULE_ID = keccak256('SubscriptionManager');
     bytes32 internal constant CONTEST_MODULE_ID = keccak256('Contest');
 
-    // ------------------------------------------------------------------
-    // Core service identifiers
-    // ------------------------------------------------------------------
-    bytes32 internal constant SERVICE_ACCESS_CONTROL = keccak256('AccessControlCenter');
-    bytes32 internal constant SERVICE_REGISTRY = keccak256('Registry');
-    bytes32 internal constant SERVICE_FEE_MANAGER = keccak256('FeeManager');
-    bytes32 internal constant SERVICE_PAYMENT_GATEWAY = keccak256('PaymentGateway');
-
-    // ------------------------------------------------------------------
-    // Module service identifiers
-    // ------------------------------------------------------------------
-    bytes32 internal constant SERVICE_VALIDATOR = keccak256('Validator');
-    bytes32 internal constant SERVICE_PRICE_ORACLE = keccak256('PriceOracle');
-    bytes32 internal constant SERVICE_PERMIT2 = keccak256('Permit2');
-    bytes32 internal constant SERVICE_NFT_MANAGER = keccak256('NFTManager');
+    // Упразднили константы сервисов - теперь используем строковые алиасы напрямую
 
     // ------------------------------------------------------------------
     // Access control roles

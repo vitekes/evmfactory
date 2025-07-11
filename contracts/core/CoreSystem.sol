@@ -2,15 +2,13 @@
 pragma solidity ^0.8.28;
 
 import '../errors/Errors.sol';
-import '../shared/CoreDefs.sol';
-import './interfaces/ICoreSystem.sol';
+import './CoreDefs.sol';
 
 /**
  * @title CoreSystem
- * @notice Объединенная система управления доступом и регистрации компонентов
- * @dev Заменяет связку Registry + AccessControlCenter и устраняет циклические зависимости
+ * @notice Система управления доступом и регистрации компонентов
  */
-contract CoreSystem is ICoreSystem {
+contract CoreSystem {
     // Роли системы
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
     bytes32 public constant FEATURE_OWNER_ROLE = keccak256('FEATURE_OWNER_ROLE');
@@ -50,10 +48,6 @@ contract CoreSystem is ICoreSystem {
     constructor(address admin) {
         if (admin == address(0)) revert InvalidAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-
-        // Регистрируем себя как ядро системы
-        coreServices[CoreDefs.SERVICE_REGISTRY] = address(this);
-        coreServices[CoreDefs.SERVICE_ACCESS_CONTROL] = address(this);
     }
 
     // === Управление ролями ===
@@ -78,32 +72,16 @@ contract CoreSystem is ICoreSystem {
         _;
     }
 
-    function hasRole(bytes32 role, address account) public view override returns (bool) {
+    function hasRole(bytes32 role, address account) public view returns (bool) {
         return roles[role][account];
     }
 
-    function grantRole(bytes32 role, address account) external override onlyAdmin {
+    function grantRole(bytes32 role, address account) external onlyAdmin {
         _grantRole(role, account);
     }
 
-    function revokeRole(bytes32 role, address account) external override onlyAdmin {
+    function revokeRole(bytes32 role, address account) external onlyAdmin {
         _revokeRole(role, account);
-    }
-
-    function isOperator(address account) external view override returns (bool) {
-        return hasRole(OPERATOR_ROLE, account);
-    }
-
-    function getOperators() external view override returns (address[] memory) {
-        return roleMembers[OPERATOR_ROLE];
-    }
-
-    function grantOperatorRole(address account) external override onlyAdmin {
-        _grantRole(OPERATOR_ROLE, account);
-    }
-
-    function revokeOperatorRole(address account) external override onlyAdmin {
-        _revokeRole(OPERATOR_ROLE, account);
     }
 
     function _grantRole(bytes32 role, address account) private {
@@ -135,13 +113,13 @@ contract CoreSystem is ICoreSystem {
 
     // === Управление компонентами ===
 
-    function registerFeature(bytes32 id, address impl, uint8 context) external override onlyFeatureOwner {
+    function registerFeature(bytes32 id, address impl, uint8 context) external onlyFeatureOwner {
         if (impl == address(0)) revert InvalidImplementation();
         features[id] = Feature(impl, context, true);
         emit FeatureRegistered(id, impl, context);
     }
 
-    function upgradeFeature(bytes32 id, address newImpl) external override onlyFeatureOwner {
+    function upgradeFeature(bytes32 id, address newImpl) external onlyFeatureOwner {
         if (newImpl == address(0)) revert InvalidAddress();
         Feature storage f = features[id];
         if (!f.exists) revert NotFound();
@@ -150,44 +128,13 @@ contract CoreSystem is ICoreSystem {
         emit FeatureUpgraded(id, oldImpl, newImpl, f.context);
     }
 
-    function getFeature(bytes32 id) external view override returns (address impl, uint8 context) {
+    function getFeature(bytes32 id) external view returns (address impl, uint8 context) {
         Feature storage f = features[id];
         if (!f.exists) revert NotFound();
         return (f.implementation, f.context);
     }
 
-    function getContext(bytes32 id) external view override returns (uint8) {
-        Feature storage f = features[id];
-        if (!f.exists) revert NotFound();
-        return f.context;
-    }
-
-    function setCoreService(bytes32 serviceId, address addr) external override onlyAdmin {
-        if (addr == address(0)) revert InvalidAddress();
-        coreServices[serviceId] = addr;
-        emit ServiceRegistered(serviceId, addr, bytes32(0));
-    }
-
-    function getCoreService(bytes32 serviceId) external view override returns (address) {
-        return coreServices[serviceId];
-    }
-
-    function setModuleService(bytes32 moduleId, bytes32 serviceId, address addr) public override onlyFeatureOwner {
-        if (!features[moduleId].exists) revert ModuleNotRegistered();
-        if (addr == address(0)) revert InvalidAddress();
-        moduleServices[moduleId][serviceId] = addr;
-        emit ServiceRegistered(serviceId, addr, moduleId);
-    }
-
-    function getModuleService(bytes32 moduleId, bytes32 serviceId) external view override returns (address) {
-        return moduleServices[moduleId][serviceId];
-    }
-
-    function setModuleServiceAlias(
-        bytes32 moduleId,
-        string calldata serviceAlias,
-        address addr
-    ) external override onlyFeatureOwner {
+    function setService(bytes32 moduleId, string calldata serviceAlias, address addr) external onlyFeatureOwner {
         if (!features[moduleId].exists) revert ModuleNotRegistered();
         if (addr == address(0)) revert InvalidAddress();
         bytes32 serviceId = keccak256(bytes(serviceAlias));
@@ -196,21 +143,7 @@ contract CoreSystem is ICoreSystem {
         emit ModuleRegistered(moduleId, serviceAlias, addr);
     }
 
-    function setModuleServiceAliasOperator(
-        bytes32 moduleId,
-        string calldata serviceAlias,
-        address addr
-    ) external override onlyOperator {
-        bytes32 serviceId = keccak256(bytes(serviceAlias));
-        if (!features[moduleId].exists) revert ModuleNotRegistered();
-        moduleServices[moduleId][serviceId] = addr;
-        emit ModuleRegistered(moduleId, serviceAlias, addr);
-    }
-
-    function getModuleServiceByAlias(
-        bytes32 moduleId,
-        string calldata serviceAlias
-    ) external view override returns (address) {
+    function getService(bytes32 moduleId, string calldata serviceAlias) external view returns (address) {
         return moduleServices[moduleId][keccak256(bytes(serviceAlias))];
     }
 }

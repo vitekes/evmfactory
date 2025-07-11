@@ -42,6 +42,13 @@ const config: HardhatUserConfig = {
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         }
     },
+    // Явно указываем, что не используем oz-upgrades
+    // Это предотвратит попытки компилятора искать upgradeable контракты
+    paths: {
+      sources: "./contracts",
+      cache: "./cache",
+      artifacts: "./artifacts"
+    },
     etherscan: {
         apiKey: process.env.ETHERSCAN_API_KEY || "",
     },

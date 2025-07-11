@@ -14,6 +14,7 @@ library SignatureLib {
         address seller;
         uint256 salt;
         uint64 expiry;
+        uint16 discountPercent; // 0-10000, где 10000 = 100%
     }
 
     struct Plan {
@@ -29,7 +30,7 @@ library SignatureLib {
     // Типы для подписей
     bytes32 internal constant LISTING_TYPEHASH =
         keccak256(
-            'Listing(uint256[] chainIds,address token,uint256 price,bytes32 sku,address seller,uint256 salt,uint64 expiry)'
+            'Listing(uint256[] chainIds,address token,uint256 price,bytes32 sku,address seller,uint256 salt,uint64 expiry,uint16 discountPercent)'
         );
 
     bytes32 internal constant PLAN_TYPEHASH =
@@ -48,7 +49,20 @@ library SignatureLib {
 
     function hashListing(Listing calldata l) internal pure returns (bytes32) {
         bytes32 chainHash = keccak256(abi.encodePacked(l.chainIds));
-        return keccak256(abi.encode(LISTING_TYPEHASH, chainHash, l.token, l.price, l.sku, l.seller, l.salt, l.expiry));
+        return
+            keccak256(
+                abi.encode(
+                    LISTING_TYPEHASH,
+                    chainHash,
+                    l.token,
+                    l.price,
+                    l.sku,
+                    l.seller,
+                    l.salt,
+                    l.expiry,
+                    l.discountPercent
+                )
+            );
     }
 
     function hashListing(Listing calldata l, bytes32 domainSeparator) internal pure returns (bytes32) {

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../core/interfaces/ICoreSystem.sol';
+import '../../core/CoreSystem.sol';
 import '../../payments/interfaces/IGateway.sol';
 import '../../payments/interfaces/IPriceOracle.sol';
 import '../../external/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -19,7 +19,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 /// @dev Uses PaymentGateway (IGateway) for payment processing and token conversion
 contract SubscriptionManager is ReentrancyGuard {
     // Core system reference
-    ICoreSystem public immutable core;
+    CoreSystem public immutable core;
 
     /// @notice Убеждается, что вызывающий имеет роль администратора
     modifier onlyAdmin() {
@@ -47,30 +47,6 @@ contract SubscriptionManager is ReentrancyGuard {
         _;
     }
 
-    /// @notice Проверяет, является ли аккаунт оператором
-    /// @param account Проверяемый адрес
-    /// @return Является ли аккаунт оператором
-    function isOperator(address account) external view returns (bool) {
-        return core.isOperator(account);
-    }
-
-    /// @notice Получает список операторов
-    /// @return Массив адресов операторов
-    function getOperators() external view returns (address[] memory) {
-        return core.getOperators();
-    }
-
-    /// @notice Назначает роль оператора указанному адресу
-    /// @param account Адрес, которому будет назначена роль
-    function grantOperatorRole(address account) external onlyAdmin {
-        core.grantOperatorRole(account);
-    }
-
-    /// @notice Отзывает роль оператора у указанного адреса
-    /// @param account Адрес, у которого будет отозвана роль
-    function revokeOperatorRole(address account) external onlyAdmin {
-        core.revokeOperatorRole(account);
-    }
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -143,7 +119,7 @@ contract SubscriptionManager is ReentrancyGuard {
         if (_core == address(0)) revert ZeroAddress();
         if (paymentGateway == address(0)) revert InvalidAddress();
 
-        core = ICoreSystem(_core);
+        core = CoreSystem(_core);
         MODULE_ID = moduleId;
 
         // Initialize DOMAIN_SEPARATOR as immutable value
@@ -182,7 +158,7 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @param sigMerchant Merchant signature over the plan
     /// @param permitSig Optional permit or Permit2 signature for token spending
     /// @param paymentToken Alternative token to use for payment
-    /// @param maxPaymentAmount Maximum amount to pay (0 to disable check)
+    /// @param maxPaymentAmount Maximum amount to payments (0 to disable check)
     function subscribeWithToken(
         SignatureLib.Plan calldata plan,
         bytes calldata sigMerchant,
@@ -202,7 +178,7 @@ contract SubscriptionManager is ReentrancyGuard {
         }
 
         // Ensure gateway is registered before heavy logic
-        address gatewayAddress = core.getModuleService(MODULE_ID, CoreDefs.SERVICE_PAYMENT_GATEWAY);
+        address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
         IGateway gateway = IGateway(gatewayAddress);
 
@@ -226,7 +202,7 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @param sigMerchant Merchant signature over the plan
     /// @param permitSig Optional permit or Permit2 signature for token spending
     /// @param paymentToken Token to use for payment
-    /// @param paymentAmount Amount to pay in the specified token
+    /// @param paymentAmount Amount to payments in the specified token
     function _subscribe(
         SignatureLib.Plan calldata plan,
         bytes calldata sigMerchant,
@@ -254,8 +230,7 @@ contract SubscriptionManager is ReentrancyGuard {
         if (!chainAllowed) revert InvalidChain();
 
         // Ensure payment gateway is registered
-        if (core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway') == address(0))
-            revert PaymentGatewayNotRegistered();
+        if (core.getService(MODULE_ID, 'PaymentGateway') == address(0)) revert PaymentGatewayNotRegistered();
 
         // Compute plan hash before signature check
         bytes32 planHash = hashPlan(plan);
@@ -274,11 +249,11 @@ contract SubscriptionManager is ReentrancyGuard {
                 permitSig,
                 (uint256, uint8, bytes32, bytes32)
             );
-            address paymentGateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+            address paymentGateway = core.getService(MODULE_ID, 'PaymentGateway');
             try IERC20Permit(paymentToken).permit(msg.sender, paymentGateway, paymentAmount, deadline, v, r, s) {
                 // ok
             } catch {
-                address permit2 = core.getModuleServiceByAlias(MODULE_ID, 'Permit2');
+                address permit2 = core.getService(MODULE_ID, 'Permit2');
                 bytes memory data = abi.encodeWithSelector(
                     IPermit2.permitTransferFrom.selector,
                     IPermit2.PermitTransferFrom({
@@ -296,7 +271,7 @@ contract SubscriptionManager is ReentrancyGuard {
         }
 
         // Get gateway address for payment
-        address gateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gateway = core.getService(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
@@ -344,7 +319,7 @@ contract SubscriptionManager is ReentrancyGuard {
         emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
 
         // Get gateway address for payment
-        address gateway = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gateway = core.getService(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
@@ -397,7 +372,7 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @notice Get payment amount for a plan in the specified token
     /// @dev Uses PaymentGateway for currency conversion
     /// @param plan Plan to calculate from
-    /// @param paymentToken Token to pay with
+    /// @param paymentToken Token to payments with
     /// @return paymentAmount Amount in the desired token
     function getPlanPaymentInToken(
         SignatureLib.Plan calldata plan,
@@ -409,7 +384,7 @@ contract SubscriptionManager is ReentrancyGuard {
         }
 
         // Convert using PaymentGateway
-        address gatewayAddress = core.getModuleServiceByAlias(MODULE_ID, 'PaymentGateway');
+        address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
 
         IGateway paymentGateway = IGateway(gatewayAddress);

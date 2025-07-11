@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import '../../shared/BaseFactory.sol';
+import '../../core/BaseFactory.sol';
 import './Marketplace.sol';
-import '../../shared/CoreDefs.sol';
+import '../../core/CoreDefs.sol';
 
 contract MarketplaceFactory is BaseFactory {
     event MarketplaceCreated(address indexed creator, address marketplace);
@@ -28,7 +28,7 @@ contract MarketplaceFactory is BaseFactory {
         // Настраиваем сервисы для экземпляра
         _copyServiceIfExists(instanceId, 'Validator');
         _copyServiceIfExists(instanceId, 'PriceOracle');
-        core.setModuleServiceAlias(instanceId, 'PaymentGateway', paymentGateway);
+        core.setService(instanceId, 'PaymentGateway', paymentGateway);
 
         // Создаем маркетплейс
         m = address(new Marketplace(address(core), paymentGateway, instanceId));
