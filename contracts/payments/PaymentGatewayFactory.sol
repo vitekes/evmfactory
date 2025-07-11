@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import './interfaces/IPaymentGatewayFactory.sol';
 import './interfaces/IPaymentFactory.sol';
 import './PaymentGateway.sol';
+import './PaymentOrchestrator.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/proxy/Clones.sol';
 
@@ -19,6 +20,7 @@ contract PaymentGatewayFactory is IPaymentGatewayFactory, IPaymentFactory, Acces
     // State variables
     address public immutable coreSystem;
     address public immutable processorRegistry;
+    address public immutable orchestrator;
     address public immutable implementation;
 
     // Mapping for module to gateway instances
@@ -41,8 +43,8 @@ contract PaymentGatewayFactory is IPaymentGatewayFactory, IPaymentFactory, Acces
         coreSystem = _coreSystem;
         processorRegistry = _processorRegistry;
 
-        // Деплоим имплементацию шлюза для последующего клонирования
-        implementation = address(new PaymentGateway(_coreSystem, _processorRegistry));
+        orchestrator = address(new PaymentOrchestrator(_processorRegistry));
+        implementation = address(new PaymentGateway(_coreSystem, orchestrator));
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(FACTORY_ADMIN_ROLE, msg.sender);
