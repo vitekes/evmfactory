@@ -7,6 +7,11 @@ import './IPaymentComponent.sol';
 /// @notice Универсальный интерфейс платежного шлюза для обработки платежей
 /// @dev Объединяет все необходимые методы для платежных шлюзов
 interface IGateway is IPaymentComponent {
+    /// @notice Результаты обработки платежа
+    enum PaymentResult {
+        FAILED,
+        SUCCESS
+    }
     /// @notice Универсальный метод обработки платежей
     /// @param moduleId Идентификатор модуля
     /// @param token Адрес токена (address(0) для нативной валюты)
