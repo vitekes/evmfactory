@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import './interfaces/IPaymentProcessor.sol';
 import './PaymentContextLibrary.sol';
-import './PaymentSystemRoleManager.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title BaseProcessor
@@ -17,11 +16,9 @@ abstract contract BaseProcessor is IPaymentProcessor, AccessControl {
 
     // Общие переменные состояния
     mapping(bytes32 => bool) public moduleEnabled; // moduleId => enabled
-    PaymentSystemRoleManager public roleManager;
 
     // События
     event ModuleConfigured(bytes32 indexed moduleId, bool enabled);
-    event RoleManagerSet(address indexed roleManager);
 
     /**
      * @dev Конструктор базового класса
@@ -31,15 +28,6 @@ abstract contract BaseProcessor is IPaymentProcessor, AccessControl {
         _grantRole(PROCESSOR_ADMIN_ROLE, msg.sender);
     }
 
-    /**
-     * @notice Установить менеджер ролей
-     * @param _roleManager Адрес менеджера ролей
-     */
-    function setRoleManager(address _roleManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_roleManager != address(0), 'BaseProcessor: role manager is zero address');
-        roleManager = PaymentSystemRoleManager(_roleManager);
-        emit RoleManagerSet(_roleManager);
-    }
 
     /**
      * @dev Проверяет, имеет ли аккаунт специфичную роль для процессора
@@ -48,13 +36,7 @@ abstract contract BaseProcessor is IPaymentProcessor, AccessControl {
      * @return Имеет ли аккаунт указанную роль
      */
     function _hasProcessorRole(bytes32 role, address account) internal view returns (bool) {
-        // Если менеджер ролей не установлен, используем стандартную проверку AccessControl
-        if (address(roleManager) == address(0)) {
-            return hasRole(role, account);
-        }
-
-        // Проверяем роль в централизованном менеджере ролей
-        return roleManager.hasProcessorRole(address(this), role, account) || roleManager.hasSystemRole(role, account);
+        return hasRole(role, account);
     }
 
     /**

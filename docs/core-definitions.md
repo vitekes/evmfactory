@@ -24,7 +24,6 @@ bytes32 internal constant PRICE_ORACLE_MODULE_ID = keccak256('PriceOracle');
 Ключевые сервисы, необходимые для функционирования системы:
 
 ```solidity
-bytes32 internal constant SERVICE_ACCESS_CONTROL = keccak256('AccessControlCenter');
 bytes32 internal constant SERVICE_REGISTRY = keccak256('Registry');
 bytes32 internal constant SERVICE_FEE_MANAGER = keccak256('CoreFeeManager');
 bytes32 internal constant SERVICE_PAYMENT_GATEWAY = keccak256('PaymentGateway');
