@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./interfaces/IGateway.sol";
-import "./interfaces/IProcessorRegistry.sol";
-import "./interfaces/IPaymentProcessor.sol";
-import "./PaymentContextLibrary.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import './interfaces/IGateway.sol';
+import './interfaces/IProcessorRegistry.sol';
+import './interfaces/IPaymentProcessor.sol';
+import './PaymentContextLibrary.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /// @title PaymentGateway
 /// @notice Платежный шлюз для маршрутизации платежей через цепочку процессоров
@@ -18,12 +18,12 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
     using PaymentContextLibrary for PaymentContextLibrary.PaymentContext;
 
     // Constants
-    bytes32 public constant PAYMENT_ADMIN_ROLE = keccak256("PAYMENT_ADMIN_ROLE");
-    bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256("PROCESSOR_MANAGER_ROLE");
+    bytes32 public constant PAYMENT_ADMIN_ROLE = keccak256('PAYMENT_ADMIN_ROLE');
+    bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256('PROCESSOR_MANAGER_ROLE');
 
     // Имя и версия компонента
-    string private constant GATEWAY_NAME = "PaymentGateway";
-    string private constant GATEWAY_VERSION = "1.0.0";
+    string private constant GATEWAY_NAME = 'PaymentGateway';
+    string private constant GATEWAY_VERSION = '1.0.0';
 
     // State variables
     address public immutable coreSystem;
@@ -54,12 +54,9 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @param _coreSystem Адрес системы ядра
      * @param _processorRegistry Адрес реестра процессоров
      */
-    constructor(
-        address _coreSystem,
-        address _processorRegistry
-    ) {
-        require(_coreSystem != address(0), "PaymentGateway: core system is zero address");
-        require(_processorRegistry != address(0), "PaymentGateway: processor registry is zero address");
+    constructor(address _coreSystem, address _processorRegistry) {
+        require(_coreSystem != address(0), 'PaymentGateway: core system is zero address');
+        require(_processorRegistry != address(0), 'PaymentGateway: processor registry is zero address');
 
         coreSystem = _coreSystem;
         processorRegistry = _processorRegistry;
@@ -86,12 +83,12 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         bytes memory signature
     ) external payable override nonReentrant returns (uint256 netAmount) {
         // Базовые проверки
-        require(amount > 0, "PaymentGateway: zero amount");
+        require(amount > 0, 'PaymentGateway: zero amount');
 
         // Проверка нативной валюты
         bool isNativeToken = token == address(0);
         if (isNativeToken) {
-            require(msg.value >= amount, "PaymentGateway: insufficient value");
+            require(msg.value >= amount, 'PaymentGateway: insufficient value');
         } else {
             // Перевод токенов от плательщика к шлюзу
             IERC20(token).safeTransferFrom(payer, address(this), amount);
@@ -100,10 +97,10 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         // Создаем контекст платежа с использованием библиотеки
         PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
             moduleId,
-            payer,              // Отправитель
-            address(0),        // Получатель будет определен процессорами
-            token,             // Токен платежа
-            amount,            // Сумма платежа
+            payer, // Отправитель
+            address(0), // Получатель будет определен процессорами
+            token, // Токен платежа
+            amount, // Сумма платежа
             PaymentContextLibrary.PaymentOperation.PAYMENT, // Тип операции
             signature.length > 0 ? signature : new bytes(0) // Метаданные (подпись, если есть)
         );
@@ -116,15 +113,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         paymentResults[paymentId] = PaymentResult.SUCCESS;
 
         // Генерируем событие о успешной обработке платежа
-        emit PaymentProcessed(
-            moduleId,
-            paymentId,
-            token,
-            payer,
-            amount,
-            netAmount,
-            PaymentResult.SUCCESS
-        );
+        emit PaymentProcessed(moduleId, paymentId, token, payer, amount, netAmount, PaymentResult.SUCCESS);
 
         return netAmount;
     }
@@ -160,8 +149,8 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
             if (!IPaymentProcessor(processor).isApplicable(contextBytes)) continue;
 
             // Обрабатываем контекст процессором
-            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) =
-                                    IPaymentProcessor(processor).process(contextBytes);
+            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) = IPaymentProcessor(processor)
+                .process(contextBytes);
 
             // Обрабатываем ошибки процессора
             if (result == IPaymentProcessor.ProcessResult.FAILED) {
@@ -222,9 +211,11 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
 
             // Проверяем, что это OracleProcessor по имени
             try IPaymentProcessor(processor).getName() returns (string memory name) {
-                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked("OracleProcessor"))) {
+                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked('OracleProcessor'))) {
                     // Делегируем вызов процессору конвертации
-                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (uint256 result) {
+                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (
+                        uint256 result
+                    ) {
                         return result;
                     } catch {
                         // Если произошла ошибка, продолжаем поиск других процессоров
@@ -253,7 +244,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         address toToken
     ) external view override returns (bool isSupported) {
         // Получаем процессор фильтрации токенов из реестра
-        try IProcessorRegistry(processorRegistry).getProcessorByName("TokenFilter") returns (address tokenFilter) {
+        try IProcessorRegistry(processorRegistry).getProcessorByName('TokenFilter') returns (address tokenFilter) {
             if (tokenFilter != address(0)) {
                 // Делегируем вызов процессору фильтрации токенов
                 try IPaymentProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
@@ -277,7 +268,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      */
     function getSupportedTokens(bytes32 moduleId) external view override returns (address[] memory tokens) {
         // Получаем процессор фильтрации токенов из реестра
-        try IProcessorRegistry(processorRegistry).getProcessorByName("TokenFilter") returns (address tokenFilter) {
+        try IProcessorRegistry(processorRegistry).getProcessorByName('TokenFilter') returns (address tokenFilter) {
             if (tokenFilter != address(0)) {
                 // Делегируем вызов процессору фильтрации токенов
                 try IPaymentProcessor(tokenFilter).getAllowedTokens(moduleId) returns (address[] memory result) {
@@ -305,14 +296,11 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
     function addProcessor(
         address processor,
         uint256 position
-    ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success){
-        require(processor != address(0), "PaymentGateway: processor is zero address");
+    ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success) {
+        require(processor != address(0), 'PaymentGateway: processor is zero address');
 
         // Проверяем, что процессор соответствует интерфейсу
-        require(
-            IPaymentProcessor(processor).getVersion().length > 0,
-            "PaymentGateway: invalid processor"
-        );
+        require(IPaymentProcessor(processor).getVersion().length > 0, 'PaymentGateway: invalid processor');
 
         // Добавляем процессор в реестр, если это новый процессор
         IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
@@ -343,7 +331,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         // Получаем адрес процессора из реестра
         IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
         address processor = registry.getProcessorByName(processorName);
-        require(processor != address(0), "PaymentGateway: processor not found");
+        require(processor != address(0), 'PaymentGateway: processor not found');
 
         // Устанавливаем конфигурацию для модуля
         moduleProcessorConfig[moduleId][processorName] = enabled;
@@ -377,7 +365,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @param moduleId Идентификатор модуля
      * @return processors Список процессоров
      */
-    function getProcessors(bytes32 moduleId) external view override returns (address[] memory processors){
+    function getProcessors(bytes32 moduleId) external view override returns (address[] memory processors) {
         return moduleProcessors[moduleId];
     }
 
@@ -407,49 +395,49 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         return moduleProcessors[moduleId].length > 0;
     }
 
-//    /**
-//     * @notice Обработать платеж с произвольными данными
-//     * @param moduleId Идентификатор модуля
-//     * @param paymentData Данные платежа
-//     * @return result Результат обработки
-//     * @return paymentId Идентификатор платежа
-//     */
-//    function processPaymentWithData(
-//        bytes32 moduleId,
-//        bytes calldata paymentData
-//    ) external override nonReentrant returns (PaymentResult result, bytes32 paymentId) {
-//        try {
-//            // Создаем контекст платежа напрямую из произвольных данных
-//            PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
-//                moduleId,
-//                msg.sender,          // По умолчанию отправитель - вызывающий контракт
-//                address(0),         // Получатель будет определен процессорами
-//                address(0),         // Токен будет определен из paymentData
-//                0,                  // Сумма будет определена из paymentData
-//                PaymentContextLibrary.PaymentOperation.PAYMENT,
-//                paymentData          // Данные для обработки процессорами
-//            );
-//
-//            // Запускаем обработку через цепочку процессоров
-//            // Флаг нативной валюты будет определен процессорами
-//            uint256 netAmount;
-//            (netAmount, paymentId) = _processPaymentThroughProcessors(context, false);
-//
-//            // Сохраняем результат платежа
-//            result = PaymentResult.SUCCESS;
-//            paymentResults[paymentId] = result;
-//
-//            return (result, paymentId);
-//        } catch Error(string memory reason) {
-//            // Обработка ошибки с сообщением
-//            result = PaymentResult.FAILED;
-//            return (result, bytes32(0));
-//        } catch {
-//            // Обработка ошибки без сообщения
-//            result = PaymentResult.FAILED;
-//            return (result, bytes32(0));
-//        }
-//    }
+    //    /**
+    //     * @notice Обработать платеж с произвольными данными
+    //     * @param moduleId Идентификатор модуля
+    //     * @param paymentData Данные платежа
+    //     * @return result Результат обработки
+    //     * @return paymentId Идентификатор платежа
+    //     */
+    //    function processPaymentWithData(
+    //        bytes32 moduleId,
+    //        bytes calldata paymentData
+    //    ) external override nonReentrant returns (PaymentResult result, bytes32 paymentId) {
+    //        try {
+    //            // Создаем контекст платежа напрямую из произвольных данных
+    //            PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
+    //                moduleId,
+    //                msg.sender,          // По умолчанию отправитель - вызывающий контракт
+    //                address(0),         // Получатель будет определен процессорами
+    //                address(0),         // Токен будет определен из paymentData
+    //                0,                  // Сумма будет определена из paymentData
+    //                PaymentContextLibrary.PaymentOperation.PAYMENT,
+    //                paymentData          // Данные для обработки процессорами
+    //            );
+    //
+    //            // Запускаем обработку через цепочку процессоров
+    //            // Флаг нативной валюты будет определен процессорами
+    //            uint256 netAmount;
+    //            (netAmount, paymentId) = _processPaymentThroughProcessors(context, false);
+    //
+    //            // Сохраняем результат платежа
+    //            result = PaymentResult.SUCCESS;
+    //            paymentResults[paymentId] = result;
+    //
+    //            return (result, paymentId);
+    //        } catch Error(string memory reason) {
+    //            // Обработка ошибки с сообщением
+    //            result = PaymentResult.FAILED;
+    //            return (result, bytes32(0));
+    //        } catch {
+    //            // Обработка ошибки без сообщения
+    //            result = PaymentResult.FAILED;
+    //            return (result, bytes32(0));
+    //        }
+    //    }
 
     /**
      * @notice Получить статус платежа

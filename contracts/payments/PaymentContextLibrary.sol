@@ -7,57 +7,57 @@ pragma solidity ^0.8.28;
 library PaymentContextLibrary {
     /// @notice Состояния обработки платежа
     enum ProcessingState {
-        INITIALIZED,    // Платеж инициализирован
-        VALIDATING,     // Проверка входных данных
-        PROCESSING,     // Обработка платежа
-        CONVERTING,     // Конвертация валют
+        INITIALIZED, // Платеж инициализирован
+        VALIDATING, // Проверка входных данных
+        PROCESSING, // Обработка платежа
+        CONVERTING, // Конвертация валют
         CALCULATING_FEES, // Расчет комиссий
         APPLYING_DISCOUNT, // Применение скидок
-        TRANSFERRING,   // Перевод средств
-        COMPLETED,      // Обработка завершена
-        FAILED          // Обработка завершилась ошибкой
+        TRANSFERRING, // Перевод средств
+        COMPLETED, // Обработка завершена
+        FAILED // Обработка завершилась ошибкой
     }
 
     /// @notice Тип операции платежа
     enum PaymentOperation {
-        PAYMENT,        // Обычный платеж
-        SUBSCRIPTION,   // Платеж по подписке
-        MARKETPLACE,    // Платеж на маркетплейсе
-        ESCROW,         // Депонирование средств
-        REFUND          // Возврат средств
+        PAYMENT, // Обычный платеж
+        SUBSCRIPTION, // Платеж по подписке
+        MARKETPLACE, // Платеж на маркетплейсе
+        ESCROW, // Депонирование средств
+        REFUND // Возврат средств
     }
 
     /// @notice Упакованные данные контекста для экономии газа
     struct PackedData {
-        bytes32 moduleId;              // Идентификатор модуля
-        address sender;                // Отправитель средств
-        address recipient;             // Получатель средств
-        address token;                 // Адрес токена платежа
-        uint128 originalAmount;        // Исходная сумма платежа (упаковано)
-        uint128 processedAmount;       // Текущая сумма после обработки (упаковано)
-        uint8 operation;               // Тип операции (упаковано из enum)
-        uint8 state;                   // Текущее состояние обработки (упаковано из enum)
-        uint32 timestamp;              // Время создания контекста (упаковано)
-        uint32 deadline;               // Срок действия, если применимо (упаковано)
-        bool success;                  // Флаг успешности операции
+        bytes32 moduleId; // Идентификатор модуля
+        address sender; // Отправитель средств
+        address recipient; // Получатель средств
+        address token; // Адрес токена платежа
+        uint128 originalAmount; // Исходная сумма платежа (упаковано)
+        uint128 processedAmount; // Текущая сумма после обработки (упаковано)
+        uint8 operation; // Тип операции (упаковано из enum)
+        uint8 state; // Текущее состояние обработки (упаковано из enum)
+        uint32 timestamp; // Время создания контекста (упаковано)
+        uint32 deadline; // Срок действия, если применимо (упаковано)
+        bool success; // Флаг успешности операции
     }
 
     /// @notice Результаты обработки процессорами
     struct ProcessorResults {
-        bytes32 paymentId;             // Уникальный идентификатор платежа
-        uint64 feeAmount;              // Сумма комиссии (упаковано)
-        uint64 discountAmount;         // Сумма скидки (упаковано)
-        uint16 discountPercent;        // Процент скидки (в базисных пунктах)
-        string[] processorNames;       // Имена процессоров, обработавших контекст
-        uint8[] processorResults;      // Результаты обработки процессорами
-        string errorMessage;           // Сообщение об ошибке, если есть
+        bytes32 paymentId; // Уникальный идентификатор платежа
+        uint64 feeAmount; // Сумма комиссии (упаковано)
+        uint64 discountAmount; // Сумма скидки (упаковано)
+        uint16 discountPercent; // Процент скидки (в базисных пунктах)
+        string[] processorNames; // Имена процессоров, обработавших контекст
+        uint8[] processorResults; // Результаты обработки процессорами
+        string errorMessage; // Сообщение об ошибке, если есть
     }
 
     /// @notice Оптимизированная структура контекста платежа
     struct PaymentContext {
-        PackedData packed;              // Упакованные основные данные
-        ProcessorResults results;      // Результаты обработки процессорами
-        bytes metadata;                // Произвольные данные для обработчиков
+        PackedData packed; // Упакованные основные данные
+        ProcessorResults results; // Результаты обработки процессорами
+        bytes metadata; // Произвольные данные для обработчиков
     }
 
     /// @notice Создать базовый контекст платежа
@@ -79,7 +79,7 @@ library PaymentContextLibrary {
         bytes memory metadata
     ) internal view returns (PaymentContext memory context) {
         // Проверка на переполнение при упаковке
-        require(amount <= type(uint128).max, "Amount too large for packing");
+        require(amount <= type(uint128).max, 'Amount too large for packing');
 
         // Инициализация упакованных данных
         context.packed.moduleId = moduleId;
@@ -94,9 +94,7 @@ library PaymentContextLibrary {
         context.packed.timestamp = uint32(block.timestamp);
 
         // Инициализация результатов
-        context.results.paymentId = keccak256(abi.encode(
-            moduleId, sender, recipient, token, amount, block.timestamp
-        ));
+        context.results.paymentId = keccak256(abi.encode(moduleId, sender, recipient, token, amount, block.timestamp));
         context.results.processorNames = new string[](0);
         context.results.processorResults = new uint8[](0);
 
@@ -160,7 +158,7 @@ library PaymentContextLibrary {
         PaymentContext memory context,
         uint256 feeAmount
     ) internal pure returns (PaymentContext memory) {
-        require(feeAmount <= type(uint64).max, "Fee amount too large for packing");
+        require(feeAmount <= type(uint64).max, 'Fee amount too large for packing');
         context.results.feeAmount = uint64(feeAmount);
         return context;
     }
@@ -175,7 +173,7 @@ library PaymentContextLibrary {
         uint256 discountAmount,
         uint16 discountPercent
     ) internal pure returns (PaymentContext memory) {
-        require(discountAmount <= type(uint64).max, "Discount amount too large for packing");
+        require(discountAmount <= type(uint64).max, 'Discount amount too large for packing');
         context.results.discountAmount = uint64(discountAmount);
         context.results.discountPercent = discountPercent;
         return context;
@@ -198,10 +196,7 @@ library PaymentContextLibrary {
     /// @param context Исходный контекст
     /// @param success Флаг успешности
     /// @return Обновленный контекст
-    function setSuccess(
-        PaymentContext memory context,
-        bool success
-    ) internal pure returns (PaymentContext memory) {
+    function setSuccess(PaymentContext memory context, bool success) internal pure returns (PaymentContext memory) {
         context.packed.success = success;
         return context;
     }
@@ -214,7 +209,7 @@ library PaymentContextLibrary {
         PaymentContext memory context,
         uint256 processedAmount
     ) internal pure returns (PaymentContext memory) {
-        require(processedAmount <= type(uint128).max, "Amount too large for packing");
+        require(processedAmount <= type(uint128).max, 'Amount too large for packing');
         context.packed.processedAmount = uint128(processedAmount);
         return context;
     }
@@ -222,18 +217,14 @@ library PaymentContextLibrary {
     /// @notice Сериализовать контекст в байты
     /// @param context Контекст для сериализации
     /// @return Сериализованный контекст
-    function serializeContext(
-        PaymentContext memory context
-    ) internal pure returns (bytes memory) {
+    function serializeContext(PaymentContext memory context) internal pure returns (bytes memory) {
         return abi.encode(context);
     }
 
     /// @notice Десериализовать контекст из байтов
     /// @param data Сериализованный контекст
     /// @return Десериализованный контекст
-    function deserializeContext(
-        bytes memory data
-    ) internal pure returns (PaymentContext memory) {
+    function deserializeContext(bytes memory data) internal pure returns (PaymentContext memory) {
         return abi.decode(data, (PaymentContext));
     }
 
