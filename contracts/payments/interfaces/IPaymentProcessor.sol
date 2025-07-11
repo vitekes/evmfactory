@@ -7,6 +7,13 @@ import './IPaymentComponent.sol';
 /// @notice Интерфейс для обработчиков платежей
 /// @dev Каждый обработчик в цепочке должен реализовывать этот интерфейс
 interface IPaymentProcessor is IPaymentComponent {
+    /// @notice Возможные результаты обработки процессором
+    enum ProcessResult {
+        FAILED,
+        SUCCESS,
+        SKIPPED,
+        MODIFIED
+    }
     /// @notice Обработать контекст платежа
     /// @param context Контекст платежа
     /// @return result Результат обработки
