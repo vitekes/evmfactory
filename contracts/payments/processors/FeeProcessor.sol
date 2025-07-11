@@ -87,23 +87,23 @@ contract FeeProcessor is BaseProcessor {
         PaymentContextLibrary.PaymentContext memory context
     ) internal override returns (ProcessResult result, bytes memory updatedContext) {
         // Проверяем конфигурацию для модуля
-        FeeConfig memory config = feeConfigs[context.moduleId];
+        FeeConfig memory config = feeConfigs[context.packed.moduleId];
         if (!config.active) {
             context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.SKIPPED));
             return (ProcessResult.SKIPPED, abi.encode(context));
         }
 
         // Рассчитываем комиссию
-        uint256 feeAmount = (context.amount * config.feePercentage) / 10000;
+        uint256 feeAmount = (uint256(context.packed.processedAmount) * config.feePercentage) / 10000;
 
         // Обновляем контекст
-        context.fee = feeAmount;
-        context.payee = config.feeRecipient;
+        context.results.feeAmount = uint64(feeAmount);
+        context.packed.recipient = config.feeRecipient;
 
         // Добавляем результат обработки
         context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.SUCCESS));
 
-        emit FeeCollected(context.moduleId, context.token, feeAmount, config.feeRecipient);
+        emit FeeCollected(context.packed.moduleId, context.packed.token, feeAmount, config.feeRecipient);
 
         return (ProcessResult.SUCCESS, abi.encode(context));
     }
@@ -117,8 +117,8 @@ contract FeeProcessor is BaseProcessor {
         PaymentContextLibrary.PaymentContext memory context
     ) internal view override returns (bool applicable) {
         // Процессор применим, если активен для модуля и настроена конфигурация комиссий
-        FeeConfig memory config = feeConfigs[context.moduleId];
-        return moduleEnabled[context.moduleId] && config.active && config.feePercentage > 0;
+        FeeConfig memory config = feeConfigs[context.packed.moduleId];
+        return moduleEnabled[context.packed.moduleId] && config.active && config.feePercentage > 0;
     }
 
     /**

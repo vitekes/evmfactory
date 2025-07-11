@@ -189,10 +189,14 @@ abstract contract BaseProcessor is IPaymentProcessor, AccessControl {
         PaymentContextLibrary.PaymentContext memory context,
         string memory errorMessage
     ) internal pure returns (bytes memory) {
-        context.state = PaymentContextLibrary.ProcessingState.FAILED;
-        context.success = false;
-        context.errorMessage = errorMessage;
-        context = PaymentContextLibrary.addProcessorResult(context, getName(), uint8(ProcessResult.FAILED));
+        context.packed.state = uint8(PaymentContextLibrary.ProcessingState.FAILED);
+        context.packed.success = false;
+        context.results.errorMessage = errorMessage;
+        context = PaymentContextLibrary.addProcessorResult(
+            context,
+            getName(),
+            uint8(ProcessResult.FAILED)
+        );
         return abi.encode(context);
     }
 }

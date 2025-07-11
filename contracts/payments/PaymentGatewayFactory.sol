@@ -19,7 +19,6 @@ contract PaymentGatewayFactory is IPaymentGatewayFactory, IPaymentFactory, Acces
     // State variables
     address public immutable coreSystem;
     address public immutable processorRegistry;
-    address public immutable feeManager;
     address public immutable implementation;
 
     // Mapping for module to gateway instances
@@ -34,19 +33,16 @@ contract PaymentGatewayFactory is IPaymentGatewayFactory, IPaymentFactory, Acces
      * @dev Конструктор инициализирует фабрику с необходимыми зависимостями
      * @param _coreSystem Адрес системы ядра
      * @param _processorRegistry Адрес реестра процессоров
-     * @param _feeManager Адрес менеджера комиссий
      */
-    constructor(address _coreSystem, address _processorRegistry, address _feeManager) {
+    constructor(address _coreSystem, address _processorRegistry) {
         require(_coreSystem != address(0), 'PaymentGatewayFactory: core system is zero address');
         require(_processorRegistry != address(0), 'PaymentGatewayFactory: processor registry is zero address');
-        require(_feeManager != address(0), 'PaymentGatewayFactory: fee manager is zero address');
 
         coreSystem = _coreSystem;
         processorRegistry = _processorRegistry;
-        feeManager = _feeManager;
 
         // Деплоим имплементацию шлюза для последующего клонирования
-        implementation = address(new PaymentGateway(_coreSystem, _processorRegistry, _feeManager));
+        implementation = address(new PaymentGateway(_coreSystem, _processorRegistry));
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(FACTORY_ADMIN_ROLE, msg.sender);
