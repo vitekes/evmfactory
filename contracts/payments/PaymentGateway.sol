@@ -2,9 +2,7 @@
 pragma solidity ^0.8.28;
 
 import './interfaces/IGateway.sol';
-import './interfaces/IProcessorRegistry.sol';
-import './interfaces/IPaymentProcessor.sol';
-import './PaymentContextLibrary.sol';
+import './PaymentOrchestrator.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -15,7 +13,6 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 /// @dev Основная задача - координация обработки платежей через различные процессоры
 contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    using PaymentContextLibrary for PaymentContextLibrary.PaymentContext;
 
     // Constants
     bytes32 public constant PAYMENT_ADMIN_ROLE = keccak256('PAYMENT_ADMIN_ROLE');
@@ -27,11 +24,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
 
     // State variables
     address public immutable coreSystem;
-    address public immutable processorRegistry;
-
-    // Processor configuration for modules
-    mapping(bytes32 => address[]) public moduleProcessors;
-    mapping(bytes32 => mapping(string => bool)) public moduleProcessorConfig;
+    address public immutable orchestrator;
 
     // Отслеживание платежей
     mapping(bytes32 => PaymentResult) public paymentResults;
@@ -46,20 +39,18 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         uint256 netAmount,
         PaymentResult result
     );
-    event ProcessorAdded(address indexed processor, uint256 position);
-    event ProcessorConfigured(bytes32 indexed moduleId, string processorName, bool enabled);
 
     /**
      * @dev Конструктор шлюза
      * @param _coreSystem Адрес системы ядра
-     * @param _processorRegistry Адрес реестра процессоров
+     * @param _orchestrator Адрес оркестратора платежей
      */
-    constructor(address _coreSystem, address _processorRegistry) {
+    constructor(address _coreSystem, address _orchestrator) {
         require(_coreSystem != address(0), 'PaymentGateway: core system is zero address');
-        require(_processorRegistry != address(0), 'PaymentGateway: processor registry is zero address');
+        require(_orchestrator != address(0), 'PaymentGateway: orchestrator is zero address');
 
         coreSystem = _coreSystem;
-        processorRegistry = _processorRegistry;
+        orchestrator = _orchestrator;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAYMENT_ADMIN_ROLE, msg.sender);
@@ -94,20 +85,24 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
             IERC20(token).safeTransferFrom(payer, address(this), amount);
         }
 
-        // Создаем контекст платежа с использованием библиотеки
-        PaymentContextLibrary.PaymentContext memory context = PaymentContextLibrary.createContext(
+        bytes32 paymentId;
+        address feeRecipient;
+        uint256 feeAmount;
+        (netAmount, paymentId, feeRecipient, feeAmount) = PaymentOrchestrator(orchestrator).processPayment(
             moduleId,
-            payer, // Отправитель
-            address(0), // Получатель будет определен процессорами
-            token, // Токен платежа
-            amount, // Сумма платежа
-            PaymentContextLibrary.PaymentOperation.PAYMENT, // Тип операции
-            signature.length > 0 ? signature : new bytes(0) // Метаданные (подпись, если есть)
+            token,
+            payer,
+            amount,
+            signature
         );
 
-        // Запускаем обработку через цепочку процессоров
-        bytes32 paymentId;
-        (netAmount, paymentId) = _processPaymentThroughProcessors(context, isNativeToken);
+        if (feeAmount > 0 && feeRecipient != address(0)) {
+            if (isNativeToken) {
+                payable(feeRecipient).transfer(feeAmount);
+            } else {
+                IERC20(token).safeTransfer(feeRecipient, feeAmount);
+            }
+        }
 
         // Сохраняем результат в истории платежей
         paymentResults[paymentId] = PaymentResult.SUCCESS;
@@ -125,66 +120,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @return netAmount Чистая сумма
      * @return paymentId Идентификатор платежа
      */
-    function _processPaymentThroughProcessors(
-        PaymentContextLibrary.PaymentContext memory context,
-        bool isNativeToken
-    ) internal returns (uint256 netAmount, bytes32 paymentId) {
-        bytes32 moduleId = context.packed.moduleId;
-        address token = context.packed.token;
-        uint256 amount = context.packed.originalAmount;
 
-        // Получаем цепочку процессоров для модуля
-        address[] memory processors = moduleProcessors[moduleId];
-        bytes memory contextBytes = abi.encode(context);
-
-        // Проходим по всем процессорам в цепочке
-        for (uint256 i = 0; i < processors.length; i++) {
-            address processor = processors[i];
-            if (processor == address(0)) continue;
-
-            string memory processorName = IPaymentProcessor(processor).getName();
-            if (!moduleProcessorConfig[moduleId][processorName]) continue;
-
-            // Проверяем применимость процессора
-            if (!IPaymentProcessor(processor).isApplicable(contextBytes)) continue;
-
-            // Обрабатываем контекст процессором
-            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) = IPaymentProcessor(processor)
-                .process(contextBytes);
-
-            // Обрабатываем ошибки процессора
-            if (result == IPaymentProcessor.ProcessResult.FAILED) {
-                context = abi.decode(updatedContext, (PaymentContextLibrary.PaymentContext));
-                revert(context.results.errorMessage);
-            }
-
-            // Обновляем контекст для следующего процессора
-            contextBytes = updatedContext;
-        }
-
-        // Декодируем финальный контекст
-        context = abi.decode(contextBytes, (PaymentContextLibrary.PaymentContext));
-
-        // Проверяем успешность обработки
-        if (!context.packed.success) {
-            revert(context.results.errorMessage);
-        }
-
-        // Рассчитываем чистую сумму
-        netAmount = amount - context.results.feeAmount;
-        paymentId = context.results.paymentId;
-
-        // Переводим комиссию, если необходимо
-        if (context.results.feeAmount > 0 && context.packed.recipient != address(0)) {
-            if (isNativeToken) {
-                payable(context.packed.recipient).transfer(context.results.feeAmount);
-            } else {
-                IERC20(token).safeTransfer(context.packed.recipient, context.results.feeAmount);
-            }
-        }
-
-        return (netAmount, paymentId);
-    }
 
     /**
      * @notice Метод-делегат для конвертации суммы из одной валюты в другую
@@ -201,33 +137,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         address toToken,
         uint256 amount
     ) external view override returns (uint256 convertedAmount) {
-        // Получаем список процессоров для модуля
-        address[] memory processors = moduleProcessors[moduleId];
-
-        // Ищем процессор конвертации (OracleProcessor)
-        for (uint256 i = 0; i < processors.length; i++) {
-            address processor = processors[i];
-            if (processor == address(0)) continue;
-
-            // Проверяем, что это OracleProcessor по имени
-            try IPaymentProcessor(processor).getName() returns (string memory name) {
-                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked('OracleProcessor'))) {
-                    // Делегируем вызов процессору конвертации
-                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (
-                        uint256 result
-                    ) {
-                        return result;
-                    } catch {
-                        // Если произошла ошибка, продолжаем поиск других процессоров
-                    }
-                }
-            } catch {
-                // Если произошла ошибка при получении имени, продолжаем
-            }
-        }
-
-        // Если подходящий процессор не найден, возвращаем исходную сумму
-        return amount;
+        return PaymentOrchestrator(orchestrator).convertAmount(moduleId, fromToken, toToken, amount);
     }
 
     /**
@@ -243,21 +153,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         address fromToken,
         address toToken
     ) external view override returns (bool isSupported) {
-        // Получаем процессор фильтрации токенов из реестра
-        try IProcessorRegistry(processorRegistry).getProcessorByName('TokenFilter') returns (address tokenFilter) {
-            if (tokenFilter != address(0)) {
-                // Делегируем вызов процессору фильтрации токенов
-                try IPaymentProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
-                    return result;
-                } catch {
-                    // Если произошла ошибка, возвращаем true (упрощенная версия)
-                }
-            }
-        } catch {
-            // Если произошла ошибка при получении процессора, возвращаем true
-        }
-
-        return true;
+        return PaymentOrchestrator(orchestrator).isPairSupported(moduleId, fromToken, toToken);
     }
 
     /**
@@ -267,24 +163,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @return tokens Список поддерживаемых токенов
      */
     function getSupportedTokens(bytes32 moduleId) external view override returns (address[] memory tokens) {
-        // Получаем процессор фильтрации токенов из реестра
-        try IProcessorRegistry(processorRegistry).getProcessorByName('TokenFilter') returns (address tokenFilter) {
-            if (tokenFilter != address(0)) {
-                // Делегируем вызов процессору фильтрации токенов
-                try IPaymentProcessor(tokenFilter).getAllowedTokens(moduleId) returns (address[] memory result) {
-                    return result;
-                } catch {
-                    // Если произошла ошибка, возвращаем упрощенный список
-                }
-            }
-        } catch {
-            // Если произошла ошибка при получении процессора, возвращаем упрощенный список
-        }
-
-        // Упрощенная версия - всегда содержит нативную валюту
-        address[] memory defaultTokens = new address[](1);
-        defaultTokens[0] = address(0);
-        return defaultTokens;
+        return PaymentOrchestrator(orchestrator).getSupportedTokens(moduleId);
     }
 
     /**
@@ -297,21 +176,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         address processor,
         uint256 position
     ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success) {
-        require(processor != address(0), 'PaymentGateway: processor is zero address');
-
-        // Проверяем, что процессор соответствует интерфейсу
-        require(IPaymentProcessor(processor).getVersion().length > 0, 'PaymentGateway: invalid processor');
-
-        // Добавляем процессор в реестр, если это новый процессор
-        IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
-        string memory processorName = IPaymentProcessor(processor).getName();
-
-        if (registry.getProcessorByName(processorName) == address(0)) {
-            registry.registerProcessor(processor, position);
-        }
-
-        emit ProcessorAdded(processor, position);
-        return true;
+        return PaymentOrchestrator(orchestrator).addProcessor(processor, position);
     }
 
     /**
@@ -328,36 +193,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
         bool enabled,
         bytes memory configData
     ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success) {
-        // Получаем адрес процессора из реестра
-        IProcessorRegistry registry = IProcessorRegistry(processorRegistry);
-        address processor = registry.getProcessorByName(processorName);
-        require(processor != address(0), 'PaymentGateway: processor not found');
-
-        // Устанавливаем конфигурацию для модуля
-        moduleProcessorConfig[moduleId][processorName] = enabled;
-
-        // Проверяем, есть ли процессор в списке для модуля
-        bool found = false;
-        address[] storage processors = moduleProcessors[moduleId];
-        for (uint256 i = 0; i < processors.length; i++) {
-            if (processors[i] == processor) {
-                found = true;
-                break;
-            }
-        }
-
-        // Если процессора нет в списке, добавляем его
-        if (!found) {
-            processors.push(processor);
-        }
-
-        // Настраиваем процессор
-        if (configData.length > 0) {
-            IPaymentProcessor(processor).configure(moduleId, configData);
-        }
-
-        emit ProcessorConfigured(moduleId, processorName, enabled);
-        return true;
+        return PaymentOrchestrator(orchestrator).configureProcessor(moduleId, processorName, enabled, configData);
     }
 
     /**
@@ -366,7 +202,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @return processors Список процессоров
      */
     function getProcessors(bytes32 moduleId) external view override returns (address[] memory processors) {
-        return moduleProcessors[moduleId];
+        return PaymentOrchestrator(orchestrator).getProcessors(moduleId);
     }
 
     /**
@@ -391,8 +227,7 @@ contract PaymentGateway is IGateway, AccessControl, ReentrancyGuard {
      * @return enabled Активен ли шлюз
      */
     function isEnabled(bytes32 moduleId) external view override returns (bool enabled) {
-        // Шлюз активен, если для модуля зарегистрирован хотя бы один процессор
-        return moduleProcessors[moduleId].length > 0;
+        return PaymentOrchestrator(orchestrator).isEnabled(moduleId);
     }
 
     //    /**
