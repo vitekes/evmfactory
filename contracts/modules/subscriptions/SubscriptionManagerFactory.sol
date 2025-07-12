@@ -4,12 +4,11 @@ pragma solidity ^0.8.28;
 import '../../core/BaseFactory.sol';
 import './SubscriptionManager.sol';
 import '../../core/CoreDefs.sol';
-import '../../payments/interfaces/IGateway.sol';
 import '../../core/CoreSystem.sol';
 
 /// @title SubscriptionManagerFactory
 /// @notice Factory for creating subscription manager instances
-/// @dev Uses PaymentGateway (IGateway) for payment processing
+/// @dev Uses PaymentGateway (IPaymentGateway) for payment processing
 contract SubscriptionManagerFactory is BaseFactory {
     event SubscriptionManagerCreated(address indexed creator, address subManager);
 

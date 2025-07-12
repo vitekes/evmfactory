@@ -7,6 +7,7 @@ import '../interfaces/IProcessorRegistry.sol';
 import '../PaymentContext.sol';
 import '../registry/ProcessorRegistry.sol';
 import '../orchestrator/PaymentOrchestrator.sol';
+import '../processors/TokenFilterProcessor.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -134,11 +135,11 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
         return paymentStatuses[paymentId];
     }
 
-    function getName() external pure override returns (string memory) {
+    function getName() external pure returns (string memory) {
         return GATEWAY_NAME;
     }
 
-    function getVersion() external pure override returns (string memory) {
+    function getVersion() external pure returns (string memory) {
         return GATEWAY_VERSION;
     }
 }

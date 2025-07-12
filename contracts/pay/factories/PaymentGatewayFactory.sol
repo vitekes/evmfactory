@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import '../../pay/interfaces/IPaymentGateway.sol';
 import '../../pay/gateway/PaymentGateway.sol';
 import '../../pay/orchestrator/PaymentOrchestrator.sol';
+import '../../pay/registry/ProcessorRegistry.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title PaymentGatewayFactory
@@ -28,7 +29,8 @@ contract PaymentGatewayFactory is AccessControl {
     ) external onlyRole(FACTORY_ADMIN_ROLE) returns (address component) {
         require(gateways[id] == address(0), 'Component already exists');
 
-        PaymentOrchestrator orchestrator = new PaymentOrchestrator();
+        ProcessorRegistry registry = new ProcessorRegistry();
+        PaymentOrchestrator orchestrator = new PaymentOrchestrator(address(registry));
         PaymentGateway gateway = new PaymentGateway(address(orchestrator));
 
         orchestrators[id] = address(orchestrator);
