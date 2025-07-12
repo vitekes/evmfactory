@@ -29,21 +29,21 @@ contract FeeProcessor is IPaymentProcessor, AccessControl {
 
     function process(
         bytes calldata contextBytes
-    ) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
+    ) external view override returns (IPaymentProcessor.ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
         uint256 feeAmount = (uint256(context.processedAmount) * feePercent) / 10000;
 
         if (feeAmount > context.processedAmount) {
             context = PaymentContext.setError(context, 'FeeProcessor: fee exceeds amount');
-            return (ProcessResult.FAILED, abi.encode(context));
+            return (IPaymentProcessor.ProcessResult.FAILED, abi.encode(context));
         }
 
         uint256 newAmount = uint256(context.processedAmount) - feeAmount;
         context = PaymentContext.updateProcessedAmount(context, newAmount);
 
         updatedContextBytes = abi.encode(context);
-        return (ProcessResult.SUCCESS, updatedContextBytes);
+        return (IPaymentProcessor.ProcessResult.SUCCESS, updatedContextBytes);
     }
 
     function getName() external pure override returns (string memory) {

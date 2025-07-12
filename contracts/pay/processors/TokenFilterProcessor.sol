@@ -26,16 +26,16 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
 
     function process(
         bytes calldata contextBytes
-    ) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
+    ) external view override returns (IPaymentProcessor.ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
         if (!allowedTokens[context.moduleId][context.token]) {
             context = PaymentContext.setError(context, 'TokenFilter: token not allowed');
-            return (ProcessResult.FAILED, abi.encode(context));
+            return (IPaymentProcessor.ProcessResult.FAILED, abi.encode(context));
         }
 
         updatedContextBytes = abi.encode(context);
-        return (ProcessResult.SUCCESS, updatedContextBytes);
+        return (IPaymentProcessor.ProcessResult.SUCCESS, updatedContextBytes);
     }
 
     function getName() external pure override returns (string memory) {
@@ -62,7 +62,7 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
         return allowedTokens[moduleId][fromToken] && allowedTokens[moduleId][toToken];
     }
 
-    function getAllowedTokens(bytes32 moduleId) external view returns (address[] memory tokens) {
+    function getAllowedTokens(bytes32) external pure returns (address[] memory tokens) {
         // For simplicity, this function is not implemented fully.
         // In a real implementation, you would store and return the list of allowed tokens.
         tokens = new address[](0);

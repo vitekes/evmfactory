@@ -26,12 +26,12 @@ contract OracleProcessor is IPaymentProcessor, AccessControl {
 
     function process(
         bytes calldata contextBytes
-    ) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
+    ) external pure override returns (IPaymentProcessor.ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
         // Для упрощения, конвертация не реализована, возвращаем контекст без изменений
         updatedContextBytes = abi.encode(context);
-        return (ProcessResult.SUCCESS, updatedContextBytes);
+        return (IPaymentProcessor.ProcessResult.SUCCESS, updatedContextBytes);
     }
 
     function getName() external pure override returns (string memory) {

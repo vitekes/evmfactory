@@ -25,7 +25,7 @@ contract PaymentGatewayFactory is AccessControl {
 
     function createComponent(
         bytes32 id,
-        bytes calldata config
+        bytes calldata /* _config */
     ) external onlyRole(FACTORY_ADMIN_ROLE) returns (address component) {
         require(gateways[id] == address(0), 'Component already exists');
 

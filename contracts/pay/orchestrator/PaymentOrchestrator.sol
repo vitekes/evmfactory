@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import '../interfaces/IPaymentProcessor.sol';
 import '../interfaces/IProcessorRegistry.sol';
+import '../PaymentContext.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
 interface IOracleProcessor {
     function convertAmount(
@@ -14,8 +16,6 @@ interface IOracleProcessor {
 
     function isPairSupported(bytes32 moduleId, address fromToken, address toToken) external view returns (bool);
 }
-import '../PaymentContext.sol';
-import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title PaymentOrchestrator
 /// @notice Управляет цепочкой процессоров и обработкой платежей
@@ -41,7 +41,7 @@ contract PaymentOrchestrator is AccessControl {
         address token,
         address payer,
         uint256 amount,
-        bytes calldata signature
+        bytes calldata /* signature */
     ) external returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount) {
         PaymentContext.Context memory context = PaymentContext.createContext(
             moduleId,
