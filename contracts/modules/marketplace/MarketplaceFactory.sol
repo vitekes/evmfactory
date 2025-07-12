@@ -8,16 +8,10 @@ import '../../core/CoreDefs.sol';
 contract MarketplaceFactory is BaseFactory {
     event MarketplaceCreated(address indexed creator, address marketplace);
 
-    // Адрес платёжного шлюза, используемого для всех маркетплейсов, созданных этой фабрикой
-    address public immutable paymentGateway;
-
     constructor(
         address registry,
         address _paymentGateway
-    ) BaseFactory(registry, _paymentGateway, CoreDefs.MARKETPLACE_MODULE_ID) {
-        if (_paymentGateway == address(0)) revert PaymentGatewayNotRegistered();
-        paymentGateway = _paymentGateway;
-    }
+    ) BaseFactory(registry, _paymentGateway, CoreDefs.MARKETPLACE_MODULE_ID) {}
 
     /// @notice Создает новый экземпляр маркетплейса
     /// @return m Адрес созданного маркетплейса
@@ -28,21 +22,11 @@ contract MarketplaceFactory is BaseFactory {
         // Регистрируем новый экземпляр маркетплейса в core
         core.registerFeature(instanceId, address(this), 1);
 
-        // Создаем и инициализируем платёжный шлюз и оркестратор для маркетплейса
-        PaymentOrchestrator orchestrator = new PaymentOrchestrator();
-        PaymentGateway gateway = new PaymentGateway(address(orchestrator));
+        // Копируем сервисы из основного модуля
+        core.setService(instanceId, 'PaymentGateway', paymentGateway);
 
-        // Регистрируем оркестратор и шлюз в core как сервисы
-        core.setService(instanceId, 'PaymentOrchestrator', address(orchestrator));
-        core.setService(instanceId, 'PaymentGateway', address(gateway));
-
-        // Инициализируем процессоры платёжного шлюза (валидатор, дисконт, комиссия, оракул и т.д.)
-        // Пример инициализации процессоров (можно расширить по необходимости)
-        // Здесь предполагается, что есть методы для регистрации процессоров в оркестраторе или реестре
-        // Для упрощения примера пропущена конкретная реализация
-
-        // Создаем новый экземпляр Marketplace, передавая core, адрес платёжного шлюза и instanceId
-        m = address(new Marketplace(address(core), address(gateway), instanceId));
+        // Создаем новый экземпляр Marketplace, передавая ядро, платёжный шлюз и идентификатор
+        m = address(new Marketplace(address(core), paymentGateway, instanceId));
 
         // Обновляем адрес созданного маркетплейса в реестре core
         core.upgradeFeature(instanceId, m);

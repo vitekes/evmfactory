@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import '../../core/CoreSystem.sol';
 import '../../pay/interfaces/IPaymentGateway.sol';
-import '../../pay/interfaces/IPriceOracle.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
@@ -54,7 +53,7 @@ contract Marketplace is ReentrancyGuard {
     CoreSystem public immutable core;
 
     bytes32 public immutable MODULE_ID;
-    IGateway public immutable paymentGateway;
+    IPaymentGateway public immutable paymentGateway;
 
     // EIP-712 domain separator
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -94,7 +93,7 @@ contract Marketplace is ReentrancyGuard {
 
         core = CoreSystem(_core);
         MODULE_ID = moduleId;
-        paymentGateway = IGateway(_paymentGateway);
+        paymentGateway = IPaymentGateway(_paymentGateway);
 
         // Create EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(
