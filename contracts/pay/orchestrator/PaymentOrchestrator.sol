@@ -3,6 +3,17 @@ pragma solidity ^0.8.28;
 
 import '../interfaces/IPaymentProcessor.sol';
 import '../interfaces/IProcessorRegistry.sol';
+
+interface IOracleProcessor {
+    function convertAmount(
+        bytes32 moduleId,
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) external view returns (uint256);
+
+    function isPairSupported(bytes32 moduleId, address fromToken, address toToken) external view returns (bool);
+}
 import '../PaymentContext.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 
@@ -87,7 +98,7 @@ contract PaymentOrchestrator is AccessControl {
             if (processor == address(0)) continue;
             try IPaymentProcessor(processor).getName() returns (string memory name) {
                 if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked('PriceOracle'))) {
-                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (
+                    try IOracleProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (
                         uint256 result
                     ) {
                         return result;
@@ -105,7 +116,7 @@ contract PaymentOrchestrator is AccessControl {
     ) external view returns (bool isSupported) {
         address tokenFilter = processorRegistry.getProcessorByName('TokenFilter');
         if (tokenFilter != address(0)) {
-            try IPaymentProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
+            try IOracleProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
                 return result;
             } catch {}
         }

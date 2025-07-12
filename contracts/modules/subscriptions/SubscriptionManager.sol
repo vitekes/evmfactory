@@ -2,8 +2,7 @@
 pragma solidity ^0.8.28;
 
 import '../../core/CoreSystem.sol';
-import '../../payments/interfaces/IGateway.sol';
-import '../../payments/interfaces/IPriceOracle.sol';
+import '../../pay/interfaces/IPaymentGateway.sol';
 import '../../external/IPermit2.sol';
 import '../../lib/SignatureLib.sol';
 import '../../core/CoreDefs.sol';
@@ -16,7 +15,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title Subscription Manager
 /// @notice Handles recurring payments with off-chain plan creation using EIP-712
-/// @dev Uses PaymentGateway (IGateway) for payment processing and token conversion
+/// @dev Uses PaymentGateway (IPaymentGateway) for payment processing and token conversion
 contract SubscriptionManager is ReentrancyGuard {
     // Core system reference
     CoreSystem public immutable core;
@@ -112,7 +111,7 @@ contract SubscriptionManager is ReentrancyGuard {
 
     /// @notice Initializes the subscription manager and registers services
     /// @param _core Address of the CoreSystem contract
-    /// @param paymentGateway Address of the payment gateway implementing IGateway
+    /// @param paymentGateway Address of the payment gateway implementing IPaymentGateway
     /// @param moduleId Unique module identifier
     constructor(address _core, address paymentGateway, bytes32 moduleId) {
         // Check inputs validity
@@ -180,7 +179,7 @@ contract SubscriptionManager is ReentrancyGuard {
         // Ensure gateway is registered before heavy logic
         address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
-        IGateway gateway = IGateway(gatewayAddress);
+        IPaymentGateway gateway = IPaymentGateway(gatewayAddress);
 
         // Verify token pair support
         if (!gateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();
@@ -275,7 +274,13 @@ contract SubscriptionManager is ReentrancyGuard {
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
-        uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
+        uint256 netAmount = IPaymentGateway(gateway).processPayment(
+            MODULE_ID,
+            paymentToken,
+            msg.sender,
+            paymentAmount,
+            ''
+        );
 
         // Transfer funds to merchant
         IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
@@ -323,7 +328,7 @@ contract SubscriptionManager is ReentrancyGuard {
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
-        uint256 netAmount = IGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
+        uint256 netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         // Transfer funds to merchant
         IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
@@ -387,7 +392,7 @@ contract SubscriptionManager is ReentrancyGuard {
         address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
 
-        IGateway paymentGateway = IGateway(gatewayAddress);
+        IPaymentGateway paymentGateway = IPaymentGateway(gatewayAddress);
 
         // Check token pair support
         if (!paymentGateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();

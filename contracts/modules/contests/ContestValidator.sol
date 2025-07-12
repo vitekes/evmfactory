@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import '../../core/CoreSystem.sol';
 import '../../errors/Errors.sol';
-import '../../payments/interfaces/ITokenValidator.sol';
+import '../../pay/interfaces/ITokenValidator.sol';
 import './interfaces/IContestValidator.sol';
 import './shared/PrizeInfo.sol';
 import '../../core/CoreDefs.sol';
