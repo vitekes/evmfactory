@@ -2,19 +2,16 @@
 pragma solidity ^0.8.28;
 
 import '../../core/CoreSystem.sol';
-import '../../payments/interfaces/IGateway.sol';
-import '../../payments/interfaces/IPriceOracle.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import '../../lib/SignatureLib.sol';
-import '../../core/CoreDefs.sol';
-import '../../errors/Errors.sol';
+import '../../pay/interfaces/IPaymentGateway.sol';
+import '../../pay/interfaces/IPriceOracle.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '../../lib/SignatureLib.sol';
+import '../../core/CoreDefs.sol';
+import '../../errors/Errors.sol';
 
 // Event payload helper
 interface IEventPayload {
@@ -67,17 +64,6 @@ contract Marketplace is ReentrancyGuard {
     mapping(bytes32 => uint256) public minSaltBySku;
     mapping(bytes32 => bool) public revokedListings;
 
-    // Временные скидки для SKU
-    struct Discount {
-        uint16 discountPercent; // 0-10000, где 10000 = 100%
-        uint64 startTime;
-        uint64 endTime;
-        bool active;
-    }
-
-    // Активные скидки по SKU
-    mapping(bytes32 => Discount) public skuDiscounts;
-
     // Marketplace events
     event MarketplaceSale(
         bytes32 indexed sku,
@@ -102,18 +88,6 @@ contract Marketplace is ReentrancyGuard {
         bytes32 listingHash,
         bytes32 moduleId
     );
-
-    event DiscountSet(
-        bytes32 indexed sku,
-        uint16 discountPercent,
-        uint64 startTime,
-        uint64 endTime,
-        address indexed setter,
-        bytes32 moduleId
-    );
-
-    event DiscountRemoved(bytes32 indexed sku, address indexed remover, bytes32 moduleId);
-
     constructor(address _core, address _paymentGateway, bytes32 moduleId) {
         if (_core == address(0)) revert ZeroAddress();
         if (_paymentGateway == address(0)) revert ZeroAddress();
@@ -159,33 +133,7 @@ contract Marketplace is ReentrancyGuard {
         // Determine token and amount for payment
         address actualPaymentToken = paymentToken == address(0) ? listing.token : paymentToken;
 
-        // Определение итоговой цены с учетом скидок
-        uint256 finalPrice = listing.price;
-
-        // Проверка системы скидок
-        address discountManager = core.getService(MODULE_ID, 'DiscountManager');
-        if (discountManager != address(0)) {
-            // Применяем динамическую скидку из менеджера скидок, если она больше встроенной в листинг
-            try IDiscountManager(discountManager).getDiscountedPrice(listing.sku, listing.price) returns (
-                uint256 discountedPrice
-            ) {
-                if (discountedPrice < finalPrice) {
-                    finalPrice = discountedPrice;
-                }
-            } catch {
-                // Если вызов не удался, используем скидку из листинга
-            }
-        }
-
-        // Применяем скидку из листинга, если она указана
-        if (listing.discountPercent > 0) {
-            uint256 discountedPrice = (listing.price * (10000 - listing.discountPercent)) / 10000;
-            if (discountedPrice < finalPrice) {
-                finalPrice = discountedPrice;
-            }
-        }
-
-        uint256 paymentAmount = finalPrice;
+        uint256 paymentAmount = listing.price;
 
         // Convert amount if payment token differs from listing token
         if (actualPaymentToken != listing.token) {

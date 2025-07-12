@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import '../core/CoreSystem.sol';
-import '../payments/interfaces/IGateway.sol';
 import '../errors/Errors.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import './CloneFactory.sol';

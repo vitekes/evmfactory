@@ -22,6 +22,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
     ethers.toUtf8Bytes("OracleProcessor.sol")
   );
   const MARKETPLACE_ID = ethers.keccak256(ethers.toUtf8Bytes("Marketplace"));
+  const PAYMENT_SYSTEM_ID = ethers.keccak256(ethers.toUtf8Bytes("PaymentSystem"));
 
   const access = m.contract("AccessControlCenter", []);
   const registry = m.contract("Registry", [access]);
@@ -52,6 +53,13 @@ const CoreModule = buildModule("CoreModule", (m) => {
   m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "OracleProcessor.sol", priceOracle]);
   m.call(registry, "setModuleServiceAlias", [MARKETPLACE_ID, "PaymentGateway", gateway]);
 
+  // Разворачиваем и регистрируем платёжную систему через PaymentSystemFactory
+  const paymentSystemFactory = m.contract("PaymentSystemFactory", [registry, gateway]);
+  m.call(paymentSystemFactory, "createPaymentSystem", [PAYMENT_SYSTEM_ID, "0x"]);
+
+  m.call(registry, "registerFeature", [PAYMENT_SYSTEM_ID, paymentSystemFactory, 0]);
+  m.call(registry, "setModuleServiceAlias", [PAYMENT_SYSTEM_ID, "PaymentGateway", gateway]);
+
   return {
     access,
     registry,
@@ -60,6 +68,7 @@ const CoreModule = buildModule("CoreModule", (m) => {
     tokenValidator,
     marketplaceFactory,
     priceOracle,
+    paymentSystemFactory,
   };
 });
 
