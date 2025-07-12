@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IPaymentProcessor.sol";
-import "../PaymentContext.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import '../interfaces/IPaymentProcessor.sol';
+import '../PaymentContext.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title TokenFilterProcessor
 /// @notice Процессор для фильтрации токенов
 contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
-    bytes32 public constant PROCESSOR_ADMIN_ROLE = keccak256("PROCESSOR_ADMIN_ROLE");
+    bytes32 public constant PROCESSOR_ADMIN_ROLE = keccak256('PROCESSOR_ADMIN_ROLE');
 
-    string private constant PROCESSOR_NAME = "TokenFilter";
-    string private constant PROCESSOR_VERSION = "1.0.0";
+    string private constant PROCESSOR_NAME = 'TokenFilter';
+    string private constant PROCESSOR_VERSION = '1.0.0';
 
     mapping(bytes32 => mapping(address => bool)) private allowedTokens;
 
@@ -24,11 +24,13 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
         return true; // всегда применим
     }
 
-    function process(bytes calldata contextBytes) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
+    function process(
+        bytes calldata contextBytes
+    ) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
         if (!allowedTokens[context.moduleId][context.token]) {
-            context = PaymentContext.setError(context, "TokenFilter: token not allowed");
+            context = PaymentContext.setError(context, 'TokenFilter: token not allowed');
             return (ProcessResult.FAILED, abi.encode(context));
         }
 
@@ -45,7 +47,7 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
     }
 
     function configure(bytes32 moduleId, bytes calldata configData) external override onlyRole(PROCESSOR_ADMIN_ROLE) {
-        require(configData.length % 20 == 0, "TokenFilter: invalid config length");
+        require(configData.length % 20 == 0, 'TokenFilter: invalid config length');
         uint256 count = configData.length / 20;
         for (uint256 i = 0; i < count; i++) {
             address token;

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../payments/BaseProcessor.sol";
-import "../payments/PaymentContextLibrary.sol";
+import '../payments/BaseProcessor.sol';
+import '../payments/PaymentContextLibrary.sol';
 
 contract DummyProcessor is BaseProcessor {
     using PaymentContextLibrary for PaymentContextLibrary.PaymentContext;
 
     function getName() public pure override returns (string memory name) {
-        return "Dummy";
+        return 'Dummy';
     }
 
     function getVersion() public pure override returns (string memory version) {
-        return "1.0";
+        return '1.0';
     }
 
     function _processInternal(

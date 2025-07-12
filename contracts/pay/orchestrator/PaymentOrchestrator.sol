@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IPaymentProcessor.sol";
-import "../interfaces/IProcessorRegistry.sol";
-import "../PaymentContext.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import '../interfaces/IPaymentProcessor.sol';
+import '../interfaces/IProcessorRegistry.sol';
+import '../PaymentContext.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title PaymentOrchestrator
 /// @notice Управляет цепочкой процессоров и обработкой платежей
 contract PaymentOrchestrator is AccessControl {
-    bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256("PROCESSOR_MANAGER_ROLE");
+    bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256('PROCESSOR_MANAGER_ROLE');
 
     IProcessorRegistry public processorRegistry;
 
@@ -19,7 +19,7 @@ contract PaymentOrchestrator is AccessControl {
     event ProcessorConfigured(bytes32 indexed moduleId, string processorName, bool enabled);
 
     constructor(address _processorRegistry) {
-        require(_processorRegistry != address(0), "Orchestrator: zero registry address");
+        require(_processorRegistry != address(0), 'Orchestrator: zero registry address');
         processorRegistry = IProcessorRegistry(_processorRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PROCESSOR_MANAGER_ROLE, msg.sender);
@@ -38,7 +38,7 @@ contract PaymentOrchestrator is AccessControl {
             address(0),
             token,
             amount,
-            ""
+            ''
         );
 
         bytes memory contextBytes = abi.encode(context);
@@ -54,7 +54,8 @@ contract PaymentOrchestrator is AccessControl {
 
             if (!IPaymentProcessor(processor).isApplicable(contextBytes)) continue;
 
-            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) = IPaymentProcessor(processor).process(contextBytes);
+            (IPaymentProcessor.ProcessResult result, bytes memory updatedContext) = IPaymentProcessor(processor)
+                .process(contextBytes);
 
             if (result == IPaymentProcessor.ProcessResult.FAILED) {
                 context = abi.decode(updatedContext, (PaymentContext.Context));
@@ -66,7 +67,7 @@ contract PaymentOrchestrator is AccessControl {
 
         context = abi.decode(contextBytes, (PaymentContext.Context));
 
-        require(context.success, "Payment failed");
+        require(context.success, 'Payment failed');
 
         netAmount = context.processedAmount;
         paymentId = context.paymentId;
@@ -85,8 +86,10 @@ contract PaymentOrchestrator is AccessControl {
             address processor = processors[i];
             if (processor == address(0)) continue;
             try IPaymentProcessor(processor).getName() returns (string memory name) {
-                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked("PriceOracle"))) {
-                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (uint256 result) {
+                if (keccak256(abi.encodePacked(name)) == keccak256(abi.encodePacked('PriceOracle'))) {
+                    try IPaymentProcessor(processor).convertAmount(moduleId, fromToken, toToken, amount) returns (
+                        uint256 result
+                    ) {
                         return result;
                     } catch {}
                 }
@@ -100,7 +103,7 @@ contract PaymentOrchestrator is AccessControl {
         address fromToken,
         address toToken
     ) external view returns (bool isSupported) {
-        address tokenFilter = processorRegistry.getProcessorByName("TokenFilter");
+        address tokenFilter = processorRegistry.getProcessorByName('TokenFilter');
         if (tokenFilter != address(0)) {
             try IPaymentProcessor(tokenFilter).isPairSupported(moduleId, fromToken, toToken) returns (bool result) {
                 return result;
@@ -120,7 +123,7 @@ contract PaymentOrchestrator is AccessControl {
         bytes calldata configData
     ) external onlyRole(PROCESSOR_MANAGER_ROLE) returns (bool success) {
         address processor = processorRegistry.getProcessorByName(processorName);
-        require(processor != address(0), "Processor not found");
+        require(processor != address(0), 'Processor not found');
 
         moduleProcessorConfig[moduleId][processorName] = enabled;
 

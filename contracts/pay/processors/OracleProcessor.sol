@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../interfaces/IPaymentProcessor.sol";
-import "../PaymentContext.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import '../interfaces/IPaymentProcessor.sol';
+import '../PaymentContext.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /// @title OracleProcessor
 /// @notice Процессор для конвертации валют с использованием оракула
 contract OracleProcessor is IPaymentProcessor, AccessControl {
-    bytes32 public constant PROCESSOR_ADMIN_ROLE = keccak256("PROCESSOR_ADMIN_ROLE");
+    bytes32 public constant PROCESSOR_ADMIN_ROLE = keccak256('PROCESSOR_ADMIN_ROLE');
 
-    string private constant PROCESSOR_NAME = "PriceOracle";
-    string private constant PROCESSOR_VERSION = "1.0.0";
+    string private constant PROCESSOR_NAME = 'PriceOracle';
+    string private constant PROCESSOR_VERSION = '1.0.0';
 
     // В реальной реализации здесь будет адрес оракула и логика получения курсов
 
@@ -24,7 +24,9 @@ contract OracleProcessor is IPaymentProcessor, AccessControl {
         return true; // всегда применим
     }
 
-    function process(bytes calldata contextBytes) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
+    function process(
+        bytes calldata contextBytes
+    ) external override returns (ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
         // Для упрощения, конвертация не реализована, возвращаем контекст без изменений

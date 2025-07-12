@@ -36,7 +36,11 @@ interface IProcessorRegistry {
     /// @param processorName Имя процессора
     /// @param enabled Включен/выключен
     /// @return success Успешность операции
-    function setProcessorEnabled(bytes32 moduleId, string calldata processorName, bool enabled) external returns (bool success);
+    function setProcessorEnabled(
+        bytes32 moduleId,
+        string calldata processorName,
+        bool enabled
+    ) external returns (bool success);
 
     /// @notice Проверить, включен ли процессор для модуля
     /// @param moduleId Идентификатор модуля

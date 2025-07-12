@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-
 /// @title IPaymentProcessor
 /// @notice Интерфейс отдельного процессора платежей
 interface IPaymentProcessor {
@@ -20,7 +19,9 @@ interface IPaymentProcessor {
     /// @param contextBytes Сериализованный контекст платежа
     /// @return result Результат обработки
     /// @return updatedContextBytes Обновлённый сериализованный контекст
-    function process(bytes calldata contextBytes) external returns (ProcessResult result, bytes memory updatedContextBytes);
+    function process(
+        bytes calldata contextBytes
+    ) external returns (ProcessResult result, bytes memory updatedContextBytes);
 
     /// @notice Получить имя процессора
     /// @return name Имя процессора

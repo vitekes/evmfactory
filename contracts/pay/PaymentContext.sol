@@ -34,7 +34,7 @@ library PaymentContext {
         uint256 amount,
         bytes memory metadata
     ) internal view returns (Context memory) {
-        require(amount <= type(uint128).max, "Amount too large");
+        require(amount <= type(uint128).max, 'Amount too large');
         Context memory ctx;
         ctx.moduleId = moduleId;
         ctx.sender = sender;
@@ -46,7 +46,7 @@ library PaymentContext {
         ctx.success = false;
         ctx.metadata = metadata;
         ctx.paymentId = keccak256(abi.encode(moduleId, sender, recipient, token, amount, block.timestamp));
-        ctx.errorMessage = "";
+        ctx.errorMessage = '';
         return ctx;
     }
 
@@ -67,7 +67,7 @@ library PaymentContext {
     }
 
     function updateProcessedAmount(Context memory ctx, uint256 amount) internal pure returns (Context memory) {
-        require(amount <= type(uint128).max, "Amount too large");
+        require(amount <= type(uint128).max, 'Amount too large');
         ctx.processedAmount = uint128(amount);
         return ctx;
     }
