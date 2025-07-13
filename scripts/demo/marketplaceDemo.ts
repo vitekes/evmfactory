@@ -9,7 +9,7 @@ import {
 
 async function main() {
   const [deployer, seller, buyer, buyer2] = await ethers.getSigners();
-  const marketplace = await getMarketplaceContract();
+  const { marketplace, gateway } = await getMarketplaceContract();
 
   const productId = 1;
   const price = ethers.parseEther("1");
@@ -25,7 +25,7 @@ async function main() {
 
   const sellerBefore = await getBalance(seller.address, nativeToken);
   const buyerBefore = await getBalance(buyer.address, nativeToken);
-  await purchaseListing(marketplace, buyer, listing, signature, nativeToken);
+  await purchaseListing(marketplace, gateway, buyer, listing, signature, nativeToken);
   const sellerAfter = await getBalance(seller.address, nativeToken);
   const buyerAfter = await getBalance(buyer.address, nativeToken);
 
@@ -55,6 +55,7 @@ async function main() {
   const buyer2Before = await getBalance(buyer2.address, await testToken.getAddress());
   await purchaseListing(
     marketplace,
+    gateway,
     buyer2,
     listing2,
     signature2,

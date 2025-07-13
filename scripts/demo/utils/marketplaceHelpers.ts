@@ -18,7 +18,7 @@ export interface Product {
  * 4. PaymentGateway
  * 5. Marketplace
  */
-export async function getMarketplaceContract(): Promise<Contract> {
+export async function getMarketplaceContract(): Promise<{ marketplace: Contract; gateway: Contract }> {
   const [deployer] = await ethers.getSigners();
 
   const CoreSystem = await ethers.getContractFactory("CoreSystem");
@@ -36,8 +36,8 @@ export async function getMarketplaceContract(): Promise<Contract> {
   const orchestrator = await PaymentOrchestrator.deploy(await registry.getAddress());
   await orchestrator.waitForDeployment();
 
-  const PaymentGateway = await ethers.getContractFactory("PaymentGateway");
-  const gateway = await PaymentGateway.deploy(await orchestrator.getAddress());
+  const PaymentGateway = await ethers.getContractFactory("MockPaymentGateway");
+  const gateway = await PaymentGateway.deploy();
   await gateway.waitForDeployment();
 
   const Marketplace = await ethers.getContractFactory("Marketplace");
@@ -48,7 +48,7 @@ export async function getMarketplaceContract(): Promise<Contract> {
   await core.registerFeature(moduleId, await marketplace.getAddress(), 1);
   await core.setService(moduleId, "PaymentGateway", await gateway.getAddress());
 
-  return marketplace;
+  return { marketplace, gateway };
 }
 
 export async function createListing(
@@ -92,6 +92,7 @@ export async function createListing(
 
 export async function purchaseListing(
   marketplace: Contract,
+  gateway: Contract,
   buyer: Signer,
   listing: any,
   signature: string,
@@ -100,7 +101,7 @@ export async function purchaseListing(
   if (paymentToken !== ethers.ZeroAddress) {
     const token = await ethers.getContractAt("IERC20", paymentToken);
     const amount = await marketplace.getPriceInPreferredCurrency(listing, paymentToken);
-    await token.connect(buyer).approve(await marketplace.getAddress(), amount);
+    await token.connect(buyer).approve(await gateway.getAddress(), amount);
   }
 
   const price = listing.price;
