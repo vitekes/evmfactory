@@ -68,8 +68,24 @@ export async function createListing(
     discountPercent: details.discount ?? 0,
   } as const;
 
-  const hash = await marketplace.hashListing(listing);
-  const signature = await seller.signMessage(ethers.getBytes(hash));
+  const domain = {
+    chainId: network.chainId,
+    verifyingContract: await marketplace.getAddress(),
+  } as const;
+  const types = {
+    Listing: [
+      { name: "chainIds", type: "uint256[]" },
+      { name: "token", type: "address" },
+      { name: "price", type: "uint256" },
+      { name: "sku", type: "bytes32" },
+      { name: "seller", type: "address" },
+      { name: "salt", type: "uint256" },
+      { name: "expiry", type: "uint64" },
+      { name: "discountPercent", type: "uint16" },
+    ],
+  } as const;
+
+  const signature = await (seller as any).signTypedData(domain, types, listing);
 
   return { listing, signature };
 }
