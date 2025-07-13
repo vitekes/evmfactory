@@ -1,8 +1,8 @@
 import { ethers } from "hardhat";
 import {
   getMarketplaceContract,
-  createProduct,
-  purchaseProduct,
+  createListing,
+  purchaseListing,
   getBalance,
   Product,
 } from "./utils/marketplaceHelpers";
@@ -13,19 +13,19 @@ async function main() {
 
   const productId = 1;
   const price = ethers.parseEther("1");
-  const discount = ethers.parseEther("0.1");
+  const discount = 1000; // 10% discount
   const nativeToken = ethers.ZeroAddress;
 
-  await createProduct(marketplace, seller, {
+  const { listing, signature } = await createListing(marketplace, seller, {
     id: productId,
     price,
     tokenAddress: nativeToken,
-    discount,
+    discount: Number(discount),
   } as Product);
 
   const sellerBefore = await getBalance(seller.address, nativeToken);
   const buyerBefore = await getBalance(buyer.address, nativeToken);
-  await purchaseProduct(marketplace, buyer, productId, nativeToken, price);
+  await purchaseListing(marketplace, buyer, listing, signature, nativeToken);
   const sellerAfter = await getBalance(seller.address, nativeToken);
   const buyerAfter = await getBalance(buyer.address, nativeToken);
 
@@ -41,20 +41,24 @@ async function main() {
 
   const productId2 = 2;
   const price2 = ethers.parseEther("10");
-  await createProduct(marketplace, seller, {
-    id: productId2,
-    price: price2,
-    tokenAddress: await testToken.getAddress(),
-  } as Product);
+  const { listing: listing2, signature: signature2 } = await createListing(
+    marketplace,
+    seller,
+    {
+      id: productId2,
+      price: price2,
+      tokenAddress: await testToken.getAddress(),
+    } as Product
+  );
 
   const sellerTokenBefore = await getBalance(seller.address, await testToken.getAddress());
   const buyer2Before = await getBalance(buyer2.address, await testToken.getAddress());
-  await purchaseProduct(
+  await purchaseListing(
     marketplace,
     buyer2,
-    productId2,
-    await testToken.getAddress(),
-    price2
+    listing2,
+    signature2,
+    await testToken.getAddress()
   );
   const sellerTokenAfter = await getBalance(seller.address, await testToken.getAddress());
   const buyer2After = await getBalance(buyer2.address, await testToken.getAddress());

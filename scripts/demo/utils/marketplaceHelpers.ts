@@ -5,7 +5,8 @@ export interface Product {
   id: number;
   price: bigint;
   tokenAddress: string;
-  discount?: bigint;
+  /** Discount percent in basis points (10000 = 100%) */
+  discount?: number;
 }
 
 /**
@@ -50,31 +51,48 @@ export async function getMarketplaceContract(): Promise<Contract> {
   return marketplace;
 }
 
-export async function createProduct(
+export async function createListing(
   marketplace: Contract,
   seller: Signer,
   details: Product
 ) {
-  const tx = await marketplace
-    .connect(seller)
-    .createProduct(details.id, details.price, details.tokenAddress, details.discount ?? 0n);
-  await tx.wait();
+  const network = await ethers.provider.getNetwork();
+  const listing = {
+    chainIds: [network.chainId],
+    token: details.tokenAddress,
+    price: details.price,
+    sku: ethers.keccak256(ethers.toUtf8Bytes(details.id.toString())),
+    seller: await seller.getAddress(),
+    salt: Date.now(),
+    expiry: 0,
+    discountPercent: details.discount ?? 0,
+  } as const;
+
+  const hash = await marketplace.hashListing(listing);
+  const signature = await seller.signMessage(ethers.getBytes(hash));
+
+  return { listing, signature };
 }
 
-export async function purchaseProduct(
+export async function purchaseListing(
   marketplace: Contract,
   buyer: Signer,
-  productId: number,
-  paymentToken: string,
-  amount: bigint
+  listing: any,
+  signature: string,
+  paymentToken: string
 ) {
   if (paymentToken !== ethers.ZeroAddress) {
     const token = await ethers.getContractAt("IERC20", paymentToken);
-    await token.connect(buyer).approve(marketplace.getAddress(), amount);
+    const amount = await marketplace.getPriceInPreferredCurrency(listing, paymentToken);
+    await token.connect(buyer).approve(await marketplace.getAddress(), amount);
   }
+
+  const price = listing.price;
   const tx = await marketplace
     .connect(buyer)
-    .purchase(productId, amount, { value: paymentToken === ethers.ZeroAddress ? amount : 0n });
+    .buy(listing, signature, paymentToken, price, {
+      value: paymentToken === ethers.ZeroAddress ? price : 0n,
+    });
   await tx.wait();
 }
 
