@@ -15,11 +15,11 @@ async function main() {
 
   // Define product details
   const productId = 1;
-  const price = ethers.utils.parseEther("1"); // 1 token or 1 native currency
-  const discount = ethers.utils.parseEther("0.1"); // 0.1 token discount
+  const price = ethers.parseEther("1"); // 1 token or 1 native currency
+  const discount = ethers.parseEther("0.1"); // 0.1 token discount
 
   // For demo, use native currency address as zero address
-  const nativeTokenAddress = ethers.constants.AddressZero;
+  const nativeTokenAddress = ethers.ZeroAddress;
 
   // Create product with price in native currency and discount
   console.log("Creating product...");
@@ -41,25 +41,25 @@ async function main() {
   const sellerBalanceAfter = await getBalance(seller.address, nativeTokenAddress);
   const buyerBalanceAfter = await getBalance(buyer.address, nativeTokenAddress);
 
-  console.log("Seller balance before:", ethers.utils.formatEther(sellerBalanceBefore));
-  console.log("Seller balance after:", ethers.utils.formatEther(sellerBalanceAfter));
-  console.log("Buyer balance before:", ethers.utils.formatEther(buyerBalanceBefore));
-  console.log("Buyer balance after:", ethers.utils.formatEther(buyerBalanceAfter));
+  console.log("Seller balance before:", ethers.formatEther(sellerBalanceBefore));
+  console.log("Seller balance after:", ethers.formatEther(sellerBalanceAfter));
+  console.log("Buyer balance before:", ethers.formatEther(buyerBalanceBefore));
+  console.log("Buyer balance after:", ethers.formatEther(buyerBalanceAfter));
 
   // Purchase product with another token
   console.log("Deploying test ERC20 token for alternate payment...");
   const Token = await ethers.getContractFactory("TestToken");
-  const testToken = await Token.deploy("Test Token", "TTK", 18, ethers.utils.parseEther("1000"));
+  const testToken = await Token.deploy("Test Token", "TTK", 18, ethers.parseEther("1000"));
   await testToken.deployed();
   console.log("TestToken deployed at:", testToken.address);
 
   // Transfer some tokens to buyer2
-  await testToken.transfer(buyer2.address, ethers.utils.parseEther("100"));
+  await testToken.transfer(buyer2.address, ethers.parseEther("100"));
   console.log("Transferred 100 TTK to buyer2");
 
   // Create product priced in testToken
   const productId2 = 2;
-  const price2 = ethers.utils.parseEther("10"); // 10 TTK
+  const price2 = ethers.parseEther("10"); // 10 TTK
   await createProduct(marketplace, seller, {
     id: productId2,
     price: price2,
@@ -78,10 +78,10 @@ async function main() {
   const sellerBalanceAfterToken = await getBalance(seller.address, testToken.address);
   const buyer2BalanceAfter = await getBalance(buyer2.address, testToken.address);
 
-  console.log("Seller TTK balance before:", ethers.utils.formatEther(sellerBalanceBeforeToken));
-  console.log("Seller TTK balance after:", ethers.utils.formatEther(sellerBalanceAfterToken));
-  console.log("Buyer2 TTK balance before:", ethers.utils.formatEther(buyer2BalanceBefore));
-  console.log("Buyer2 TTK balance after:", ethers.utils.formatEther(buyer2BalanceAfter));
+  console.log("Seller TTK balance before:", ethers.formatEther(sellerBalanceBeforeToken));
+  console.log("Seller TTK balance after:", ethers.formatEther(sellerBalanceAfterToken));
+  console.log("Buyer2 TTK balance before:", ethers.formatEther(buyer2BalanceBefore));
+  console.log("Buyer2 TTK balance after:", ethers.formatEther(buyer2BalanceAfter));
 
   // Purchase product with discount
   console.log("Purchasing product with discount...");
@@ -95,17 +95,17 @@ async function main() {
   const buyerBalanceAfterDiscount = await getBalance(buyer.address, nativeTokenAddress);
   const sellerBalanceAfterDiscount = await getBalance(seller.address, nativeTokenAddress);
 
-  console.log("Buyer balance before discount purchase:", ethers.utils.formatEther(buyerBalanceBeforeDiscount));
-  console.log("Buyer balance after discount purchase:", ethers.utils.formatEther(buyerBalanceAfterDiscount));
-  console.log("Seller balance before discount purchase:", ethers.utils.formatEther(sellerBalanceBeforeDiscount));
-  console.log("Seller balance after discount purchase:", ethers.utils.formatEther(sellerBalanceAfterDiscount));
+  console.log("Buyer balance before discount purchase:", ethers.formatEther(buyerBalanceBeforeDiscount));
+  console.log("Buyer balance after discount purchase:", ethers.formatEther(buyerBalanceAfterDiscount));
+  console.log("Seller balance before discount purchase:", ethers.formatEther(sellerBalanceBeforeDiscount));
+  console.log("Seller balance after discount purchase:", ethers.formatEther(sellerBalanceAfterDiscount));
 
   // Commission collection check
   console.log("Checking commission collection...");
   // For demo, assume marketplace contract has a function to get collected fees
   if (typeof marketplace.getCollectedFees === "function") {
     const fees = await marketplace.getCollectedFees(nativeTokenAddress);
-    console.log("Collected fees in native currency:", ethers.utils.formatEther(fees));
+    console.log("Collected fees in native currency:", ethers.formatEther(fees));
   } else {
     console.log("Marketplace contract does not expose getCollectedFees function for demo.");
   }

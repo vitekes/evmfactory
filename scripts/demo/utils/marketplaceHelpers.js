@@ -70,16 +70,16 @@ async function createProduct(marketplace, seller, productDetails) {
 
 async function purchaseProduct(marketplace, buyer, productId, paymentToken, amount) {
   // Approve token if needed
-  if (paymentToken !== ethers.constants.AddressZero) {
+  if (paymentToken !== ethers.ZeroAddress) {
     const token = await ethers.getContractAt("IERC20", paymentToken);
     await token.connect(buyer).approve(marketplace.address, amount);
   }
-  const tx = await marketplace.connect(buyer).purchase(productId, amount, { value: paymentToken === ethers.constants.AddressZero ? amount : 0 });
+  const tx = await marketplace.connect(buyer).purchase(productId, amount, { value: paymentToken === ethers.ZeroAddress ? amount : 0 });
   await tx.wait();
 }
 
 async function getBalance(address, tokenAddress) {
-  if (tokenAddress === ethers.constants.AddressZero) {
+  if (tokenAddress === ethers.ZeroAddress) {
     return await ethers.provider.getBalance(address);
   } else {
     const token = await ethers.getContractAt("IERC20", tokenAddress);
