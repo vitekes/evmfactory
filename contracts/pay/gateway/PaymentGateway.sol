@@ -78,7 +78,7 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
             // Возвращаем только избыток, если msg.value больше amount
             uint256 excess = msg.value - amount;
             if (excess > 0) {
-                (bool success, ) = payable(payer).call{value: excess}("");
+                (bool success, ) = payable(payer).call{value: excess}('');
                 if (!success) revert TransferFailed();
             }
         }
@@ -86,7 +86,7 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
 
         // Отправляем netAmount обратно вызывающему контракту (Marketplace)
         if (isNative && netAmount_ > 0) {
-            (bool success, ) = payable(msg.sender).call{value: netAmount_}("");
+            (bool success, ) = payable(msg.sender).call{value: netAmount_}('');
             if (!success) revert TransferFailed();
         } else if (!isNative && netAmount_ > 0) {
             IERC20(token).safeTransfer(msg.sender, netAmount_);

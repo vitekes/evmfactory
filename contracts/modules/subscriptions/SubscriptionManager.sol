@@ -290,18 +290,12 @@ contract SubscriptionManager is ReentrancyGuard {
             );
             // Gateway returns netAmount to this contract, transfer to merchant
             if (netAmount > 0) {
-                (bool success, ) = payable(plan.merchant).call{value: netAmount}("");
+                (bool success, ) = payable(plan.merchant).call{value: netAmount}('');
                 if (!success) revert TransferFailed();
             }
         } else {
             // For ERC20 payments, no msg.value needed
-            netAmount = IPaymentGateway(gateway).processPayment(
-                MODULE_ID,
-                paymentToken,
-                msg.sender,
-                paymentAmount,
-                ''
-            );
+            netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
             // Transfer ERC20 tokens to merchant
             IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
         }
@@ -355,7 +349,7 @@ contract SubscriptionManager is ReentrancyGuard {
         if (plan.token == address(0)) {
             // For ETH payments
             if (netAmount > 0) {
-                (bool success, ) = payable(plan.merchant).call{value: netAmount}("");
+                (bool success, ) = payable(plan.merchant).call{value: netAmount}('');
                 if (!success) revert TransferFailed();
             }
         } else {

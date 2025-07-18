@@ -98,7 +98,7 @@ contract ContestEscrow is ReentrancyGuard {
                 if (p.token == address(0)) {
                     // Handle native ETH
                     if (address(this).balance < amount) revert InsufficientBalance();
-                    (bool success, ) = payable(winners[i]).call{value: amount}("");
+                    (bool success, ) = payable(winners[i]).call{value: amount}('');
                     if (!success) revert TransferFailed();
                 } else {
                     // Handle ERC20 tokens
@@ -154,7 +154,7 @@ contract ContestEscrow is ReentrancyGuard {
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
                 if (p.token == address(0)) {
                     // Handle native ETH
-                    (bool success, ) = payable(creator).call{value: p.amount}("");
+                    (bool success, ) = payable(creator).call{value: p.amount}('');
                     if (!success) revert TransferFailed();
                 } else {
                     // Handle ERC20 tokens
@@ -221,7 +221,7 @@ contract ContestEscrow is ReentrancyGuard {
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
                 if (p.token == address(0)) {
                     // Handle native ETH
-                    (bool success, ) = payable(creator).call{value: p.amount}("");
+                    (bool success, ) = payable(creator).call{value: p.amount}('');
                     if (!success) revert TransferFailed();
                 } else {
                     // Handle ERC20 tokens

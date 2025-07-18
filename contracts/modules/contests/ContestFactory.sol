@@ -154,7 +154,13 @@ contract ContestFactory is BaseFactory {
         }
 
         // Emit event directly
-        emit ContestCreated(uint256(instanceId), msg.sender, bytes32(0), abi.encode(_prizes), CoreDefs.CONTEST_MODULE_ID);
+        emit ContestCreated(
+            uint256(instanceId),
+            msg.sender,
+            bytes32(0),
+            abi.encode(_prizes),
+            CoreDefs.CONTEST_MODULE_ID
+        );
     }
 
     /// @notice Sets default contest duration
