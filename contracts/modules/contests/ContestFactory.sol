@@ -25,7 +25,7 @@ contract ContestFactory is BaseFactory {
     /// @param moduleId Module identifier
     event ContestCreated(uint256 contestId, address manager, bytes32 category, bytes metadata, bytes32 moduleId);
 
-    constructor(address registry, address feeManager) BaseFactory(registry, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
+    constructor(address core, address feeManager) BaseFactory(core, feeManager, CoreDefs.CONTEST_MODULE_ID) {}
 
     /// @notice Creates a new contest with specified prizes
     /// @param _prizes List of contest prizes
@@ -61,7 +61,7 @@ contract ContestFactory is BaseFactory {
         }
 
         // Create ID for new contest
-        /* bytes32 instanceId = */ _generateInstanceId('ContestEscrow');
+        bytes32 instanceId = _generateInstanceId('ContestEscrow');
 
         // Calculate contest deadline
         uint256 deadline = block.timestamp + defaultContestDuration;
@@ -69,14 +69,9 @@ contract ContestFactory is BaseFactory {
         // instanceId is already guaranteed to be non-zero by _generateInstanceId
         uint256 gasPoolAmount = 0;
 
-        // Check if sender has allowed tokens for gas pool
-        if (paymentGateway != address(0)) {
-            uint256 gasBalance = IERC20(paymentGateway).allowance(msg.sender, address(this));
-            if (gasBalance > 0) {
-                IERC20(paymentGateway).safeTransferFrom(msg.sender, address(this), gasBalance);
-                gasPoolAmount = gasBalance;
-            }
-        }
+        // Gas pool functionality disabled for now
+        // TODO: Implement proper gas pool with actual ERC20 token
+        gasPoolAmount = 0;
 
         // Create escrow contract
         ContestEscrow esc = new ContestEscrow(
@@ -107,7 +102,7 @@ contract ContestFactory is BaseFactory {
         // Check token limit
         uint256 uniqueTokensCount = 0;
         for (uint256 i = 0; i < prizesLen; i++) {
-            if (_prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0 && _prizes[i].token != address(0)) {
+            if (_prizes[i].prizeType == PrizeType.MONETARY && _prizes[i].amount > 0) {
                 uniqueTokensCount++;
             }
         }
@@ -124,6 +119,9 @@ contract ContestFactory is BaseFactory {
             // Cache token to avoid multiple calldata access
             address token = p.token;
             uint256 amount = p.amount;
+
+            // Skip ETH prizes as they are handled via msg.value
+            if (token == address(0)) continue;
 
             // Fast search with optimized loop
             bool found = false;
@@ -156,7 +154,7 @@ contract ContestFactory is BaseFactory {
         }
 
         // Emit event directly
-        emit ContestCreated(tcount, msg.sender, bytes32(0), abi.encode(_prizes), CoreDefs.CONTEST_MODULE_ID);
+        emit ContestCreated(uint256(instanceId), msg.sender, bytes32(0), abi.encode(_prizes), CoreDefs.CONTEST_MODULE_ID);
     }
 
     /// @notice Sets default contest duration

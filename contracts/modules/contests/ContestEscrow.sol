@@ -50,9 +50,9 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 _deadline
     ) {
         // factory should deploy the escrow, not the creator
-        assert(msg.sender != _creator);
+        // Note: msg.sender should be the factory, _creator should be the contest creator
         if (_coreSystem == address(0)) revert ZeroAddress();
-        if (_commissionToken == address(0)) revert ZeroAddress();
+        // _commissionToken can be zero address if no commission token is used
         core = CoreSystem(_coreSystem);
         creator = _creator;
         commissionToken = _commissionToken;
@@ -94,8 +94,17 @@ contract ContestEscrow is ReentrancyGuard {
 
             if (p.prizeType == PrizeType.MONETARY) {
                 uint256 amount = p.distribution == 0 ? p.amount : _computeDescending(p.amount, uint8(i));
-                if (IERC20(p.token).balanceOf(address(this)) < amount) revert InsufficientBalance();
-                IERC20(p.token).safeTransfer(winners[i], amount);
+
+                if (p.token == address(0)) {
+                    // Handle native ETH
+                    if (address(this).balance < amount) revert InsufficientBalance();
+                    (bool success, ) = payable(winners[i]).call{value: amount}("");
+                    if (!success) revert TransferFailed();
+                } else {
+                    // Handle ERC20 tokens
+                    if (IERC20(p.token).balanceOf(address(this)) < amount) revert InsufficientBalance();
+                    IERC20(p.token).safeTransfer(winners[i], amount);
+                }
                 emit MonetaryPrizePaid(winners[i], amount);
             } else {
                 emit PromoPrizeIssued(uint8(i), winners[i], p.uri);
@@ -143,7 +152,14 @@ contract ContestEscrow is ReentrancyGuard {
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
-                IERC20(p.token).safeTransfer(creator, p.amount);
+                if (p.token == address(0)) {
+                    // Handle native ETH
+                    (bool success, ) = payable(creator).call{value: p.amount}("");
+                    if (!success) revert TransferFailed();
+                } else {
+                    // Handle ERC20 tokens
+                    IERC20(p.token).safeTransfer(creator, p.amount);
+                }
             }
         }
 
@@ -203,7 +219,14 @@ contract ContestEscrow is ReentrancyGuard {
         for (uint256 i = 0; i < prizes.length; i++) {
             PrizeInfo memory p = prizes[i];
             if (p.prizeType == PrizeType.MONETARY && p.amount > 0) {
-                IERC20(p.token).safeTransfer(creator, p.amount);
+                if (p.token == address(0)) {
+                    // Handle native ETH
+                    (bool success, ) = payable(creator).call{value: p.amount}("");
+                    if (!success) revert TransferFailed();
+                } else {
+                    // Handle ERC20 tokens
+                    IERC20(p.token).safeTransfer(creator, p.amount);
+                }
             }
         }
 
@@ -217,4 +240,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         emit EmergencyWithdraw(creator, block.timestamp);
     }
+
+    /// @notice Allows contract to receive ETH (needed for native currency contests)
+    receive() external payable {}
 }

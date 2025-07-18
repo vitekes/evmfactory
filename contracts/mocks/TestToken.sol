@@ -20,4 +20,11 @@ contract TestToken is ERC20 {
     function decimals() public view override returns (uint8) {
         return _customDecimals;
     }
+
+    /**
+     * @dev Mint tokens to a specific address (for testing purposes)
+     */
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }

@@ -37,6 +37,7 @@ error ModuleNotRegistered();
 error NothingToWithdraw();
 error InsufficientBalance();
 error RefundDisabled();
+error TransferFailed();
 error NotAllowedToken();
 error ValidatorNotFound();
 error PriceFeedNotFound();

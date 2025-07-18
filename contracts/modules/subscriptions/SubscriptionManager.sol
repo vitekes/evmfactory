@@ -148,7 +148,7 @@ contract SubscriptionManager is ReentrancyGuard {
         SignatureLib.Plan calldata plan,
         bytes calldata sigMerchant,
         bytes calldata permitSig
-    ) external nonReentrant {
+    ) external payable nonReentrant {
         _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
     }
 
@@ -211,8 +211,10 @@ contract SubscriptionManager is ReentrancyGuard {
     ) internal {
         // Basic parameter checks first
         if (paymentAmount == 0) revert InvalidAmount();
-        if (paymentToken == address(0)) revert ZeroAddress();
         if (plan.merchant == address(0)) revert ZeroAddress();
+
+        // For ETH payments, paymentToken can be address(0)
+        bool isNativePayment = paymentToken == address(0);
 
         // Check plan expiry
         if (!(plan.expiry == 0 || plan.expiry >= block.timestamp)) revert Expired();
@@ -235,7 +237,8 @@ contract SubscriptionManager is ReentrancyGuard {
         bytes32 planHash = hashPlan(plan);
 
         // Verify signature last (expensive)
-        if (planHash.recover(sigMerchant) != plan.merchant) revert InvalidSignature();
+        // planHash уже содержит EIP-712 хеш с DOMAIN_SEPARATOR
+        if (ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
 
         // Save plan and create subscriber before external calls
         if (plans[planHash].merchant == address(0)) {
@@ -243,7 +246,8 @@ contract SubscriptionManager is ReentrancyGuard {
         }
         subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
 
-        if (permitSig.length > 0) {
+        // Only process permit signatures for token payments, not for ETH
+        if (permitSig.length > 0 && !isNativePayment) {
             (uint256 deadline, uint8 v, bytes32 r, bytes32 s) = abi.decode(
                 permitSig,
                 (uint256, uint8, bytes32, bytes32)
@@ -274,16 +278,33 @@ contract SubscriptionManager is ReentrancyGuard {
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
         // Process payment via gateway
-        uint256 netAmount = IPaymentGateway(gateway).processPayment(
-            MODULE_ID,
-            paymentToken,
-            msg.sender,
-            paymentAmount,
-            ''
-        );
-
-        // Transfer funds to merchant
-        IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
+        uint256 netAmount;
+        if (isNativePayment) {
+            // For ETH payments, send msg.value to the gateway
+            netAmount = IPaymentGateway(gateway).processPayment{value: msg.value}(
+                MODULE_ID,
+                paymentToken,
+                msg.sender,
+                paymentAmount,
+                ''
+            );
+            // Gateway returns netAmount to this contract, transfer to merchant
+            if (netAmount > 0) {
+                (bool success, ) = payable(plan.merchant).call{value: netAmount}("");
+                if (!success) revert TransferFailed();
+            }
+        } else {
+            // For ERC20 payments, no msg.value needed
+            netAmount = IPaymentGateway(gateway).processPayment(
+                MODULE_ID,
+                paymentToken,
+                msg.sender,
+                paymentAmount,
+                ''
+            );
+            // Transfer ERC20 tokens to merchant
+            IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
+        }
 
         // Emit event directly
         emit SubscriptionCreated(
@@ -331,7 +352,16 @@ contract SubscriptionManager is ReentrancyGuard {
         uint256 netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
 
         // Transfer funds to merchant
-        IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
+        if (plan.token == address(0)) {
+            // For ETH payments
+            if (netAmount > 0) {
+                (bool success, ) = payable(plan.merchant).call{value: netAmount}("");
+                if (!success) revert TransferFailed();
+            }
+        } else {
+            // For ERC20 payments
+            IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
+        }
     }
 
     /// @notice Charge multiple subscribers in a single transaction.
@@ -417,4 +447,7 @@ contract SubscriptionManager is ReentrancyGuard {
         emit Unsubscribed(msg.sender, s.planHash);
         emit PlanCancelled(msg.sender, s.planHash, block.timestamp);
     }
+
+    /// @notice Allow contract to receive ETH from PaymentGateway
+    receive() external payable {}
 }

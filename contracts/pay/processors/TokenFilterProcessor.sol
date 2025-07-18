@@ -14,6 +14,7 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
     string private constant PROCESSOR_VERSION = '1.0.0';
 
     mapping(bytes32 => mapping(address => bool)) private allowedTokens;
+    mapping(bytes32 => address[]) private tokenLists;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -48,13 +49,21 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
 
     function configure(bytes32 moduleId, bytes calldata configData) external override onlyRole(PROCESSOR_ADMIN_ROLE) {
         require(configData.length % 20 == 0, 'TokenFilter: invalid config length');
+
+        // Очищаем предыдущий список токенов
+        delete tokenLists[moduleId];
+
         uint256 count = configData.length / 20;
         for (uint256 i = 0; i < count; i++) {
             address token;
             assembly {
-                token := calldataload(add(configData.offset, mul(i, 20)))
+                // Правильное извлечение адреса из calldata
+                // Каждый адрес занимает 20 байт, но в памяти хранится как 32-байтное слово
+                let offset := add(configData.offset, mul(i, 20))
+                token := shr(96, calldataload(offset)) // Сдвигаем на 96 бит (12 байт) чтобы получить адрес
             }
             allowedTokens[moduleId][token] = true;
+            tokenLists[moduleId].push(token);
         }
     }
 
@@ -62,9 +71,7 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
         return allowedTokens[moduleId][fromToken] && allowedTokens[moduleId][toToken];
     }
 
-    function getAllowedTokens(bytes32) external pure returns (address[] memory tokens) {
-        // For simplicity, this function is not implemented fully.
-        // In a real implementation, you would store and return the list of allowed tokens.
-        tokens = new address[](0);
+    function getAllowedTokens(bytes32 moduleId) external view returns (address[] memory tokens) {
+        return tokenLists[moduleId];
     }
 }

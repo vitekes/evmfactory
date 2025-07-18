@@ -8,6 +8,7 @@ import '../PaymentContext.sol';
 import '../registry/ProcessorRegistry.sol';
 import '../orchestrator/PaymentOrchestrator.sol';
 import '../processors/TokenFilterProcessor.sol';
+import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -38,7 +39,7 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
     );
 
     constructor(address orchestratorAddress) {
-        require(orchestratorAddress != address(0), 'Invalid orchestrator address');
+        if (orchestratorAddress == address(0)) revert ZeroAddress();
         orchestrator = PaymentOrchestrator(orchestratorAddress);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -52,12 +53,12 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
         uint256 amount,
         bytes calldata signature
     ) external payable returns (uint256 netAmount) {
-        require(amount > 0, 'Amount must be greater than zero');
+        if (amount == 0) revert InvalidAmount();
 
         bool isNative = token == address(0);
 
         if (isNative) {
-            require(msg.value >= amount, 'Insufficient native token sent');
+            if (msg.value < amount) revert InsufficientBalance();
         } else {
             IERC20(token).safeTransferFrom(payer, address(this), amount);
         }
@@ -73,15 +74,22 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
         paymentStatuses[paymentId_] = 1; // success
 
         if (isNative) {
-            uint256 feeAmount = amount - netAmount_;
-            if (feeAmount > 0) {
-                payable(payer).transfer(feeAmount);
+            // Для нативного токена оставляем netAmount в контракте для Marketplace
+            // Возвращаем только избыток, если msg.value больше amount
+            uint256 excess = msg.value - amount;
+            if (excess > 0) {
+                (bool success, ) = payable(payer).call{value: excess}("");
+                if (!success) revert TransferFailed();
             }
-        } else {
-            uint256 feeAmount = amount - netAmount_;
-            if (feeAmount > 0) {
-                IERC20(token).safeTransfer(payer, feeAmount);
-            }
+        }
+        // Для ERC20 токенов комиссии остаются в контракте gateway
+
+        // Отправляем netAmount обратно вызывающему контракту (Marketplace)
+        if (isNative && netAmount_ > 0) {
+            (bool success, ) = payable(msg.sender).call{value: netAmount_}("");
+            if (!success) revert TransferFailed();
+        } else if (!isNative && netAmount_ > 0) {
+            IERC20(token).safeTransfer(msg.sender, netAmount_);
         }
 
         emit PaymentProcessed(moduleId, paymentId_, token, payer, amount, netAmount_, 1);
