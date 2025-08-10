@@ -50,6 +50,11 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
     function configure(bytes32 moduleId, bytes calldata configData) external override onlyRole(PROCESSOR_ADMIN_ROLE) {
         require(configData.length % 20 == 0, 'TokenFilter: invalid config length');
 
+        // Сбрасываем старые флаги allow для модуля
+        address[] storage prev = tokenLists[moduleId];
+        for (uint256 i = 0; i < prev.length; i++) {
+            allowedTokens[moduleId][prev[i]] = false;
+        }
         // Очищаем предыдущий список токенов
         delete tokenLists[moduleId];
 
@@ -62,8 +67,11 @@ contract TokenFilterProcessor is IPaymentProcessor, AccessControl {
                 let offset := add(configData.offset, mul(i, 20))
                 token := shr(96, calldataload(offset)) // Сдвигаем на 96 бит (12 байт) чтобы получить адрес
             }
-            allowedTokens[moduleId][token] = true;
-            tokenLists[moduleId].push(token);
+            require(token != address(0), 'TokenFilter: zero token');
+            if (!allowedTokens[moduleId][token]) {
+                allowedTokens[moduleId][token] = true;
+                tokenLists[moduleId].push(token);
+            }
         }
     }
 

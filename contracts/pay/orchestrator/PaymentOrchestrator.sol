@@ -5,6 +5,8 @@ import '../interfaces/IPaymentProcessor.sol';
 import '../interfaces/IProcessorRegistry.sol';
 import '../PaymentContext.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/utils/Pausable.sol';
 
 interface IOracleProcessor {
     function convertAmount(
@@ -19,8 +21,9 @@ interface IOracleProcessor {
 
 /// @title PaymentOrchestrator
 /// @notice Управляет цепочкой процессоров и обработкой платежей
-contract PaymentOrchestrator is AccessControl {
+contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256('PROCESSOR_MANAGER_ROLE');
+    bytes32 public constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
     IProcessorRegistry public processorRegistry;
 
@@ -34,6 +37,8 @@ contract PaymentOrchestrator is AccessControl {
         processorRegistry = IProcessorRegistry(_processorRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PROCESSOR_MANAGER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+
     }
 
     function processPayment(
@@ -42,7 +47,7 @@ contract PaymentOrchestrator is AccessControl {
         address payer,
         uint256 amount,
         bytes calldata /* signature */
-    ) external returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount) {
+    ) external nonReentrant whenNotPaused returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount) {
         PaymentContext.Context memory context = PaymentContext.createContext(
             moduleId,
             payer,
@@ -163,4 +168,13 @@ contract PaymentOrchestrator is AccessControl {
         emit ProcessorConfigured(moduleId, processorName, enabled);
         return true;
     }
+
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
 }

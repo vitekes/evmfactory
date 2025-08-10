@@ -11,15 +11,17 @@ import '../processors/TokenFilterProcessor.sol';
 import '../../errors/Errors.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/utils/Pausable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /// @title PaymentGateway
 /// @notice Платёжный шлюз для приёма и маршрутизации платежей
-contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
+contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     bytes32 public constant PAYMENT_ADMIN_ROLE = keccak256('PAYMENT_ADMIN_ROLE');
+    bytes32 public constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
     string private constant GATEWAY_NAME = 'PaymentGateway';
     string private constant GATEWAY_VERSION = '1.0.0';
@@ -44,6 +46,7 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAYMENT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
     }
 
     function processPayment(
@@ -52,25 +55,31 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
         address payer,
         uint256 amount,
         bytes calldata signature
-    ) external payable returns (uint256 netAmount) {
+    ) external payable nonReentrant whenNotPaused returns (uint256 netAmount) {
         if (amount == 0) revert InvalidAmount();
 
         bool isNative = token == address(0);
+        uint256 actualAmount = amount;
 
         if (isNative) {
             if (msg.value < amount) revert InsufficientBalance();
         } else {
+            uint256 beforeBal = IERC20(token).balanceOf(address(this));
             IERC20(token).safeTransferFrom(payer, address(this), amount);
+            uint256 afterBal = IERC20(token).balanceOf(address(this));
+            actualAmount = afterBal - beforeBal;
+            if (actualAmount == 0) revert TransferFailed();
         }
 
         (uint256 netAmount_, bytes32 paymentId_, , ) = orchestrator.processPayment(
             moduleId,
             token,
             payer,
-            amount,
+            actualAmount,
             signature
         );
 
+        require(paymentStatuses[paymentId_] == 0, "Payment already processed");
         paymentStatuses[paymentId_] = 1; // success
 
         if (isNative) {
@@ -149,5 +158,13 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard {
 
     function getVersion() external pure returns (string memory) {
         return GATEWAY_VERSION;
+    }
+
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 }
