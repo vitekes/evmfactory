@@ -79,7 +79,7 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Paus
             signature
         );
 
-        require(paymentStatuses[paymentId_] == 0, "Payment already processed");
+        require(paymentStatuses[paymentId_] == 0, 'Payment already processed');
         paymentStatuses[paymentId_] = 1; // success
 
         if (isNative) {

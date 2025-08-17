@@ -38,7 +38,6 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PROCESSOR_MANAGER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-
     }
 
     function processPayment(
@@ -47,7 +46,12 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
         address payer,
         uint256 amount,
         bytes calldata /* signature */
-    ) external nonReentrant whenNotPaused returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount) {
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount)
+    {
         PaymentContext.Context memory context = PaymentContext.createContext(
             moduleId,
             payer,
@@ -176,5 +180,4 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
-
 }
