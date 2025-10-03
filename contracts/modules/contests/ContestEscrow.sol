@@ -56,6 +56,7 @@ contract ContestEscrow is ReentrancyGuard {
         core = CoreSystem(_coreSystem);
         creator = _creator;
         commissionToken = _commissionToken;
+        if (_gasPool > 0 && _commissionToken == address(0)) revert InvalidParameters();
         gasPool = _gasPool;
         deadline = _deadline > 0 ? _deadline : block.timestamp + 180 days;
         for (uint256 i = 0; i < _prizes.length; i++) {
@@ -122,6 +123,7 @@ contract ContestEscrow is ReentrancyGuard {
         uint256 refund = gasUsed * actualGasPrice;
         if (refund > gasPool) refund = gasPool;
         if (refund > 0) {
+            if (commissionToken == address(0)) revert InvalidParameters();
             gasPool -= refund;
             IERC20(commissionToken).safeTransfer(msg.sender, refund);
             emit GasRefunded(msg.sender, refund);
@@ -165,6 +167,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         // Return remaining gas pool
         if (gasPool > 0) {
+            if (commissionToken == address(0)) revert InvalidParameters();
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }
@@ -232,6 +235,7 @@ contract ContestEscrow is ReentrancyGuard {
 
         // Return remaining gas pool
         if (gasPool > 0) {
+            if (commissionToken == address(0)) revert InvalidParameters();
             IERC20(commissionToken).safeTransfer(creator, gasPool);
             gasPool = 0;
         }

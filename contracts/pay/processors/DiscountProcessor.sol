@@ -32,15 +32,19 @@ contract DiscountProcessor is IPaymentProcessor, AccessControl {
     ) external view override returns (IPaymentProcessor.ProcessResult result, bytes memory updatedContextBytes) {
         PaymentContext.Context memory context = abi.decode(contextBytes, (PaymentContext.Context));
 
-        uint256 discountAmount = (uint256(context.processedAmount) * discountPercent) / 10000;
+        uint256 processedBefore = uint256(context.processedAmount);
+        uint256 payerBefore = uint256(context.payerAmount);
 
-        if (discountAmount > context.processedAmount) {
+        uint256 processedDiscount = (processedBefore * discountPercent) / 10000;
+        uint256 payerDiscount = (payerBefore * discountPercent) / 10000;
+
+        if (processedDiscount > processedBefore || payerDiscount > payerBefore) {
             context = PaymentContext.setError(context, 'DiscountProcessor: discount exceeds amount');
             return (IPaymentProcessor.ProcessResult.FAILED, abi.encode(context));
         }
 
-        uint256 newAmount = uint256(context.processedAmount) - discountAmount;
-        context = PaymentContext.updateProcessedAmount(context, newAmount);
+        context = PaymentContext.updateProcessedAmount(context, processedBefore - processedDiscount);
+        context = PaymentContext.setPayerAmount(context, payerBefore - payerDiscount);
 
         updatedContextBytes = abi.encode(context);
         return (IPaymentProcessor.ProcessResult.SUCCESS, updatedContextBytes);

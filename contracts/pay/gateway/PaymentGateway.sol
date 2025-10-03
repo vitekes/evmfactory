@@ -28,7 +28,10 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Paus
 
     PaymentOrchestrator public orchestrator;
 
+    mapping(bytes32 => mapping(address => bool)) private moduleAuthorizations;
     mapping(bytes32 => uint8) private paymentStatuses;
+
+    event ModuleAuthorizationUpdated(bytes32 indexed moduleId, address indexed module, bool authorized);
 
     event PaymentProcessed(
         bytes32 indexed moduleId,
@@ -49,6 +52,24 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Paus
         _grantRole(PAUSER_ROLE, msg.sender);
     }
 
+    function setModuleAuthorization(
+        bytes32 moduleId,
+        address module,
+        bool authorized
+    ) external onlyRole(PAYMENT_ADMIN_ROLE) {
+        if (module == address(0)) revert ZeroAddress();
+        moduleAuthorizations[moduleId][module] = authorized;
+        emit ModuleAuthorizationUpdated(moduleId, module, authorized);
+    }
+
+    function _isAuthorizedModule(bytes32 moduleId) internal view returns (bool) {
+        return moduleAuthorizations[moduleId][msg.sender] || hasRole(PAYMENT_ADMIN_ROLE, msg.sender);
+    }
+
+    function _enforceAuthorizedModule(bytes32 moduleId) internal view {
+        if (!_isAuthorizedModule(moduleId)) revert Forbidden();
+    }
+
     function processPayment(
         bytes32 moduleId,
         address token,
@@ -57,6 +78,8 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Paus
         bytes calldata signature
     ) external payable nonReentrant whenNotPaused returns (uint256 netAmount) {
         if (amount == 0) revert InvalidAmount();
+
+        _enforceAuthorizedModule(moduleId);
 
         bool isNative = token == address(0);
         uint256 actualAmount = amount;
@@ -71,37 +94,74 @@ contract PaymentGateway is IPaymentGateway, AccessControl, ReentrancyGuard, Paus
             if (actualAmount == 0) revert TransferFailed();
         }
 
-        (uint256 netAmount_, bytes32 paymentId_, , ) = orchestrator.processPayment(
-            moduleId,
-            token,
-            payer,
-            actualAmount,
-            signature
-        );
+        (
+            uint256 netAmount_,
+            bytes32 paymentId_,
+            uint256 payerAmount_,
+            PaymentContext.FeeInfo[] memory fees_
+        ) = orchestrator.processPayment(moduleId, token, payer, actualAmount, signature);
 
         require(paymentStatuses[paymentId_] == 0, 'Payment already processed');
-        paymentStatuses[paymentId_] = 1; // success
+        paymentStatuses[paymentId_] = 1;
+
+        if (netAmount_ > payerAmount_) revert InvalidState();
+        if (payerAmount_ > actualAmount) revert InvalidState();
 
         if (isNative) {
-            // Для нативного токена оставляем netAmount в контракте для Marketplace
-            // Возвращаем только избыток, если msg.value больше amount
             uint256 excess = msg.value - amount;
             if (excess > 0) {
                 (bool success, ) = payable(payer).call{value: excess}('');
                 if (!success) revert TransferFailed();
             }
         }
-        // Для ERC20 токенов комиссии остаются в контракте gateway
 
-        // Отправляем netAmount обратно вызывающему контракту (Marketplace)
-        if (isNative && netAmount_ > 0) {
-            (bool success, ) = payable(msg.sender).call{value: netAmount_}('');
-            if (!success) revert TransferFailed();
-        } else if (!isNative && netAmount_ > 0) {
-            IERC20(token).safeTransfer(msg.sender, netAmount_);
+        uint256 discountRefund = actualAmount - payerAmount_;
+        if (discountRefund > 0) {
+            if (isNative) {
+                (bool successDiscount, ) = payable(payer).call{value: discountRefund}('');
+                if (!successDiscount) revert TransferFailed();
+            } else {
+                IERC20(token).safeTransfer(payer, discountRefund);
+            }
         }
 
-        emit PaymentProcessed(moduleId, paymentId_, token, payer, amount, netAmount_, 1);
+        uint256 feesBudget = payerAmount_ - netAmount_;
+        uint256 distributedFees = 0;
+        for (uint256 i = 0; i < fees_.length; i++) {
+            uint256 feeAmount = fees_[i].amount;
+            if (feeAmount == 0) continue;
+            if (feeAmount > feesBudget - distributedFees) revert InvalidState();
+            distributedFees += feeAmount;
+            address recipient = fees_[i].recipient;
+            if (recipient == address(0)) revert InvalidState();
+            if (isNative) {
+                (bool successFee, ) = payable(recipient).call{value: feeAmount}('');
+                if (!successFee) revert TransferFailed();
+            } else {
+                IERC20(token).safeTransfer(recipient, feeAmount);
+            }
+        }
+
+        uint256 remainingBudget = feesBudget - distributedFees;
+        if (remainingBudget > 0) {
+            if (isNative) {
+                (bool successResidual, ) = payable(payer).call{value: remainingBudget}('');
+                if (!successResidual) revert TransferFailed();
+            } else {
+                IERC20(token).safeTransfer(payer, remainingBudget);
+            }
+        }
+
+        if (netAmount_ > 0) {
+            if (isNative) {
+                (bool successNet, ) = payable(msg.sender).call{value: netAmount_}('');
+                if (!successNet) revert TransferFailed();
+            } else {
+                IERC20(token).safeTransfer(msg.sender, netAmount_);
+            }
+        }
+
+        emit PaymentProcessed(moduleId, paymentId_, token, payer, actualAmount, netAmount_, 1);
 
         return netAmount_;
     }

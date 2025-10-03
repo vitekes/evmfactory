@@ -20,7 +20,7 @@ interface IOracleProcessor {
 }
 
 /// @title PaymentOrchestrator
-/// @notice Управляет цепочкой процессоров и обработкой платежей
+/// @notice ��������� ����������� ������� ��������� ����������� ��� ������
 contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant PROCESSOR_MANAGER_ROLE = keccak256('PROCESSOR_MANAGER_ROLE');
     bytes32 public constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
@@ -29,6 +29,7 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
 
     mapping(bytes32 => address[]) private moduleProcessors;
     mapping(bytes32 => mapping(string => bool)) private moduleProcessorConfig;
+    uint256 private paymentNonce;
 
     event ProcessorConfigured(bytes32 indexed moduleId, string processorName, bool enabled);
 
@@ -50,14 +51,17 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
         external
         nonReentrant
         whenNotPaused
-        returns (uint256 netAmount, bytes32 paymentId, address feeRecipient, uint256 feeAmount)
+        returns (uint256 netAmount, bytes32 paymentId, uint256 payerAmount, PaymentContext.FeeInfo[] memory fees)
     {
+        uint256 currentNonce = ++paymentNonce;
+
         PaymentContext.Context memory context = PaymentContext.createContext(
             moduleId,
             payer,
             address(0),
             token,
             amount,
+            currentNonce,
             ''
         );
 
@@ -87,8 +91,6 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
 
         context = abi.decode(contextBytes, (PaymentContext.Context));
 
-        // Mark payment processing as successful if all processors executed
-        // without reverting and none explicitly set the success flag
         if (!context.success) {
             context = PaymentContext.setSuccess(context, true);
         }
@@ -97,8 +99,15 @@ contract PaymentOrchestrator is AccessControl, ReentrancyGuard, Pausable {
 
         netAmount = context.processedAmount;
         paymentId = context.paymentId;
-        feeAmount = 0; // For now, feeRecipient and feeAmount can be set by processors in context.metadata or extended later
-        feeRecipient = address(0);
+        payerAmount = context.payerAmount;
+        fees = context.fees;
+
+        uint256 originalAmount = context.originalAmount;
+        require(payerAmount <= originalAmount, 'Orchestrator: payer amount exceeds original');
+        require(netAmount <= payerAmount, 'Orchestrator: net amount exceeds payer amount');
+
+        uint256 feesTotal = PaymentContext.totalFees(context);
+        require(feesTotal <= payerAmount - netAmount, 'Orchestrator: fees exceed payer delta');
     }
 
     function convertAmount(

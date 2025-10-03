@@ -14,10 +14,14 @@ contract FeeProcessor is IPaymentProcessor, AccessControl {
     string private constant PROCESSOR_VERSION = '1.0.0';
 
     uint16 public feePercent; // комиссия в базисных пунктах (например, 100 = 1%)
+    address public feeRecipient;
+
+    event FeeRecipientUpdated(address indexed previousRecipient, address indexed newRecipient);
 
     constructor(uint16 initialFeePercent) {
         require(initialFeePercent <= 10000, 'FeeProcessor: fee percent too high');
         feePercent = initialFeePercent;
+        feeRecipient = msg.sender;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PROCESSOR_ADMIN_ROLE, msg.sender);
@@ -39,8 +43,16 @@ contract FeeProcessor is IPaymentProcessor, AccessControl {
             return (IPaymentProcessor.ProcessResult.FAILED, abi.encode(context));
         }
 
-        uint256 newAmount = uint256(context.processedAmount) - feeAmount;
-        context = PaymentContext.updateProcessedAmount(context, newAmount);
+        if (feeAmount > 0) {
+            if (feeRecipient == address(0)) {
+                context = PaymentContext.setError(context, 'FeeProcessor: fee recipient not set');
+                return (IPaymentProcessor.ProcessResult.FAILED, abi.encode(context));
+            }
+
+            uint256 newAmount = uint256(context.processedAmount) - feeAmount;
+            context = PaymentContext.updateProcessedAmount(context, newAmount);
+            context = PaymentContext.addFee(context, feeRecipient, feeAmount);
+        }
 
         updatedContextBytes = abi.encode(context);
         return (IPaymentProcessor.ProcessResult.SUCCESS, updatedContextBytes);
@@ -55,9 +67,20 @@ contract FeeProcessor is IPaymentProcessor, AccessControl {
     }
 
     function configure(bytes32, bytes calldata configData) external override onlyRole(PROCESSOR_ADMIN_ROLE) {
-        require(configData.length == 2, 'FeeProcessor: invalid config length');
+        if (configData.length != 2 && configData.length != 22) revert('FeeProcessor: invalid config length');
+
         uint16 newFeePercent = (uint16(uint8(configData[0])) << 8) | uint16(uint8(configData[1]));
         require(newFeePercent <= 10000, 'FeeProcessor: fee percent too high');
         feePercent = newFeePercent;
+
+        if (configData.length == 22) {
+            address newRecipient;
+            assembly {
+                newRecipient := shr(96, calldataload(add(configData.offset, 2)))
+            }
+            require(newRecipient != address(0), 'FeeProcessor: zero recipient');
+            emit FeeRecipientUpdated(feeRecipient, newRecipient);
+            feeRecipient = newRecipient;
+        }
     }
 }

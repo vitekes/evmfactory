@@ -11,7 +11,7 @@ import "hardhat-gas-reporter";
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
     paths: {
-        tests: "./test/hardhat",
+        tests: "./test",
         sources: "./contracts",
         cache: "./cache",
         artifacts: "./artifacts"
@@ -84,3 +84,4 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async ({ solcVersion }) 
         longVersion: solcVersion,
     };
 });
+

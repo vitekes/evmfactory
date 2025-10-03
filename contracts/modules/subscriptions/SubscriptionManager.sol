@@ -63,8 +63,14 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @notice Active subscriber info mapped by user address
     mapping(address => Subscriber) public subscribers;
 
+    /// @notice Native token balances reserved for recurring payments
+    mapping(address => uint256) private nativeDeposits;
+
     /// @notice Maximum number of users to charge in a single batch. 0 disables the limit.
     uint16 public batchLimit;
+    uint8 private constant SKIP_REASON_NO_PLAN = 1;
+    uint8 private constant SKIP_REASON_NOT_DUE = 2;
+    uint8 private constant SKIP_REASON_INSUFFICIENT_NATIVE_DEPOSIT = 3;
 
     /// @notice EIP-712 domain separator for plan signatures
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -108,6 +114,9 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @param subscriptionId Subscription ID
     /// @param moduleId Module ID
     event SubscriptionCancelled(uint256 subscriptionId, bytes32 moduleId);
+    event ChargeSkipped(address indexed user, bytes32 indexed planHash, uint8 reason);
+    event NativeDepositIncreased(address indexed user, uint256 amount, uint256 newBalance);
+    event NativeDepositWithdrawn(address indexed user, uint256 amount, uint256 newBalance);
 
     /// @notice Initializes the subscription manager and registers services
     /// @param _core Address of the CoreSystem contract
@@ -139,6 +148,25 @@ contract SubscriptionManager is ReentrancyGuard {
     function hashPlan(SignatureLib.Plan calldata plan) public view returns (bytes32) {
         return SignatureLib.hashPlan(plan, DOMAIN_SEPARATOR);
     }
+    function getNativeDeposit(address user) external view returns (uint256) {
+        return nativeDeposits[user];
+    }
+
+    function depositNativeFunds() external payable {
+        if (msg.value == 0) revert InvalidAmount();
+        nativeDeposits[msg.sender] += msg.value;
+        emit NativeDepositIncreased(msg.sender, msg.value, nativeDeposits[msg.sender]);
+    }
+
+    function withdrawNativeFunds(uint256 amount) external nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        uint256 balance = nativeDeposits[msg.sender];
+        if (amount > balance) revert InsufficientBalance();
+        nativeDeposits[msg.sender] = balance - amount;
+        (bool success, ) = payable(msg.sender).call{value: amount}('');
+        if (!success) revert TransferFailed();
+        emit NativeDepositWithdrawn(msg.sender, amount, nativeDeposits[msg.sender]);
+    }
 
     /// @notice Subscribe caller to a plan
     /// @param plan Plan parameters signed by the merchant
@@ -150,6 +178,38 @@ contract SubscriptionManager is ReentrancyGuard {
         bytes calldata permitSig
     ) external payable nonReentrant {
         _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
+    }
+
+    function _subscribeWithToken(
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        bytes calldata permitSig,
+        address paymentToken,
+        uint256 maxPaymentAmount
+    ) private {
+        if (paymentToken == address(0)) revert InvalidAddress();
+        if (plan.price == 0) revert InvalidAmount();
+        if (plan.merchant == address(0)) revert ZeroAddress();
+
+        if (paymentToken == plan.token) {
+            _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
+            return;
+        }
+
+        address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
+        if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
+        IPaymentGateway gateway = IPaymentGateway(gatewayAddress);
+
+        if (!gateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();
+
+        uint256 paymentAmount = gateway.convertAmount(MODULE_ID, plan.token, paymentToken, plan.price);
+        if (paymentAmount == 0) revert InvalidPrice();
+
+        if (maxPaymentAmount > 0 && paymentAmount > maxPaymentAmount) {
+            revert PriceExceedsMaximum();
+        }
+
+        _subscribe(plan, sigMerchant, permitSig, paymentToken, paymentAmount);
     }
 
     /// @notice Subscribe caller to a plan using an alternative token
@@ -165,35 +225,7 @@ contract SubscriptionManager is ReentrancyGuard {
         address paymentToken,
         uint256 maxPaymentAmount
     ) external nonReentrant {
-        // Cheap pre-checks
-        if (paymentToken == address(0)) revert InvalidAddress();
-        if (plan.price == 0) revert InvalidAmount();
-        if (plan.merchant == address(0)) revert ZeroAddress();
-
-        // If tokens match use the regular path
-        if (paymentToken == plan.token) {
-            _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
-            return;
-        }
-
-        // Ensure gateway is registered before heavy logic
-        address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
-        if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
-        IPaymentGateway gateway = IPaymentGateway(gatewayAddress);
-
-        // Verify token pair support
-        if (!gateway.isPairSupported(MODULE_ID, plan.token, paymentToken)) revert UnsupportedPair();
-
-        // Calculate payment amount in chosen token
-        uint256 paymentAmount = gateway.convertAmount(MODULE_ID, plan.token, paymentToken, plan.price);
-        if (paymentAmount == 0) revert InvalidPrice();
-
-        // Ensure amount does not exceed limit
-        if (maxPaymentAmount > 0 && paymentAmount > maxPaymentAmount) {
-            revert PriceExceedsMaximum();
-        }
-
-        _subscribe(plan, sigMerchant, permitSig, paymentToken, paymentAmount);
+        _subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, maxPaymentAmount);
     }
 
     /// @notice Internal function to handle subscription logic
@@ -209,17 +241,20 @@ contract SubscriptionManager is ReentrancyGuard {
         address paymentToken,
         uint256 paymentAmount
     ) internal {
-        // Basic parameter checks first
         if (paymentAmount == 0) revert InvalidAmount();
         if (plan.merchant == address(0)) revert ZeroAddress();
+        if (plan.period == 0) revert InvalidParameters();
 
-        // For ETH payments, paymentToken can be address(0)
         bool isNativePayment = paymentToken == address(0);
 
-        // Check plan expiry
+        if (isNativePayment) {
+            if (msg.value < paymentAmount) revert InsufficientBalance();
+        } else if (msg.value != 0) {
+            revert InvalidAmount();
+        }
+
         if (!(plan.expiry == 0 || plan.expiry >= block.timestamp)) revert Expired();
 
-        // Verify chain support
         bool chainAllowed = false;
         uint256 chainIdsLen = plan.chainIds.length;
         for (uint256 i = 0; i < chainIdsLen; i++) {
@@ -230,30 +265,24 @@ contract SubscriptionManager is ReentrancyGuard {
         }
         if (!chainAllowed) revert InvalidChain();
 
-        // Ensure payment gateway is registered
-        if (core.getService(MODULE_ID, 'PaymentGateway') == address(0)) revert PaymentGatewayNotRegistered();
+        address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
+        if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
+        IPaymentGateway gateway = IPaymentGateway(gatewayAddress);
 
-        // Compute plan hash before signature check
         bytes32 planHash = hashPlan(plan);
-
-        // Verify signature last (expensive)
-        // planHash уже содержит EIP-712 хеш с DOMAIN_SEPARATOR
         if (ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
 
-        // Save plan and create subscriber before external calls
         if (plans[planHash].merchant == address(0)) {
             plans[planHash] = plan;
         }
         subscribers[msg.sender] = Subscriber({nextBilling: block.timestamp + plan.period, planHash: planHash});
 
-        // Only process permit signatures for token payments, not for ETH
         if (permitSig.length > 0 && !isNativePayment) {
             (uint256 deadline, uint8 v, bytes32 r, bytes32 s) = abi.decode(
                 permitSig,
                 (uint256, uint8, bytes32, bytes32)
             );
-            address paymentGateway = core.getService(MODULE_ID, 'PaymentGateway');
-            try IERC20Permit(paymentToken).permit(msg.sender, paymentGateway, paymentAmount, deadline, v, r, s) {
+            try IERC20Permit(paymentToken).permit(msg.sender, gatewayAddress, paymentAmount, deadline, v, r, s) {
                 // ok
             } catch {
                 address permit2 = core.getService(MODULE_ID, 'Permit2');
@@ -264,7 +293,7 @@ contract SubscriptionManager is ReentrancyGuard {
                         nonce: 0,
                         deadline: deadline
                     }),
-                    IPermit2.SignatureTransferDetails({to: paymentGateway, requestedAmount: paymentAmount}),
+                    IPermit2.SignatureTransferDetails({to: gatewayAddress, requestedAmount: paymentAmount}),
                     msg.sender,
                     abi.encodePacked(r, s, v)
                 );
@@ -273,36 +302,31 @@ contract SubscriptionManager is ReentrancyGuard {
             }
         }
 
-        // Get gateway address for payment
-        address gateway = core.getService(MODULE_ID, 'PaymentGateway');
-        if (gateway == address(0)) revert PaymentGatewayNotRegistered();
-
-        // Process payment via gateway
         uint256 netAmount;
         if (isNativePayment) {
-            // For ETH payments, send msg.value to the gateway
-            netAmount = IPaymentGateway(gateway).processPayment{value: msg.value}(
+            uint256 depositAdded = msg.value - paymentAmount;
+            netAmount = gateway.processPayment{value: paymentAmount}(
                 MODULE_ID,
                 paymentToken,
                 msg.sender,
                 paymentAmount,
                 ''
             );
-            // Gateway returns netAmount to this contract, transfer to merchant
             if (netAmount > 0) {
                 (bool success, ) = payable(plan.merchant).call{value: netAmount}('');
                 if (!success) revert TransferFailed();
             }
+            if (depositAdded > 0) {
+                nativeDeposits[msg.sender] += depositAdded;
+                emit NativeDepositIncreased(msg.sender, depositAdded, nativeDeposits[msg.sender]);
+            }
         } else {
-            // For ERC20 payments, no msg.value needed
-            netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
-            // Transfer ERC20 tokens to merchant
+            netAmount = gateway.processPayment(MODULE_ID, paymentToken, msg.sender, paymentAmount, '');
             IERC20(paymentToken).safeTransfer(plan.merchant, netAmount);
         }
 
-        // Emit event directly
         emit SubscriptionCreated(
-            uint256(planHash), // Use plan hash as subscription ID
+            uint256(planHash),
             msg.sender,
             planHash,
             block.timestamp,
@@ -321,56 +345,82 @@ contract SubscriptionManager is ReentrancyGuard {
     /// @notice Charge a user according to their plan
     /// @param user Address of the subscriber to charge
     function charge(address user) public onlyAutomation nonReentrant {
-        _charge(user);
+        _charge(user, true);
     }
 
-    function _charge(address user) internal {
+    function _charge(address user, bool strict) internal returns (bool processed) {
         Subscriber storage s = subscribers[user];
-        SignatureLib.Plan memory plan = plans[s.planHash];
-        if (plan.merchant == address(0)) revert NoPlan();
-        if (block.timestamp < s.nextBilling) revert NotDue();
+        bytes32 planHash = s.planHash;
+        if (planHash == bytes32(0)) {
+            if (strict) revert NoPlan();
+            emit ChargeSkipped(user, planHash, SKIP_REASON_NO_PLAN);
+            return false;
+        }
 
-        // Update state before external call (CEI pattern)
+        SignatureLib.Plan memory plan = plans[planHash];
+        if (plan.merchant == address(0)) {
+            if (strict) revert NoPlan();
+            emit ChargeSkipped(user, planHash, SKIP_REASON_NO_PLAN);
+            return false;
+        }
+
+        if (block.timestamp < s.nextBilling) {
+            if (strict) revert NotDue();
+            emit ChargeSkipped(user, planHash, SKIP_REASON_NOT_DUE);
+            return false;
+        }
+
+        bool isNativePlan = plan.token == address(0);
+        if (isNativePlan) {
+            uint256 balance = nativeDeposits[user];
+            if (balance < plan.price) {
+                if (strict) revert InsufficientBalance();
+                emit ChargeSkipped(user, planHash, SKIP_REASON_INSUFFICIENT_NATIVE_DEPOSIT);
+                return false;
+            }
+            nativeDeposits[user] = balance - plan.price;
+        }
+
         uint256 nextBillingTime = s.nextBilling + plan.period;
         s.nextBilling = nextBillingTime;
 
-        // Emit events directly
-        emit SubscriptionRenewed(uint256(s.planHash), nextBillingTime, MODULE_ID);
-        emit SubscriptionCharged(user, s.planHash, plan.price, nextBillingTime);
+        emit SubscriptionRenewed(uint256(planHash), nextBillingTime, MODULE_ID);
+        emit SubscriptionCharged(user, planHash, plan.price, nextBillingTime);
 
-        // Get gateway address for payment
         address gateway = core.getService(MODULE_ID, 'PaymentGateway');
         if (gateway == address(0)) revert PaymentGatewayNotRegistered();
 
-        // Process payment via gateway
-        uint256 netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
-
-        // Transfer funds to merchant
-        if (plan.token == address(0)) {
-            // For ETH payments
+        uint256 netAmount;
+        if (isNativePlan) {
+            netAmount = IPaymentGateway(gateway).processPayment{value: plan.price}(
+                MODULE_ID,
+                plan.token,
+                user,
+                plan.price,
+                ''
+            );
             if (netAmount > 0) {
                 (bool success, ) = payable(plan.merchant).call{value: netAmount}('');
                 if (!success) revert TransferFailed();
             }
         } else {
-            // For ERC20 payments
+            netAmount = IPaymentGateway(gateway).processPayment(MODULE_ID, plan.token, user, plan.price, '');
             IERC20(plan.token).safeTransfer(plan.merchant, netAmount);
         }
+
+        return true;
     }
 
     /// @notice Charge multiple subscribers in a single transaction.
-    /// @dev Processes up to `batchLimit` addresses if the provided array is
-    ///      larger. Reverts with {NoPlan} or {NotDue} for each user that cannot
-    ///      be charged.
+    /// @dev Processes up to batchLimit addresses and skips users without an active plan or those not due yet.
     /// @param users Array of subscriber addresses to charge.
-    function chargeBatch(address[] calldata users) external onlyAutomation {
+    function chargeBatch(address[] calldata users) external onlyAutomation nonReentrant {
         uint256 limit = users.length;
         if (batchLimit > 0 && limit > batchLimit) {
             limit = batchLimit;
         }
-        uint256 len = limit;
-        for (uint256 i = 0; i < len; ) {
-            _charge(users[i]);
+        for (uint256 i = 0; i < limit; ) {
+            _charge(users[i], false);
             unchecked {
                 ++i;
             }
@@ -395,7 +445,7 @@ contract SubscriptionManager is ReentrancyGuard {
         address paymentToken
     ) external nonReentrant {
         // Call new version with disabled max amount check
-        this.subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, 0);
+        _subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, 0);
     }
 
     /// @notice Get payment amount for a plan in the specified token
@@ -429,12 +479,20 @@ contract SubscriptionManager is ReentrancyGuard {
 
     /// @notice Cancel the caller's subscription and delete their state.
     /// @dev Emits {Unsubscribed} and {PlanCancelled}.
-    function unsubscribe() external {
+    function unsubscribe() external nonReentrant {
         Subscriber memory s = subscribers[msg.sender];
         // Ensure subscription exists
         if (s.planHash == bytes32(0)) revert NoPlan();
 
         delete subscribers[msg.sender];
+
+        uint256 deposit = nativeDeposits[msg.sender];
+        if (deposit > 0) {
+            nativeDeposits[msg.sender] = 0;
+            (bool success, ) = payable(msg.sender).call{value: deposit}('');
+            if (!success) revert TransferFailed();
+            emit NativeDepositWithdrawn(msg.sender, deposit, 0);
+        }
 
         // Emit events directly
         emit SubscriptionCancelled(uint256(s.planHash), MODULE_ID);
