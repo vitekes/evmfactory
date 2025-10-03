@@ -1,11 +1,6 @@
 import { ethers } from 'hardhat';
 import type { Signer } from 'ethers';
-import type {
-  PaymentGateway,
-  PaymentOrchestrator,
-  ProcessorRegistry,
-  TestToken,
-} from '../../typechain-types';
+import type { PaymentGateway, PaymentOrchestrator, ProcessorRegistry, TestToken } from '../../typechain-types';
 
 export interface GatewayStack {
   registry: ProcessorRegistry;

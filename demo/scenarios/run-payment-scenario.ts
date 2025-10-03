@@ -28,12 +28,7 @@ async function main() {
 
   const moduleId = ethers.id('PAYMENT_SCENARIO');
   log.info('Authorizing demo module in PaymentGateway...');
-  await authorizeModule(
-    addresses.paymentGateway,
-    moduleId,
-    await moduleCaller.getAddress(),
-    deployer,
-  );
+  await authorizeModule(addresses.paymentGateway, moduleId, await moduleCaller.getAddress(), deployer);
 
   const erc20Amount = ethers.parseUnits('100', 18);
   log.info('Ensuring payer has enough demo tokens...');
@@ -59,7 +54,9 @@ async function main() {
     })
     .find((parsed) => parsed?.name === 'PaymentProcessed');
   if (erc20Log) {
-    log.success(`ERC-20 payment processed successfully. Net amount: ${ethers.formatUnits(erc20Log.args.netAmount, 18)} tokens.`);
+    log.success(
+      `ERC-20 payment processed successfully. Net amount: ${ethers.formatUnits(erc20Log.args.netAmount, 18)} tokens.`,
+    );
   }
 
   const nativeAmount = ethers.parseEther('0.5');
@@ -83,7 +80,9 @@ async function main() {
     })
     .find((parsed) => parsed?.name === 'PaymentProcessed');
   if (nativeLog) {
-    log.success(`Native payment processed successfully. Net amount: ${ethers.formatEther(nativeLog.args.netAmount)} ETH.`);
+    log.success(
+      `Native payment processed successfully. Net amount: ${ethers.formatEther(nativeLog.args.netAmount)} ETH.`,
+    );
   }
 
   log.success('Payment scenario finished successfully.');
@@ -93,4 +92,3 @@ main().catch((error) => {
   log.error(`Payment scenario failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
 });
-

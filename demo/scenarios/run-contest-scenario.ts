@@ -1,10 +1,9 @@
 import { ethers } from 'hardhat';
-import type { ContestFactory, ContestEscrow, TestToken } from '../../typechain-types';
+import type { ContestFactory, ContestEscrow, CoreSystem, TestToken } from '../../typechain-types';
 import { getDemoAddresses } from '../config/addresses';
 import { getDemoSigners } from '../utils/signers';
 import { log } from '../utils/logging';
 import { mintIfNeeded, ensureAllowance } from '../utils/tokens';
-import { grantFeatureOwner } from '../utils/core';
 
 async function ensureTestToken(existing?: string): Promise<string> {
   if (existing) {
@@ -22,29 +21,32 @@ async function ensureTestToken(existing?: string): Promise<string> {
 
 async function main() {
   const addresses = await getDemoAddresses();
-  const { deployer, secondary: manager, tertiary: winner } = await getDemoSigners();
+  const { deployer: creator, secondary: firstWinner, tertiary: secondWinner } = await getDemoSigners();
 
   log.info(`Core address: ${addresses.core}`);
   log.info(`ContestFactory address: ${addresses.contestFactory}`);
 
   const tokenAddress = await ensureTestToken(addresses.testToken);
-  await grantFeatureOwner(addresses.core, await manager.getAddress());
 
-  const factory = (await ethers.getContractAt(
-    'ContestFactory',
-    addresses.contestFactory,
-    manager,
-  )) as ContestFactory;
-  const token = (await ethers.getContractAt(
-    'contracts/mocks/TestToken.sol:TestToken',
-    tokenAddress,
-  )) as TestToken;
+  const core = (await ethers.getContractAt('CoreSystem', addresses.core, creator)) as CoreSystem;
+
+  const featureOwnerRole = await core.FEATURE_OWNER_ROLE();
+  const creatorAddress = await creator.getAddress();
+  const hasRoleBefore = await core.hasRole(featureOwnerRole, creatorAddress);
+  log.info(`Creator has feature owner role: ${hasRoleBefore}`);
+  if (!hasRoleBefore) {
+    await (await core.grantRole(featureOwnerRole, creatorAddress)).wait();
+    log.info('Granted feature owner role to creator');
+  }
+
+  const factory = (await ethers.getContractAt('ContestFactory', addresses.contestFactory, creator)) as ContestFactory;
+  const token = (await ethers.getContractAt('contracts/mocks/TestToken.sol:TestToken', tokenAddress)) as TestToken;
 
   const tokenPrizeAmount = ethers.parseEther('50');
   const ethPrizeAmount = ethers.parseEther('1');
 
-  await mintIfNeeded(tokenAddress, deployer, await manager.getAddress(), tokenPrizeAmount);
-  await ensureAllowance(tokenAddress, manager, addresses.contestFactory, tokenPrizeAmount);
+  await mintIfNeeded(tokenAddress, creator, await creator.getAddress(), tokenPrizeAmount);
+  await ensureAllowance(tokenAddress, creator, addresses.contestFactory, tokenPrizeAmount);
 
   const prizes: ContestFactory.PrizeInfoStruct[] = [
     {
@@ -63,21 +65,37 @@ async function main() {
     },
   ];
 
-  log.info('Estimating escrow address...');
-  const predictedEscrow = await factory.connect(manager).createContest.staticCall(prizes, '0x', { value: ethPrizeAmount });
-
   log.info('Creating contest and funding escrow...');
-  const createTx = await factory.connect(manager).createContest(prizes, '0x', { value: ethPrizeAmount });
-  await createTx.wait();
-  log.success(`Contest created. Escrow: ${predictedEscrow}`);
+  const createTx = await factory.connect(creator).createContest(prizes, '0x', { value: ethPrizeAmount });
+  const createReceipt = await createTx.wait();
 
-  const escrow = (await ethers.getContractAt('ContestEscrow', predictedEscrow)) as ContestEscrow;
-  const winners = [await winner.getAddress(), await manager.getAddress()];
+  const contestCreated = createReceipt?.logs
+    .map((logEntry) => {
+      try {
+        return factory.interface.parseLog(logEntry);
+      } catch {
+        return null;
+      }
+    })
+    .find((parsed) => parsed?.name === 'ContestCreated');
+
+  if (!contestCreated) {
+    throw new Error('ContestCreated event not emitted');
+  }
+
+  const contestId = contestCreated.args.contestId as bigint;
+  const instanceId = ethers.zeroPadValue(ethers.toBeHex(contestId), 32);
+
+  const [escrowAddress] = await core.connect(creator).getFeature(instanceId);
+  log.success(`Contest created. Escrow: ${escrowAddress}`);
+
+  const escrow = (await ethers.getContractAt('ContestEscrow', escrowAddress)) as ContestEscrow;
+  const winners = [await firstWinner.getAddress(), await secondWinner.getAddress()];
   const winnerTokenBalanceBefore = await token.balanceOf(winners[0]);
   const winnerEthBalanceBefore = await ethers.provider.getBalance(winners[1]);
 
   log.info('Finalizing contest and distributing prizes...');
-  const finalizeTx = await escrow.connect(manager).finalize(winners, 0);
+  const finalizeTx = await escrow.connect(creator).finalize(winners, 0);
   await finalizeTx.wait();
   log.success('Contest finalized.');
 

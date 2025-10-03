@@ -1,12 +1,7 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
-import type {
-  CoreSystem,
-  PaymentGateway,
-  SubscriptionManager,
-  TestToken,
-} from '../../typechain-types';
+import type { CoreSystem, PaymentGateway, SubscriptionManager, TestToken } from '../../typechain-types';
 import { deployGatewayStack, deployTestToken } from '../shared/paymentStack';
 
 describe('SubscriptionManager', function () {
@@ -37,7 +32,11 @@ describe('SubscriptionManager', function () {
     gateway = deployedGateway;
 
     const Manager = await ethers.getContractFactory('SubscriptionManager', deployer);
-    manager = (await Manager.deploy(await core.getAddress(), await gateway.getAddress(), MODULE_ID)) as SubscriptionManager;
+    manager = (await Manager.deploy(
+      await core.getAddress(),
+      await gateway.getAddress(),
+      MODULE_ID,
+    )) as SubscriptionManager;
 
     await core.connect(deployer).grantRole(FEATURE_OWNER_ROLE, deployer.address);
 
@@ -50,7 +49,17 @@ describe('SubscriptionManager', function () {
     await token.mint(subscriber.address, PLAN_PRICE * 5n);
   });
 
-  async function buildPlan(period: bigint = BigInt(PLAN_PERIOD_SECONDS)) {
+  type PlanOptions = {
+    period?: bigint;
+    price?: bigint;
+    tokenOverride?: string;
+  };
+
+  async function buildPlan(options: PlanOptions = {}) {
+    const period = options.period ?? BigInt(PLAN_PERIOD_SECONDS);
+    const price = options.price ?? PLAN_PRICE;
+    const tokenAddress = options.tokenOverride ?? (await token.getAddress());
+
     const { chainId } = await ethers.provider.getNetwork();
     const latestBlock = await ethers.provider.getBlock('latest');
     if (!latestBlock) {
@@ -58,9 +67,9 @@ describe('SubscriptionManager', function () {
     }
     const plan = {
       chainIds: [chainId],
-      price: PLAN_PRICE,
+      price,
       period,
-      token: await token.getAddress(),
+      token: tokenAddress,
       merchant: merchant.address,
       salt: 1n,
       expiry: BigInt(latestBlock.timestamp) + 3600n,
@@ -88,15 +97,16 @@ describe('SubscriptionManager', function () {
     return { plan, signature, planHash };
   }
 
-    it('reverts when plan has zero period', async function () {
-    const { plan, signature } = await buildPlan(0n);
+  it('reverts when plan has zero period', async function () {
+    const { plan, signature } = await buildPlan({ period: 0n });
 
-    await expect(
-      manager.connect(subscriber).subscribe(plan, signature, '0x'),
-    ).to.be.revertedWithCustomError(manager, 'InvalidParameters');
+    await expect(manager.connect(subscriber).subscribe(plan, signature, '0x')).to.be.revertedWithCustomError(
+      manager,
+      'InvalidParameters',
+    );
   });
 
-    it('subscribes successfully and stores plan data', async function () {
+  it('subscribes successfully and stores plan data', async function () {
     const { plan, signature, planHash } = await buildPlan();
 
     await token.connect(subscriber).approve(await gateway.getAddress(), PLAN_PRICE * 3n);
@@ -119,16 +129,12 @@ describe('SubscriptionManager', function () {
 
     await token.connect(subscriber).approve(await gateway.getAddress(), PLAN_PRICE);
 
-    await expect(
-      manager
-        .connect(subscriber)
-        .subscribeWithToken(plan, signature, '0x', await token.getAddress()),
-    )
+    await expect(manager.connect(subscriber).subscribeWithToken(plan, signature, '0x', await token.getAddress()))
       .to.emit(manager, 'SubscriptionCreated')
       .withArgs(anyValue, subscriber.address, anyValue, anyValue, anyValue, MODULE_ID);
   });
 
-    it('automation charge processes due subscription', async function () {
+  it('automation charge processes due subscription', async function () {
     const { plan, signature } = await buildPlan();
 
     await token.connect(subscriber).approve(await gateway.getAddress(), PLAN_PRICE * 3n);
@@ -154,9 +160,7 @@ describe('SubscriptionManager', function () {
 
     await core.connect(deployer).grantRole(AUTOMATION_ROLE, automation.address);
 
-    const tx = manager
-      .connect(automation)
-      .chargeBatch([subscriber.address, outsider.address]);
+    const tx = manager.connect(automation).chargeBatch([subscriber.address, outsider.address]);
 
     await expect(tx)
       .to.emit(manager, 'ChargeSkipped')
@@ -165,5 +169,65 @@ describe('SubscriptionManager', function () {
       .withArgs(outsider.address, ethers.ZeroHash, 1);
 
     expect(await token.balanceOf(merchant.address)).to.equal(PLAN_PRICE);
+  });
+
+  describe('native deposits and payments', function () {
+    const nativePrice = ethers.parseEther('1');
+
+    it('tracks native deposit and partial withdrawal', async function () {
+      const depositAmount = nativePrice;
+      await expect(manager.connect(subscriber).depositNativeFunds({ value: depositAmount }))
+        .to.emit(manager, 'NativeDepositIncreased')
+        .withArgs(subscriber.address, depositAmount, depositAmount);
+
+      expect(await manager.getNativeDeposit(subscriber.address)).to.equal(depositAmount);
+
+      const withdrawal = ethers.parseEther('0.4');
+      await expect(manager.connect(subscriber).withdrawNativeFunds(withdrawal))
+        .to.emit(manager, 'NativeDepositWithdrawn')
+        .withArgs(subscriber.address, withdrawal, depositAmount - withdrawal);
+
+      expect(await manager.getNativeDeposit(subscriber.address)).to.equal(depositAmount - withdrawal);
+    });
+
+    it('subscribes with native plan and stores extra deposit', async function () {
+      const extra = ethers.parseEther('0.5');
+      const { plan, signature } = await buildPlan({ tokenOverride: ethers.ZeroAddress, price: nativePrice });
+      const merchantBalanceBefore = await ethers.provider.getBalance(merchant.address);
+
+      await expect(manager.connect(subscriber).subscribe(plan, signature, '0x', { value: nativePrice + extra }))
+        .to.emit(manager, 'SubscriptionCreated')
+        .withArgs(anyValue, subscriber.address, anyValue, anyValue, anyValue, MODULE_ID)
+        .and.to.emit(manager, 'NativeDepositIncreased')
+        .withArgs(subscriber.address, extra, extra);
+
+      expect(await manager.getNativeDeposit(subscriber.address)).to.equal(extra);
+
+      const merchantBalanceAfter = await ethers.provider.getBalance(merchant.address);
+      expect(merchantBalanceAfter - merchantBalanceBefore).to.equal(nativePrice);
+    });
+
+    it('uses native deposit during recurring charge', async function () {
+      const extra = nativePrice;
+      const { plan, signature, planHash } = await buildPlan({ tokenOverride: ethers.ZeroAddress, price: nativePrice });
+
+      await manager.connect(subscriber).subscribe(plan, signature, '0x', { value: nativePrice + extra });
+      expect(await manager.getNativeDeposit(subscriber.address)).to.equal(extra);
+
+      await core.connect(deployer).grantRole(AUTOMATION_ROLE, automation.address);
+      await ethers.provider.send('evm_increaseTime', [PLAN_PERIOD_SECONDS]);
+      await ethers.provider.send('evm_mine', []);
+
+      const merchantBalanceBefore = await ethers.provider.getBalance(merchant.address);
+
+      await expect(manager.connect(automation).charge(subscriber.address))
+        .to.emit(manager, 'SubscriptionCharged')
+        .withArgs(subscriber.address, planHash, nativePrice, anyValue);
+
+      expect(await manager.getNativeDeposit(subscriber.address)).to.equal(extra - nativePrice);
+
+      const merchantBalanceAfter = await ethers.provider.getBalance(merchant.address);
+      expect(merchantBalanceAfter - merchantBalanceBefore).to.equal(nativePrice);
+    });
   });
 });

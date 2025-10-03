@@ -20,7 +20,10 @@ async function ensureTestToken(existing?: string): Promise<string> {
   return tokenAddress;
 }
 
-async function parsePaymentEvent(receipt: Awaited<ReturnType<typeof ethers.ContractTransactionResponse.prototype.wait>>, gateway: PaymentGateway) {
+async function parsePaymentEvent(
+  receipt: Awaited<ReturnType<typeof ethers.ContractTransactionResponse.prototype.wait>>,
+  gateway: PaymentGateway,
+) {
   if (!receipt) return;
   const parsed = receipt.logs
     .map((logEntry) => {
@@ -35,7 +38,9 @@ async function parsePaymentEvent(receipt: Awaited<ReturnType<typeof ethers.Contr
   if (parsed) {
     const net = parsed.args.netAmount as bigint;
     const token = parsed.args.token as string;
-    log.info(`PaymentProcessed => ${token === ethers.ZeroAddress ? ethers.formatEther(net) + ' ETH' : ethers.formatEther(net) + ' tokens'}`);
+    log.info(
+      `PaymentProcessed => ${token === ethers.ZeroAddress ? ethers.formatEther(net) + ' ETH' : ethers.formatEther(net) + ' tokens'}`,
+    );
   }
 }
 
@@ -65,10 +70,7 @@ async function main() {
   await mintIfNeeded(tokenAddress, deployer, await subscriber.getAddress(), planPrice * 3n);
   await ensureAllowance(tokenAddress, subscriber, paymentGatewayAddress, planPrice * 3n);
 
-  const token = (await ethers.getContractAt(
-    'contracts/mocks/TestToken.sol:TestToken',
-    tokenAddress,
-  )) as TestToken;
+  const token = (await ethers.getContractAt('contracts/mocks/TestToken.sol:TestToken', tokenAddress)) as TestToken;
 
   const network = await ethers.provider.getNetwork();
   const plan: SubscriptionManager.PlanStruct = {
@@ -125,7 +127,9 @@ async function main() {
   const subscriberBalance = await token.balanceOf(await subscriber.getAddress());
   log.info(`Merchant balance after charge: ${ethers.formatEther(merchantBalance)} tokens.`);
   log.info(`Subscriber balance: ${ethers.formatEther(subscriberBalance)} tokens.`);
-  log.warn('Note: current processor chain does not forward funds to the merchant automatically. This demo only verifies successful charges.');
+  log.warn(
+    'Note: current processor chain does not forward funds to the merchant automatically. This demo only verifies successful charges.',
+  );
 
   log.success('Subscription scenario finished successfully.');
 }

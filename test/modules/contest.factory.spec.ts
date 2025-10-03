@@ -58,22 +58,15 @@ describe('ContestFactory & ContestEscrow', function () {
     await core.connect(admin).grantRole(FEATURE_OWNER_ROLE, creator.address);
     await core.connect(admin).grantRole(FEATURE_OWNER_ROLE, await factory.getAddress());
 
-    await core
-      .connect(admin)
-      .registerFeature(await factory.MODULE_ID(), await factory.getAddress(), 0);
+    await core.connect(admin).registerFeature(await factory.MODULE_ID(), await factory.getAddress(), 0);
 
-    await core
-      .connect(admin)
-      .setService(await factory.MODULE_ID(), 'Validator', await validator.getAddress());
-    await core
-      .connect(admin)
-      .setService(await factory.MODULE_ID(), 'NFTManager', await nftManager.getAddress());
+    await core.connect(admin).setService(await factory.MODULE_ID(), 'Validator', await validator.getAddress());
+    await core.connect(admin).setService(await factory.MODULE_ID(), 'NFTManager', await nftManager.getAddress());
   });
 
   async function createContest(
     prizes: ContestFactory.PrizeInfoStruct[],
-  ): Promise<{ escrow: ContestEscrow; instanceId: string; contestId: bigint }>
-  {
+  ): Promise<{ escrow: ContestEscrow; instanceId: string; contestId: bigint }> {
     const predictedEscrow = await factory.connect(creator).createContest.staticCall(prizes, '0x');
     const tx = await factory.connect(creator).createContest(prizes, '0x');
     const receipt = await tx.wait();
@@ -98,7 +91,7 @@ describe('ContestFactory & ContestEscrow', function () {
     return { escrow, instanceId, contestId };
   }
 
-    it('creates contest escrow and locks monetary prize', async function () {
+  it('creates contest escrow and locks monetary prize', async function () {
     const prizes: ContestFactory.PrizeInfoStruct[] = [
       {
         prizeType: PrizeType.MONETARY,
@@ -124,7 +117,7 @@ describe('ContestFactory & ContestEscrow', function () {
     expect(await escrow.finalized()).to.equal(false);
   });
 
-    it('reverts when prize batch exceeds ERC-20 limit', async function () {
+  it('reverts when prize batch exceeds ERC-20 limit', async function () {
     const maxTokens = 21;
     const prizes: ContestFactory.PrizeInfoStruct[] = [];
 
@@ -148,7 +141,7 @@ describe('ContestFactory & ContestEscrow', function () {
     );
   });
 
-    it('finalizes contest and distributes monetary prize', async function () {
+  it('finalizes contest and distributes monetary prize', async function () {
     const amount = ethers.parseEther('90');
     const prizes: ContestFactory.PrizeInfoStruct[] = [
       {
@@ -179,7 +172,7 @@ describe('ContestFactory & ContestEscrow', function () {
     expect(await tokenA.balanceOf(winners[0])).to.equal(ethers.parseEther('90'));
   });
 
-    it('registers contest services in CoreSystem', async function () {
+  it('registers contest services in CoreSystem', async function () {
     const amount = ethers.parseEther('50');
     const prizes: ContestFactory.PrizeInfoStruct[] = [
       {
