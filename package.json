@@ -14,13 +14,13 @@
     "demo:payment": "npx hardhat run demo/scenarios/run-payment-scenario.ts --network hardhat",
     "demo:subscription": "npx hardhat run demo/scenarios/run-subscription-scenario.ts --network hardhat",
     "demo:contest": "npx hardhat run demo/scenarios/run-contest-scenario.ts --network hardhat",
-
     "verify:sepolia": "npx hardhat ignition verify sepolia-deployment",
     "verify:mainnet": "npx hardhat ignition verify mainnet-deployment",
     "lint": "prettier --check \"contracts/**/*.sol\"",
     "lint:fix": "prettier --write \"contracts/**/*.sol\"",
     "prepare": "husky install",
-    "gasreport": "REPORT_GAS=true npx hardhat test"
+    "gasreport": "REPORT_GAS=true npx hardhat test",
+    "demo:marketplace": "npx hardhat run demo/scenarios/run-marketplace-scenario.ts --network hardhat"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

@@ -5,7 +5,6 @@ import '../../core/CoreSystem.sol';
 import '../../pay/interfaces/IPaymentGateway.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../../lib/SignatureLib.sol';
@@ -60,7 +59,8 @@ contract Marketplace is ReentrancyGuard {
 
     // Listing signature tracking
     mapping(bytes32 => mapping(address => bool)) public consumed;
-    mapping(bytes32 => uint256) public minSaltBySku;
+    mapping(bytes32 => mapping(address => uint256)) public minSaltBySku;
+    mapping(bytes32 => bool) public listingConsumed;
     mapping(bytes32 => bool) public revokedListings;
 
     // Marketplace events
@@ -126,64 +126,63 @@ contract Marketplace is ReentrancyGuard {
         // Validate listing (signature checked last)
         _validateListing(listing, sellerSignature, buyListingHash);
 
-        // Mark listing as consumed for this buyer
+        // Mark listing as consumed
         consumed[buyListingHash][msg.sender] = true;
+        listingConsumed[buyListingHash] = true;
+        revokedListings[buyListingHash] = true;
 
         // Determine token and amount for payment
         address actualPaymentToken = paymentToken == address(0) ? listing.token : paymentToken;
 
         uint256 paymentAmount = listing.price;
 
+        if (maxPaymentAmount > 0 && actualPaymentToken == listing.token && listing.price > maxPaymentAmount) {
+            revert PriceExceedsMaximum();
+        }
+
         // Convert amount if payment token differs from listing token
         if (actualPaymentToken != listing.token) {
-            // Check token pair support
             if (!paymentGateway.isPairSupported(MODULE_ID, listing.token, actualPaymentToken)) {
                 revert UnsupportedPair();
             }
 
-            // Calculate amount in selected currency
             paymentAmount = paymentGateway.convertAmount(MODULE_ID, listing.token, actualPaymentToken, listing.price);
             if (paymentAmount == 0) revert InvalidPrice();
 
-            // Verify payment amount doesn't exceed maximum limit
             if (maxPaymentAmount > 0 && paymentAmount > maxPaymentAmount) {
                 revert PriceExceedsMaximum();
             }
         }
 
-        // Cache addresses to reduce storage reads
         address buyer = msg.sender;
         address seller = listing.seller;
 
-        // Cache if token is native to avoid multiple calls
         bool isNativeToken = actualPaymentToken == address(0) ||
             actualPaymentToken == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
         uint256 netAmount;
         if (isNativeToken) {
-            // Process payment with native currency
+            if (msg.value < paymentAmount) revert InsufficientBalance();
+
             netAmount = paymentGateway.processPayment{value: paymentAmount}(
                 MODULE_ID,
-                address(0), // Use zero address for native currency
+                address(0),
                 buyer,
                 paymentAmount,
-                '' // Empty signature for direct payments
+                ''
             );
 
-            // Transfer native currency to seller
             (bool success, ) = payable(seller).call{value: netAmount}('');
             if (!success) revert RefundDisabled();
-        } else {
-            // Process payment with ERC20 token
-            netAmount = paymentGateway.processPayment(
-                MODULE_ID,
-                actualPaymentToken,
-                buyer,
-                paymentAmount,
-                '' // Empty signature for direct payments
-            );
 
-            // Transfer funds to seller using cached addresses
+            uint256 excess = msg.value - paymentAmount;
+            if (excess > 0) {
+                (bool refundSuccess, ) = payable(buyer).call{value: excess}('');
+                if (!refundSuccess) revert RefundDisabled();
+            }
+        } else {
+            netAmount = paymentGateway.processPayment(MODULE_ID, actualPaymentToken, buyer, paymentAmount, '');
+
             IERC20(actualPaymentToken).safeTransfer(seller, netAmount);
         }
 
@@ -229,7 +228,7 @@ contract Marketplace is ReentrancyGuard {
         }
 
         // Check salt for SKU
-        if (listing.salt < minSaltBySku[listing.sku]) {
+        if (listing.salt < minSaltBySku[listing.sku][listing.seller]) {
             return false;
         }
 
@@ -237,9 +236,8 @@ contract Marketplace is ReentrancyGuard {
             return true;
         }
 
-        // Check specific listing revocation
         bytes32 listingHash = hashListing(listing);
-        if (revokedListings[listingHash]) {
+        if (listingConsumed[listingHash] || revokedListings[listingHash]) {
             return false;
         }
 
@@ -259,9 +257,8 @@ contract Marketplace is ReentrancyGuard {
     /// @param sku Item SKU
     /// @param minSalt Minimum salt (listings with lower salt are revoked)
     function revokeBySku(bytes32 sku, uint256 minSalt) external {
-        minSaltBySku[sku] = minSalt;
+        minSaltBySku[sku][msg.sender] = minSalt;
 
-        // Emit event directly
         emit ListingRevoked(sku, msg.sender, address(0), 0, address(0), 0, block.timestamp, bytes32(0), MODULE_ID);
     }
 
@@ -269,40 +266,15 @@ contract Marketplace is ReentrancyGuard {
     /// @param listing Listing data
     /// @param sellerSignature Seller signature
     function revokeListing(SignatureLib.Listing calldata listing, bytes calldata sellerSignature) external {
-        // Basic checks first
         if (listing.seller == address(0)) revert ZeroAddress();
+        if (msg.sender != listing.seller) revert NotSeller();
 
-        // Skip signature if caller is the seller
-        if (msg.sender == listing.seller) {
-            // Seller can revoke without signature check
-            bytes32 currentListingHash = hashListing(listing);
-            revokedListings[currentListingHash] = true;
-
-            // Emit event directly
-            emit ListingRevoked(
-                listing.sku,
-                listing.seller,
-                address(0),
-                0,
-                address(0),
-                listing.salt,
-                block.timestamp,
-                currentListingHash,
-                MODULE_ID
-            );
-        }
-
-        // If caller is not the seller verify signature
         bytes32 listingHash = hashListing(listing);
-
-        // Verify signature
-        if (sellerSignature.length == 0) revert InvalidSignature();
-        address signer = ECDSA.recover(listingHash, sellerSignature);
-        if (signer != listing.seller) {
-            revert InvalidSignature();
+        if (sellerSignature.length > 0) {
+            if (ECDSA.recover(listingHash, sellerSignature) != listing.seller) {
+                revert InvalidSignature();
+            }
         }
-
-        // Revoke listing
         revokedListings[listingHash] = true;
 
         emit ListingRevoked(
@@ -345,12 +317,11 @@ contract Marketplace is ReentrancyGuard {
         }
 
         // 3. Check global SKU revocation
-        if (listing.salt < minSaltBySku[listing.sku]) {
+        if (listing.salt < minSaltBySku[listing.sku][listing.seller]) {
             revert Expired();
         }
 
-        // 4. Check specific listing revocation status
-        if (revokedListings[listingHash]) {
+        if (listingConsumed[listingHash] || revokedListings[listingHash]) {
             revert Expired();
         }
 

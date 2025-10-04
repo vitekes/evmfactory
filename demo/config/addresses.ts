@@ -14,6 +14,7 @@ export interface DemoAddresses {
   paymentFeeProcessor?: string;
   contestFactory: string;
   subscriptionManager: string;
+  marketplace?: string;
   testToken?: string;
 }
 
@@ -33,9 +34,10 @@ async function verifyAddresses(addresses: DemoAddresses): Promise<boolean> {
     addresses.processorRegistry,
     addresses.contestFactory,
     addresses.subscriptionManager,
+    addresses.marketplace,
     addresses.paymentTokenFilter,
     addresses.paymentFeeProcessor,
-  ];
+  ].filter((addr): addr is string => !!addr);
   for (const addr of checks) {
     if (!(await isDeployed(addr))) {
       return false;
@@ -65,6 +67,7 @@ function readEnvAddresses(): DemoAddresses | null {
   const optionalToken = process.env.DEMO_TEST_TOKEN;
   const optionalFilter = process.env.DEMO_TOKEN_FILTER;
   const optionalFee = process.env.DEMO_FEE_PROCESSOR;
+  const optionalMarketplace = process.env.DEMO_MARKETPLACE;
 
   return {
     core: values.DEMO_CORE!,
@@ -74,6 +77,7 @@ function readEnvAddresses(): DemoAddresses | null {
     paymentFeeProcessor: optionalFee || undefined,
     contestFactory: values.DEMO_CONTEST_FACTORY!,
     subscriptionManager: values.DEMO_SUBSCRIPTION_MANAGER!,
+    marketplace: optionalMarketplace || undefined,
     testToken: optionalToken || undefined,
   };
 }
@@ -111,6 +115,8 @@ async function deployWithIgnition(): Promise<DemoAddresses> {
     paymentFeeProcessor: await deployment.paymentFeeProcessor.getAddress(),
     contestFactory: await deployment.contestFactory.getAddress(),
     subscriptionManager: await deployment.subscriptionManager.getAddress(),
+    marketplace:
+      'marketplace' in deployment ? await (deployment as Record<string, any>).marketplace.getAddress() : undefined,
   };
 }
 

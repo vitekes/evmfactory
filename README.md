@@ -25,12 +25,13 @@ npm install
 
 ## Useful Scripts
 
-- `npm run compile` – Hardhat compile.
-- `npm run test` – Hardhat unit/integration tests.
-- `npm run lint` – Prettier check for Solidity contracts.
-- `npm run demo:payment` – Runs the payment scenario against Hardhat network.
-- `npm run demo:subscription` – Runs the subscription scenario (covers native deposits).
-- `npm run demo:contest` – Runs the contest scenario.
+- `npm run compile` â€“ Hardhat compile.
+- `npm run test` â€“ Hardhat unit/integration tests.
+- `npm run lint` â€“ Prettier check for Solidity contracts.
+- `npm run demo:payment` â€“ Runs the payment scenario against Hardhat network.
+- `npm run demo:subscription` â€“ Runs the subscription scenario (covers native deposits).
+- `npm run demo:contest` â€“ Runs the contest scenario.
+- `npm run demo:marketplace` â€“ Runs the marketplace scenario (off-chain listing purchase).
 
 See `package.json` for the full script list. Demo scripts rely on Ignition deployment helpers located in `ignition/modules/*`.
 

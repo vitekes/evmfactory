@@ -29,9 +29,9 @@ npx hardhat ignition deploy ignition/modules/deploy.ts \
 
 ### Parameters
 
-- `DEFAULT_FEE_BPS` – default commission for `FeeProcessor`.
-- `AUTOMATION_ACCOUNT` – address allowed to trigger scheduled tasks.
-- `contestAllowedTokens` / `subscriptionAllowedTokens` – token allowlists for `TokenFilter`.
+- `DEFAULT_FEE_BPS` ï¿½ default commission for `FeeProcessor`.
+- `AUTOMATION_ACCOUNT` ï¿½ address allowed to trigger scheduled tasks.
+- `contestAllowedTokens` / `subscriptionAllowedTokens` ï¿½ token allowlists for `TokenFilter`.
 
 You can bypass auto-deployment by providing `.env.demo` with the following variables (used by `demo/config/addresses.ts`):
 
@@ -59,9 +59,9 @@ DEMO_TEST_TOKEN=0x...
 
 ## CI / smoke-checks
 
-1. `npm run lint` (or `npm run lint:fix`) – Prettier formatting for Solidity.
-2. `npx hardhat test` – full unit/integration suite, including native-deposit coverage.
-3. `npm run demo:payment`, `npm run demo:subscription`, `npm run demo:contest` – end-to-end flows on Hardhat. For `demo:contest` make sure the caller has `FEATURE_OWNER_ROLE` as described above.
+1. `npm run lint` (or `npm run lint:fix`) ï¿½ Prettier formatting for Solidity.
+2. `npx hardhat test` ï¿½ full unit/integration suite, including native-deposit coverage.
+3. `npm run demo:payment`, `npm run demo:subscription`, `npm run demo:contest` ï¿½ end-to-end flows on Hardhat. For `demo:contest` make sure the caller has `FEATURE_OWNER_ROLE` as described above.
 
 ## Production notes
 

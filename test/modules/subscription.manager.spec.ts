@@ -39,9 +39,10 @@ describe('SubscriptionManager', function () {
     )) as SubscriptionManager;
 
     await core.connect(deployer).grantRole(FEATURE_OWNER_ROLE, deployer.address);
-
     await core.connect(deployer).registerFeature(MODULE_ID, await manager.getAddress(), 0);
     await core.connect(deployer).setService(MODULE_ID, 'PaymentGateway', await gateway.getAddress());
+    await core.connect(deployer).grantRole(FEATURE_OWNER_ROLE, await manager.getAddress());
+    await core.connect(deployer).revokeRole(FEATURE_OWNER_ROLE, deployer.address);
 
     await gateway.connect(deployer).setModuleAuthorization(MODULE_ID, await manager.getAddress(), true);
 
@@ -171,6 +172,52 @@ describe('SubscriptionManager', function () {
     expect(await token.balanceOf(merchant.address)).to.equal(PLAN_PRICE);
   });
 
+  it('reverts native subscribe when msg.value is insufficient', async function () {
+    const { plan, signature } = await buildPlan({ tokenOverride: ethers.ZeroAddress, price: PLAN_PRICE });
+
+    await expect(
+      manager.connect(subscriber).subscribe(plan, signature, '0x', { value: PLAN_PRICE - 1n }),
+    ).to.be.revertedWithCustomError(manager, 'InsufficientBalance');
+  });
+
+  it('returns leftover native deposit on unsubscribe', async function () {
+    const extra = ethers.parseEther('0.8');
+    const { plan, signature } = await buildPlan({ tokenOverride: ethers.ZeroAddress, price: PLAN_PRICE });
+
+    await manager.connect(subscriber).subscribe(plan, signature, '0x', { value: PLAN_PRICE + extra });
+    expect(await manager.getNativeDeposit(await subscriber.getAddress())).to.equal(extra);
+
+    const balanceBefore = await ethers.provider.getBalance(await subscriber.getAddress());
+    const tx = await manager.connect(subscriber).unsubscribe();
+    const receipt = await tx.wait();
+    const gasSpent = receipt?.gasUsed ? receipt.gasUsed * tx.gasPrice! : 0n;
+    const balanceAfter = await ethers.provider.getBalance(await subscriber.getAddress());
+
+    expect(balanceAfter + gasSpent - balanceBefore).to.equal(extra);
+  });
+
+  it('subscribes with alternative payment token and respects maxPaymentAmount', async function () {
+    const altToken = await deployTestToken(deployer, 'AltPay', 'ALT', 18, 0);
+    await altToken.mint(await subscriber.getAddress(), PLAN_PRICE * 2n);
+    await altToken.connect(subscriber).approve(await gateway.getAddress(), PLAN_PRICE * 2n);
+
+    const { plan, signature } = await buildPlan({ price: PLAN_PRICE, tokenOverride: await token.getAddress() });
+
+    await manager
+      .connect(subscriber)
+      [
+        'subscribeWithToken((uint256[],uint256,uint256,address,address,uint256,uint64),bytes,bytes,address,uint256)'
+      ](plan, signature, '0x', await altToken.getAddress(), PLAN_PRICE);
+
+    await expect(
+      manager
+        .connect(subscriber)
+        [
+          'subscribeWithToken((uint256[],uint256,uint256,address,address,uint256,uint64),bytes,bytes,address,uint256)'
+        ](plan, signature, '0x', await altToken.getAddress(), PLAN_PRICE - 1n),
+    ).to.be.revertedWithCustomError(manager, 'PriceExceedsMaximum');
+  });
+
   describe('native deposits and payments', function () {
     const nativePrice = ethers.parseEther('1');
 
@@ -205,6 +252,22 @@ describe('SubscriptionManager', function () {
 
       const merchantBalanceAfter = await ethers.provider.getBalance(merchant.address);
       expect(merchantBalanceAfter - merchantBalanceBefore).to.equal(nativePrice);
+    });
+
+    it('fails recurring charge when deposit insufficient', async function () {
+      const { plan, signature, planHash } = await buildPlan({ tokenOverride: ethers.ZeroAddress, price: PLAN_PRICE });
+
+      await manager.connect(subscriber).subscribe(plan, signature, '0x', { value: PLAN_PRICE });
+      await core.connect(deployer).grantRole(AUTOMATION_ROLE, automation.address);
+      await ethers.provider.send('evm_increaseTime', [PLAN_PERIOD_SECONDS]);
+      await ethers.provider.send('evm_mine', []);
+
+      await expect(manager.connect(automation).charge(subscriber.address)).to.be.revertedWithCustomError(
+        manager,
+        'InsufficientBalance',
+      );
+      expect(await manager.getNativeDeposit(await subscriber.getAddress())).to.equal(0);
+      expect((await manager.subscribers(await subscriber.getAddress())).planHash).to.equal(planHash);
     });
 
     it('uses native deposit during recurring charge', async function () {

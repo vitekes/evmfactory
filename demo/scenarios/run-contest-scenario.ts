@@ -32,11 +32,19 @@ async function main() {
 
   const featureOwnerRole = await core.FEATURE_OWNER_ROLE();
   const creatorAddress = await creator.getAddress();
-  const hasRoleBefore = await core.hasRole(featureOwnerRole, creatorAddress);
-  log.info(`Creator has feature owner role: ${hasRoleBefore}`);
-  if (!hasRoleBefore) {
+  const hasCreatorRole = await core.hasRole(featureOwnerRole, creatorAddress);
+  log.info(`Creator has feature owner role: ${hasCreatorRole}`);
+  if (!hasCreatorRole) {
     await (await core.grantRole(featureOwnerRole, creatorAddress)).wait();
     log.info('Granted feature owner role to creator');
+  }
+
+  const contestFactoryAddress = addresses.contestFactory;
+  const hasFactoryRole = await core.hasRole(featureOwnerRole, contestFactoryAddress);
+  log.info(`ContestFactory has feature owner role: ${hasFactoryRole}`);
+  if (!hasFactoryRole) {
+    await (await core.grantRole(featureOwnerRole, contestFactoryAddress)).wait();
+    log.info('Granted feature owner role to ContestFactory');
   }
 
   const factory = (await ethers.getContractAt('ContestFactory', addresses.contestFactory, creator)) as ContestFactory;
