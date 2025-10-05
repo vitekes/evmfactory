@@ -8,7 +8,18 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "types": ["node", "mocha", "hardhat"],
-  "include": ["./scripts", "./test", "./typechain", "./hardhat.config.ts"],
-  "exclude": ["node_modules"]
+  "types": [
+    "node",
+    "mocha",
+    "hardhat"
+  ],
+  "include": [
+    "./scripts",
+    "./test",
+    "./typechain-types",
+    "./hardhat.config.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

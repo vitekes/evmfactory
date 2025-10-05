@@ -1,0 +1,14 @@
+[workspace]
+members = [
+  "programs/evmfactory"
+]
+
+[programs.localnet]
+evmfactory = "Evmmarket111111111111111111111111111111111"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "node dist/tests/evmfactory.js"

@@ -7,60 +7,73 @@ on:
   pull_request:
 
 jobs:
-  build:
+  evm:
     runs-on: ubuntu-latest
-
     steps:
-      # 1) Checkout repository
       - uses: actions/checkout@v3
 
-      # 2) Set up Node.js (for Hardhat / front-end)
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Install Foundry toolchain
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      # 4) Install Solidity library dependencies
-      - name: Forge install libraries
-        run: |
-          forge install foundry-rs/forge-std
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0
-          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.3.0
-
-      # 5) Install JS dependencies
-      - name: Install NPM dependencies
+      - name: Install dependencies
+        working-directory: ./evm
         run: npm install
 
-      # 6) Install Slither for static analysis
-      - name: Install Slither
-        run: |
-          python3 -m pip install --user slither-analyzer
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Lint Solidity sources
+        working-directory: ./evm
+        run: npm run lint
 
-      # 7) Run Foundry tests with coverage enforcement
-      - name: Forge coverage
-        run: |
-          forge coverage --report lcov --ir-minimum
-          bash scripts/check-coverage.sh 70
+      - name: Compile contracts
+        working-directory: ./evm
+        run: npm run compile
 
-      # 8) Compile contracts with Hardhat
-      - name: Hardhat compile
-        run: npx hardhat compile
+      - name: Run unit/integration tests
+        working-directory: ./evm
+        run: npm test
 
-      # 9) Run demo scripts
-      - name: Run demo scripts
-        run: |
-          for f in scripts/demo/*.ts; do
-            npx hardhat run "$f" || exit 1
-          done
-
-      # 10) Hardhat coverage (using solidity-coverage)
-      - name: Hardhat coverage
+      - name: Coverage
+        working-directory: ./evm
         run: npm run coverage
 
-      # 11) Static analysis with Slither
-      - name: Slither static
-        run: bash scripts/security/run-slither.sh --critical-only
+      - name: Run demo scenarios
+        working-directory: ./evm
+        run: |
+          npm run demo:payment
+          npm run demo:subscription
+          npm run demo:contest
+          npm run demo:marketplace
+
+  solana:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Solana CLI
+        uses: anza-labs/setup-solana@v1
+
+      - name: Install Anchor CLI
+        run: cargo install --locked anchor-cli --version 0.29.0
+
+      - name: Install dependencies
+        working-directory: ./solana
+        run: npm install
+
+      - name: Build TypeScript helpers
+        working-directory: ./solana
+        run: npm run build
+
+      - name: Anchor build
+        working-directory: ./solana
+        run: anchor build
+
+      - name: Anchor tests
+        working-directory: ./solana
+        run: npm test

@@ -1,0 +1,14 @@
+{
+  "CoreSystemModule": {
+    "automationAccount": null
+  },
+  "PaymentStackModule": {
+    "defaultFeeBps": 250
+  },
+  "ContestModule": {
+    "contestAllowedTokens": []
+  },
+  "SubscriptionModule": {
+    "subscriptionAllowedTokens": []
+  }
+}

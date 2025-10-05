@@ -3,12 +3,14 @@ import { CoreSystemModule } from './core';
 import { PaymentStackModule } from './paymentStack';
 import { ContestModule } from './contest';
 import { SubscriptionModule } from './subscription';
+import { MarketplaceModule } from './marketplace';
 
 const DeploymentModule = buildModule('DeploymentModule', (m) => {
   const core = m.useModule(CoreSystemModule);
   const payment = m.useModule(PaymentStackModule);
   const contest = m.useModule(ContestModule);
   const subscription = m.useModule(SubscriptionModule);
+  const marketplace = m.useModule(MarketplaceModule);
 
   return {
     core: core.core,
@@ -19,6 +21,7 @@ const DeploymentModule = buildModule('DeploymentModule', (m) => {
     paymentFeeProcessor: payment.feeProcessor,
     contestFactory: contest.contestFactory,
     subscriptionManager: subscription.subscriptionManager,
+    marketplace: marketplace.marketplace,
   };
 });
 

@@ -1,61 +1,18 @@
-# EVM Factory
+# EVM Factory Monorepo
 
-EVM Factory provides a modular payment stack for Hardhat-based projects. It includes a Payment Gateway with processor orchestration, a Subscription Manager that supports ERC-20 and native cycles, and a Contest Factory for prize escrow flows. The repository ships demo scenarios, deployment modules, and end-to-end tests covering the main integrations.
+This repository now groups multiple blockchain targets under a single tree:
 
-## Features
+- `evm/` ? Hardhat project with Solidity contracts, Ignition modules, demos, and tests.
+- `solana/` ? Anchor workspace and TypeScript tests that implement the Solana port.
+- `move/` ? placeholder for future Move-based implementation.
+- `docs/` ? shared documentation that applies across targets.
 
-- PaymentGateway orchestrated by PaymentOrchestrator and ProcessorRegistry with plug-in processors (discount, fee, token filter).
-- SubscriptionManager with native token deposits, ERC-20 billing, Permit/Permit2 support, and automation hooks.
-- ContestFactory + ContestEscrow for prize distribution backed by CoreSystem services.
-- Ignition deployment modules for demo, local, and production networks.
-- Demo scenarios (`npm run demo:*`) showcasing payment, subscription, and contest flows.
+To work with a specific target, switch into its folder and follow the local README instructions.
 
-## Requirements
-
-- Node.js 20+
-- npm
-- Hardhat (bundled in `devDependencies`)
-- (optional) Foundry if you run the full CI pipeline
-
-Install dependencies once:
-
-```
-npm install
+```bash
+cd evm   # or solana
 ```
 
-## Useful Scripts
+The EVM package retains the original npm scripts for compilation, testing, deployments, and demos. The Solana workspace includes Anchor configuration plus TypeScript helpers/tests; install its toolchain separately (Rust + Anchor CLI) before running `anchor test`.
 
-- `npm run compile` – Hardhat compile.
-- `npm run test` – Hardhat unit/integration tests.
-- `npm run lint` – Prettier check for Solidity contracts.
-- `npm run demo:payment` – Runs the payment scenario against Hardhat network.
-- `npm run demo:subscription` – Runs the subscription scenario (covers native deposits).
-- `npm run demo:contest` – Runs the contest scenario.
-- `npm run demo:marketplace` – Runs the marketplace scenario (off-chain listing purchase).
-
-See `package.json` for the full script list. Demo scripts rely on Ignition deployment helpers located in `ignition/modules/*`.
-
-## Native Subscription Flow
-
-Native currency subscriptions require prefunding:
-
-1. Call `SubscriptionManager.depositNativeFunds` to top up a user balance (or send extra `msg.value` during `subscribe`).
-2. `subscribe` or `subscribeWithToken` with `plan.token == address(0)` must include `msg.value >= plan.price` for the first cycle; any excess is stored in the user deposit.
-3. Automation can call `charge`/`chargeBatch`; the contract debits `nativeDeposits[user]` and forwards net proceeds via PaymentGateway.
-4. Users can withdraw unused funds with `withdrawNativeFunds` or automatically receive them during `unsubscribe`.
-
-## Testing
-
-```
-npx hardhat test
-```
-
-CI also executes demo scenarios through `.github/workflows/ci.yml`. When modifying processors or Ignition modules, update `docs/deployment.md` if new parameters are required.
-
-## Documentation
-
-- Deployment notes: `docs/deployment.md`
-- Hardhat demos: `demo/scenarios/*`
-- Tests: `test/modules`, `test/payments`, `test/integration`
-
-Feel free to open issues or PRs to expand processor coverage, add new modules, or improve the documentation.
+Shared CI configuration and hooks are left at the repository root (`.github/`, `.husky/`). Adjust or extend them as you wire additional targets.

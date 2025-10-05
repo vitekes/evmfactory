@@ -1,25 +1,31 @@
-node_modules
+# Common secrets
 .env
 
-# Hardhat files
-/cache
-/artifacts
+# Node dependencies
+node_modules
+/evm/node_modules
 
-# TypeChain files
-/typechain
-/typechain-types
+# Hardhat build artifacts
+/evm/cache
+/evm/artifacts
 
-# solidity-coverage files
-/coverage
-/coverage.json
+# TypeChain outputs
+/evm/typechain
+/evm/typechain-types
 
-# Foundry build artifacts
-/lib
-# Keep required libraries (Chainlink)
-!lib/chainlink/
-!lib/chainlink/**
-/out
+# Coverage reports
+/evm/coverage
+/evm/coverage.json
 
-# Hardhat Ignition default folder for deployments against a local node
-ignition/deployments/chain-31337
-/package-lock.json
+# Misc generated files
+/evm/gas-report.txt
+
+# Ignition local deployments
+/evm/ignition/deployments/chain-31337
+
+# Lockfiles generated locally
+/evm/package-lock.json
+
+# Solana workspace artifacts
+/solana/node_modules
+/solana/dist
