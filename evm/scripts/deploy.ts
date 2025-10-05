@@ -1,7 +1,8 @@
-import fs from 'fs/promises';
+﻿import fs from 'fs/promises';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { ignition, network } from 'hardhat';
+import type { DeploymentParameters } from '@nomicfoundation/ignition-core';
 import DeploymentModule from '../ignition/modules/deploy';
 
 type DeployArgs = {
@@ -59,9 +60,9 @@ function parseArgs(): DeployArgs {
   return result;
 }
 
-async function loadParameters(parameterFile?: string): Promise<Record<string, unknown>> {
+async function loadParameters(parameterFile?: string): Promise<DeploymentParameters | undefined> {
   if (!parameterFile) {
-    return {};
+    return undefined;
   }
 
   const resolvedPath = path.isAbsolute(parameterFile)
@@ -75,11 +76,11 @@ async function loadParameters(parameterFile?: string): Promise<Record<string, un
 
   if (extension === '.json') {
     const raw = await fs.readFile(resolvedPath, 'utf8');
-    return JSON.parse(raw);
+    return JSON.parse(raw) as DeploymentParameters;
   }
 
-  const module = await import(pathToFileURL(resolvedPath).toString());
-  return module.default ?? module;
+  const loadedModule = await import(pathToFileURL(resolvedPath).toString());
+  return (loadedModule.default ?? loadedModule) as DeploymentParameters;
 }
 
 async function logAddress(label: string, contract: { getAddress(): Promise<string> }): Promise<void> {
@@ -92,16 +93,15 @@ async function main(): Promise<void> {
   const parameters = await loadParameters(args.parameterFile);
   const deploymentId = args.deploymentId ?? `evmfactory-${network.name}`;
 
-  if (Object.keys(parameters).length > 0) {
+  if (parameters) {
     console.log(`Using parameters from ${args.parameterFile}`);
   }
 
   console.log(`Deploying ${deploymentId} to network ${network.name}...`);
 
-  const options = {
-    deploymentId,
-    ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-  } as const;
+  const options: Parameters<typeof ignition.deploy>[1] = parameters
+    ? { deploymentId, parameters }
+    : { deploymentId };
 
   const {
     core,

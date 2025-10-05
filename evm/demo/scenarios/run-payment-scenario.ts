@@ -6,7 +6,7 @@ import { log } from '../utils/logging';
 import { mintIfNeeded, ensureAllowance } from '../utils/tokens';
 import { authorizeModule } from '../utils/gateway';
 
-async function ensureTestToken(addressesToken: string | undefined, deployerAddress: string) {
+async function ensureTestToken(addressesToken: string | undefined) {
   if (addressesToken) {
     return addressesToken;
   }
@@ -24,7 +24,7 @@ async function main() {
   const addresses = await getDemoAddresses();
   const { deployer, secondary: moduleCaller, tertiary: payer } = await getDemoSigners();
 
-  const tokenAddress = await ensureTestToken(addresses.testToken, await deployer.getAddress());
+  const tokenAddress = await ensureTestToken(addresses.testToken);
 
   const moduleId = ethers.id('PAYMENT_SCENARIO');
   log.info('Authorizing demo module in PaymentGateway...');

@@ -1,13 +1,12 @@
-import { AnchorProvider, Program, web3 } from "@project-serum/anchor";
+﻿import { AnchorProvider } from "@project-serum/anchor";
+import { PublicKey } from "@solana/web3.js";
 
-export default async function (provider: AnchorProvider) {
+const PROGRAM_ID = new PublicKey("Evmmarket111111111111111111111111111111111");
+
+export default async function deploy(provider: AnchorProvider): Promise<void> {
   AnchorProvider.setProvider(provider);
-  const program = (await Program.at(
-    "Evmmarket111111111111111111111111111111111",
-    provider,
-  )) as Program;
 
   console.log("Deploy script placeholder", {
-    programId: program.programId.toBase58(),
+    programId: PROGRAM_ID.toBase58(),
   });
 }

@@ -108,5 +108,6 @@ library PaymentContext {
         for (uint256 i = 0; i < ctx.fees.length; i++) {
             total += ctx.fees[i].amount;
         }
+        return total;
     }
 }
