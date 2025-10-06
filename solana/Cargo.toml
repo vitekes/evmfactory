@@ -10,3 +10,7 @@ anchor-spl = "0.29.0"
 solana-program = "1.18"
 anyhow = "1"
 thiserror = "1"
+
+[profile.release]
+overflow-checks = true
+

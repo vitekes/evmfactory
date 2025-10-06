@@ -195,6 +195,8 @@ fn handle_spl_subscription(ctx: &Context<ProcessSubscriptionPayment>, fee_amount
     let treasury_token_ai = &accounts[2];
     let token_program_ai = &accounts[3];
 
+    require_keys_eq!(token_program_ai.key(), token::ID, EvmFactoryError::InvalidTokenProgram);
+
     validate_token_account(
         subscriber_token_ai,
         &ctx.accounts.plan.mint,

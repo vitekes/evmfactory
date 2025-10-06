@@ -46,4 +46,9 @@ pub enum EvmFactoryError {
     TokenAccountMintMismatch,
     #[msg("Amount must be greater than zero")]
     AmountMustBePositive,
+    #[msg("Invalid token program provided")]
+    InvalidTokenProgram,
+    #[msg("Withdrawal would drop account below rent exemption")]
+    RentExemptionViolation,
 }
+

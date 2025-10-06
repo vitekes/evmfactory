@@ -4,7 +4,7 @@ members = [
 ]
 
 [programs.localnet]
-evmfactory = "Evmmarket111111111111111111111111111111111"
+evmfactory = "Evmmarket1111111111111111111111111111111111"
 
 [provider]
 cluster = "Localnet"

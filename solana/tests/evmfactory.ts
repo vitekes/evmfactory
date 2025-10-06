@@ -1,5 +1,4 @@
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram, Keypair, Transaction } from "@solana/web3.js";
 import { expect } from "chai";
 import nacl from "tweetnacl";
@@ -41,7 +40,7 @@ const EXPECTED_SPL_SUB_FEE = Math.floor((SPL_SUBSCRIPTION_PRICE * FEE_BPS) / 10_
 describe("evmfactory program", () => {
   anchor.setProvider(anchor.AnchorProvider.local());
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const program = anchor.workspace.Evmfactory as Program;
+  const program = anchor.workspace.Evmfactory as anchor.Program<any>;
   const connection = provider.connection;
   const admin = provider.wallet as anchor.Wallet;
 
@@ -159,7 +158,7 @@ describe("evmfactory program", () => {
     const treasuryAfter = await connection.getBalance(treasuryPda);
     expect(treasuryAfter - treasuryBefore).to.equal(EXPECTED_SOL_FEE);
 
-    const listingState = await program.account.listingAccount.fetch(listingAddress);
+    const listingState = (await program.account.listingAccount.fetch(listingAddress)) as any;
     expect(listingState.active).to.equal(false);
   });
 
@@ -398,7 +397,7 @@ describe("evmfactory program", () => {
     expect(treasuryAfter - treasuryBefore).to.equal(EXPECTED_SUB_FEE * 2);
     expect(creatorAfter - creatorBefore).to.equal((SUBSCRIPTION_PRICE - EXPECTED_SUB_FEE) * 2);
 
-    const instanceState = await program.account.subscriptionInstanceAccount.fetch(instanceAddress);
+    const instanceState = (await program.account.subscriptionInstanceAccount.fetch(instanceAddress)) as any;
     expect(Number(instanceState.lastPaymentAt)).to.equal(next);
   });
 
@@ -518,7 +517,7 @@ describe("evmfactory program", () => {
       (SPL_SUBSCRIPTION_PRICE - EXPECTED_SPL_SUB_FEE) * 2,
     );
 
-    const instanceState = await program.account.subscriptionInstanceAccount.fetch(instanceAddress);
+    const instanceState = (await program.account.subscriptionInstanceAccount.fetch(instanceAddress)) as any;
     expect(Number(instanceState.lastPaymentAt)).to.equal(next);
   });
 
@@ -678,7 +677,7 @@ describe("evmfactory program", () => {
     const contestInfo = await connection.getAccountInfo(contestAddress);
     expect(contestInfo).to.be.null;
 
-    const entryState = await program.account.contestEntryAccount.fetch(entryAddress);
+    const entryState = (await program.account.contestEntryAccount.fetch(entryAddress)) as any;
     expect(Number(entryState.score)).to.equal(100);
   });
 });

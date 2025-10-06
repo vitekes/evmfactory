@@ -1,7 +1,7 @@
-﻿import { AnchorProvider } from "@project-serum/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
-const PROGRAM_ID = new PublicKey("Evmmarket111111111111111111111111111111111");
+const PROGRAM_ID = new PublicKey("Evmmarket1111111111111111111111111111111111");
 
 export default async function deploy(provider: AnchorProvider): Promise<void> {
   AnchorProvider.setProvider(provider);
@@ -10,3 +10,4 @@ export default async function deploy(provider: AnchorProvider): Promise<void> {
     programId: PROGRAM_ID.toBase58(),
   });
 }
+

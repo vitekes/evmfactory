@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::rent::Rent;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::errors::EvmFactoryError;
@@ -176,6 +177,13 @@ pub fn withdraw_treasury_native(ctx: Context<WithdrawTreasuryNative>, params: Wi
     let source = ctx.accounts.treasury_vault.to_account_info();
     require!(source.lamports() >= params.amount, EvmFactoryError::EscrowBalanceTooLow);
 
+    let rent_exempt_minimum = Rent::get()?.minimum_balance(VaultAccount::LEN + 8);
+    let remaining = source
+        .lamports()
+        .checked_sub(params.amount)
+        .ok_or(EvmFactoryError::EscrowBalanceTooLow)?;
+    require!(remaining >= rent_exempt_minimum, EvmFactoryError::RentExemptionViolation);
+
     **source.try_borrow_mut_lamports()? -= params.amount;
     **ctx
         .accounts
@@ -213,6 +221,13 @@ pub fn withdraw_reward_native(ctx: Context<WithdrawRewardNative>, params: Withdr
 
     let source = ctx.accounts.reward_vault.to_account_info();
     require!(source.lamports() >= params.amount, EvmFactoryError::EscrowBalanceTooLow);
+
+    let rent_exempt_minimum = Rent::get()?.minimum_balance(VaultAccount::LEN + 8);
+    let remaining = source
+        .lamports()
+        .checked_sub(params.amount)
+        .ok_or(EvmFactoryError::EscrowBalanceTooLow)?;
+    require!(remaining >= rent_exempt_minimum, EvmFactoryError::RentExemptionViolation);
 
     **source.try_borrow_mut_lamports()? -= params.amount;
     **ctx

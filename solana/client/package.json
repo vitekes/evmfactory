@@ -7,9 +7,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.29.0"
+    "@coral-xyz/anchor": "^0.29.0"
   },
   "devDependencies": {
     "typescript": "^5.2.0"
   }
 }
+

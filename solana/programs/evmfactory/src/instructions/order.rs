@@ -164,6 +164,8 @@ fn handle_spl_purchase(ctx: &Context<PurchaseListing>, amount: u64) -> Result<()
     let treasury_token_ai = &accounts[4];
     let token_program_ai = &accounts[5];
 
+    require_keys_eq!(token_program_ai.key(), token::ID, EvmFactoryError::InvalidTokenProgram);
+
     validate_token_account(
         buyer_token_ai,
         &ctx.accounts.listing.mint,
@@ -212,6 +214,8 @@ fn handle_spl_finalize(ctx: &Context<FinalizeOrder>, seller_amount: u64, fee_amo
     let seller_token_ai = &accounts[2];
     let treasury_token_ai = &accounts[3];
     let token_program_ai = &accounts[4];
+
+    require_keys_eq!(token_program_ai.key(), token::ID, EvmFactoryError::InvalidTokenProgram);
 
     validate_token_account(
         order_token_ai,
