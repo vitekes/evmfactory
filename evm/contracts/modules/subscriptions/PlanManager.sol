@@ -46,12 +46,7 @@ contract PlanManager is IPlanManager {
     );
     event MaxActivePlansUpdated(uint8 oldLimit, uint8 newLimit);
 
-    constructor(
-        address coreAddress,
-        address subscriptionManagerAddress,
-        bytes32 moduleId,
-        uint8 initialMaxActive
-    ) {
+    constructor(address coreAddress, address subscriptionManagerAddress, bytes32 moduleId, uint8 initialMaxActive) {
         if (coreAddress == address(0) || subscriptionManagerAddress == address(0)) revert ZeroAddress();
         core = CoreSystem(coreAddress);
         subscriptionManager = subscriptionManagerAddress;
@@ -64,11 +59,7 @@ contract PlanManager is IPlanManager {
     // External API
     // ---------------------------------------------------------------------
 
-    function createPlan(
-        SignatureLib.Plan calldata plan,
-        bytes calldata sigMerchant,
-        string calldata uri
-    ) external {
+    function createPlan(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, string calldata uri) external {
         if (plan.merchant == address(0)) revert ZeroAddress();
         if (msg.sender != plan.merchant) revert UnauthorizedMerchant();
         if (!core.hasRole(CoreDefs.AUTHOR_ROLE, msg.sender)) revert Forbidden();
@@ -215,9 +206,7 @@ contract PlanManager is IPlanManager {
         return activePlans[merchant];
     }
 
-    function listMerchantPlans(
-        address merchant
-    ) external view returns (bytes32[] memory) {
+    function listMerchantPlans(address merchant) external view returns (bytes32[] memory) {
         return merchantPlanHistory[merchant];
     }
 

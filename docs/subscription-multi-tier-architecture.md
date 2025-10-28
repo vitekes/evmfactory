@@ -104,7 +104,7 @@ sequenceDiagram
 - При оплате native пользователь может отправить `msg.value > plan.price`: остаток сохраняется в `nativeDeposits`, `retryCount` и `retryAt` сбрасываются.
 - Для альтернативных токенов вызывается `subscribeWithToken` (через `PaymentGateway` и Permit/Permit2).
 ```
-- Подписка выполняется без депозита; `retryCount` и `retryAt` обнуляются.
+- После успешного `subscribe*` состояние активируется, `retryCount` и `retryAt` сбрасываются.
 - Первое списание происходит сразу (как и сейчас), следующее — через `plan.period`.
 
 ### Отмена

@@ -83,12 +83,7 @@ contract SubscriptionManager is ReentrancyGuard {
     );
     event SubscriptionCancelled(address indexed user, bytes32 indexed planHash, uint8 reason);
     event SubscriptionCharged(address indexed user, bytes32 indexed planHash, uint256 amount, uint40 nextChargeAt);
-    event SubscriptionRetryScheduled(
-        address indexed user,
-        bytes32 indexed planHash,
-        uint40 retryAt,
-        uint16 retryCount
-    );
+    event SubscriptionRetryScheduled(address indexed user, bytes32 indexed planHash, uint40 retryAt, uint16 retryCount);
     event SubscriptionFailedFinal(address indexed user, bytes32 indexed planHash, uint8 reason);
     event ManualActivation(address indexed operator, address indexed user, bytes32 indexed planHash, uint8 mode);
     event NativeDepositIncreased(address indexed user, uint256 amount, uint256 newBalance);
@@ -185,11 +180,7 @@ contract SubscriptionManager is ReentrancyGuard {
         _deactivatePlan(user, planHash, cancelReason);
     }
 
-    function activateManually(
-        address user,
-        bytes32 planHash,
-        ActivationMode mode
-    ) external onlyOperator nonReentrant {
+    function activateManually(address user, bytes32 planHash, ActivationMode mode) external onlyOperator nonReentrant {
         SubscriptionState storage state = subscriptionStates[user][planHash];
         if (state.merchant == address(0)) revert PlanNotFound();
 
@@ -410,11 +401,7 @@ contract SubscriptionManager is ReentrancyGuard {
         emit SubscriptionCharged(msg.sender, planHash, plan.price, uint40(block.timestamp + storedPlan.period));
     }
 
-    function _activateSubscription(
-        address user,
-        bytes32 planHash,
-        IPlanManager.PlanData memory plan
-    ) internal {
+    function _activateSubscription(address user, bytes32 planHash, IPlanManager.PlanData memory plan) internal {
         bytes32 currentPlan = activePlanByMerchant[user][plan.merchant];
         if (currentPlan != bytes32(0) && currentPlan != planHash) {
             _deactivatePlan(user, currentPlan, CancelReason.Switch);
