@@ -21,6 +21,7 @@ const DeploymentModule = buildModule('DeploymentModule', (m) => {
     paymentFeeProcessor: payment.feeProcessor,
     contestFactory: contest.contestFactory,
     subscriptionManager: subscription.subscriptionManager,
+    planManager: subscription.planManager,
     marketplace: marketplace.marketplace,
   };
 });

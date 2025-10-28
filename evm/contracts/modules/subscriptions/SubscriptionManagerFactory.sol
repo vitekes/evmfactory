@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import '../../core/BaseFactory.sol';
 import './SubscriptionManager.sol';
+import './PlanManager.sol';
 import '../../core/CoreDefs.sol';
 import '../../core/CoreSystem.sol';
 
@@ -10,7 +11,7 @@ import '../../core/CoreSystem.sol';
 /// @notice Factory for creating subscription manager instances
 /// @dev Uses PaymentGateway (IPaymentGateway) for payment processing
 contract SubscriptionManagerFactory is BaseFactory {
-    event SubscriptionManagerCreated(address indexed creator, address subManager);
+    event SubscriptionManagerCreated(address indexed creator, address subManager, address planManager);
 
     constructor(
         address coreSystem,
@@ -53,11 +54,17 @@ contract SubscriptionManagerFactory is BaseFactory {
         }
 
         // Create subscription manager using cached addresses
-        m = address(new SubscriptionManager(coreAddr, gateway, instanceId));
+        SubscriptionManager subscriptionManager = new SubscriptionManager(coreAddr, gateway, instanceId);
+        m = address(subscriptionManager);
+
+        // Deploy plan manager with default limit (5 active plans per merchant)
+        PlanManager planManager = new PlanManager(coreAddr, m, instanceId, 5);
+
+        core.setService(instanceId, 'PlanManager', address(planManager));
 
         // Update instance address in core
         core.upgradeFeature(instanceId, m);
 
-        emit SubscriptionManagerCreated(sender, m);
+        emit SubscriptionManagerCreated(sender, m, address(planManager));
     }
 }

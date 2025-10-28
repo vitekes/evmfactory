@@ -9,8 +9,25 @@ export const SubscriptionModule = buildModule('SubscriptionModule', (m) => {
 
   const subscriptionModuleId = ethers.id('SubscriptionManager');
   const allowedTokens = m.getParameter('subscriptionAllowedTokens', [] as string[]);
+  const maxActivePlans = m.getParameter('subscriptionMaxActivePlans', 5);
+  const authorAccountsParam = m.getParameter('subscriptionAuthors', [] as string[]);
+  const automationAccountsParam = m.getParameter('subscriptionAutomation', [] as string[]);
+
+  const toAccountArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    }
+    if (typeof value === 'string' && value.length > 0) {
+      return [value];
+    }
+    return [];
+  };
+
+  const authorAccounts = toAccountArray(authorAccountsParam);
+  const automationAccounts = toAccountArray(automationAccountsParam);
 
   const subscriptionManager = m.contract('SubscriptionManager', [core, gateway, subscriptionModuleId]);
+  const planManager = m.contract('PlanManager', [core, subscriptionManager, subscriptionModuleId, maxActivePlans]);
 
   const registerSubscription = m.call(core, 'registerFeature', [subscriptionModuleId, subscriptionManager, 0], {
     id: 'SubscriptionModule_registerFeature',
@@ -21,16 +38,35 @@ export const SubscriptionModule = buildModule('SubscriptionModule', (m) => {
     after: [registerSubscription],
   });
 
+  const setPlanManager = m.call(core, 'setService', [subscriptionModuleId, 'PlanManager', planManager], {
+    id: 'SubscriptionModule_setPlanManager',
+    after: [registerSubscription],
+  });
+
+  const authorRoleCalls = authorAccounts.map((account, index) =>
+    m.call(core, 'grantRole', [ethers.id('AUTHOR_ROLE'), account], {
+      id: `SubscriptionModule_grantAuthor_${index}`,
+      after: [registerSubscription],
+    }),
+  );
+
+  const automationRoleCalls = automationAccounts.map((account, index) =>
+    m.call(core, 'grantRole', [ethers.id('AUTOMATION_ROLE'), account], {
+      id: `SubscriptionModule_grantAutomation_${index}`,
+      after: [registerSubscription],
+    }),
+  );
+
   m.call(gateway, 'setModuleAuthorization', [subscriptionModuleId, subscriptionManager, true], {
     id: 'SubscriptionModule_authorizeGateway',
-    after: [setPaymentGateway],
+    after: [setPaymentGateway, setPlanManager],
   });
 
   m.call(
     orchestrator,
     'configureProcessor',
     [subscriptionModuleId, 'FeeProcessor', true, '0x'],
-    { id: 'SubscriptionModule_configureFeeProcessor', after: [setPaymentGateway] },
+    { id: 'SubscriptionModule_configureFeeProcessor', after: [setPaymentGateway, setPlanManager] },
   );
 
   const tokenFilterEnabled = allowedTokens.length > 0;
@@ -42,11 +78,14 @@ export const SubscriptionModule = buildModule('SubscriptionModule', (m) => {
     orchestrator,
     'configureProcessor',
     [subscriptionModuleId, 'TokenFilter', tokenFilterEnabled, tokenFilterConfig],
-    { id: 'SubscriptionModule_configureTokenFilter', after: [setPaymentGateway] },
+    { id: 'SubscriptionModule_configureTokenFilter', after: [setPaymentGateway, setPlanManager] },
   );
 
   return {
     subscriptionManager,
+    planManager,
+    authorRoleCalls,
+    automationRoleCalls,
   };
 });
 

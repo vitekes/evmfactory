@@ -1,10 +1,11 @@
 import { ethers } from 'hardhat';
-import type { SubscriptionManager, TestToken, PaymentGateway } from '../../typechain-types';
+import type { SubscriptionManager, TestToken, PaymentGateway, PlanManager } from '../../typechain-types';
 import { getDemoAddresses } from '../config/addresses';
 import { getDemoSigners } from '../utils/signers';
 import { log } from '../utils/logging';
 import { mintIfNeeded, ensureAllowance } from '../utils/tokens';
 import { authorizeModule } from '../utils/gateway';
+import { grantAuthorRole, grantAutomationRole } from '../utils/core';
 
 async function ensureTestToken(existing?: string): Promise<string> {
   if (existing) {
@@ -54,10 +55,11 @@ async function main() {
     'SubscriptionManager',
     addresses.subscriptionManager,
   )) as SubscriptionManager;
+  const planManager = (await ethers.getContractAt('PlanManager', addresses.planManager)) as PlanManager;
   const paymentGatewayAddress = addresses.paymentGateway;
 
   const planPrice = ethers.parseEther('25');
-  const planPeriodSeconds = BigInt(7 * 24 * 60 * 60);
+  const planPeriodSeconds = BigInt(30 * 24 * 60 * 60);
 
   log.info('Authorizing SubscriptionManager in PaymentGateway...');
   await authorizeModule(
@@ -71,6 +73,10 @@ async function main() {
   await ensureAllowance(tokenAddress, subscriber, paymentGatewayAddress, planPrice * 3n);
 
   const token = (await ethers.getContractAt('contracts/mocks/TestToken.sol:TestToken', tokenAddress)) as TestToken;
+
+  log.info('Ensuring merchant and automation roles...');
+  await grantAuthorRole(addresses.core, await merchant.getAddress());
+  await grantAutomationRole(addresses.core, await deployer.getAddress());
 
   const network = await ethers.provider.getNetwork();
   const plan: SubscriptionManager.PlanStruct = {
@@ -102,6 +108,17 @@ async function main() {
 
   log.info('Signing subscription plan...');
   const signature = await merchant.signTypedData(domain, types, plan);
+  const planHash = await subscriptionManager.hashPlan(plan);
+
+  log.info('Registering plan in PlanManager...');
+  try {
+    await (await planManager.connect(merchant).createPlan(plan, signature, 'demo://tier')).wait();
+  } catch (error) {
+    if (!isPlanAlreadyExists(error)) {
+      throw error;
+    }
+    log.warn('Plan already registered, skipping create.');
+  }
 
   log.info('Subscribing...');
   const subscribeTx = await subscriptionManager.connect(subscriber).subscribe(plan, signature, '0x');
@@ -118,7 +135,9 @@ async function main() {
   await ethers.provider.send('evm_increaseTime', [Number(planPeriodSeconds)]);
   await ethers.provider.send('evm_mine', []);
 
-  const chargeTx = await subscriptionManager.connect(deployer).charge(await subscriber.getAddress());
+  const chargeTx = await subscriptionManager
+    .connect(deployer)
+    ['charge(address,bytes32)'](await subscriber.getAddress(), planHash);
   const chargeReceipt = await chargeTx.wait();
   log.success('Recurring charge executed.');
   await parsePaymentEvent(chargeReceipt, gateway);
@@ -139,3 +158,8 @@ main().catch((error) => {
   log.error(`Subscription scenario failed: ${message}`);
   process.exitCode = 1;
 });
+function isPlanAlreadyExists(error: unknown): boolean {
+  if (!error) return false;
+  const message = (error as Error).message ?? String(error);
+  return message.includes('PlanAlreadyExists');
+}

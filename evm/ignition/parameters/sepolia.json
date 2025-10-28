@@ -11,6 +11,13 @@
     ]
   },
   "SubscriptionModule": {
-    "subscriptionAllowedTokens": []
+    "subscriptionAllowedTokens": [],
+    "subscriptionMaxActivePlans": 5,
+    "subscriptionAuthors": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "subscriptionAutomation": [
+      "0x0000000000000000000000000000000000000000"
+    ]
   }
 }

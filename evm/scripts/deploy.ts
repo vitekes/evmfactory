@@ -1,58 +1,58 @@
-﻿import fs from 'fs/promises';
+import fs from 'fs/promises';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { ignition, network } from 'hardhat';
 import type { DeploymentParameters } from '@nomicfoundation/ignition-core';
 import DeploymentModule from '../ignition/modules/deploy';
 
-type DeployArgs = {
+type DeployConfig = {
   parameterFile?: string;
   deploymentId?: string;
 };
 
 const SUPPORTED_PARAM_EXTENSIONS = new Set(['.json', '.js', '.cjs', '.mjs', '.ts']);
 
-function parseArgs(): DeployArgs {
+function readEnvConfig(): DeployConfig {
+  return {
+    parameterFile: process.env.DEPLOY_PARAMS ?? process.env.DEPLOY_PARAMETERS ?? undefined,
+    deploymentId: process.env.DEPLOY_ID ?? process.env.DEPLOYMENT_ID ?? undefined,
+  };
+}
+
+function mergeCliArgs(config: DeployConfig): DeployConfig {
   const args = process.argv.slice(2);
-  const result: DeployArgs = {};
+  const result: DeployConfig = { ...config };
 
   for (let i = 0; i < args.length; i += 1) {
     const current = args[i];
-
     if (!current.startsWith('--')) {
       continue;
     }
 
     const [flag, valueFromEquals] = current.split('=', 2);
+    const value = valueFromEquals ?? args[i + 1];
 
     switch (flag) {
       case '--params':
-      case '--parameters': {
-        const value = valueFromEquals ?? args[i + 1];
-        if (!value) {
-          throw new Error(`Missing value for ${flag}`);
-        }
-        result.parameterFile = value;
-        if (valueFromEquals === undefined) {
-          i += 1;
+      case '--parameters':
+        if (value) {
+          result.parameterFile = value;
+          if (valueFromEquals === undefined) {
+            i += 1;
+          }
         }
         break;
-      }
       case '--name':
       case '--deployment-id':
-      case '--deployment-name': {
-        const value = valueFromEquals ?? args[i + 1];
-        if (!value) {
-          throw new Error(`Missing value for ${flag}`);
-        }
-        result.deploymentId = value;
-        if (valueFromEquals === undefined) {
-          i += 1;
+      case '--deployment-name':
+        if (value) {
+          result.deploymentId = value;
+          if (valueFromEquals === undefined) {
+            i += 1;
+          }
         }
         break;
-      }
       default:
-        // Ignore unknown flags to avoid conflicts with Hardhat internals.
         break;
     }
   }
@@ -60,16 +60,40 @@ function parseArgs(): DeployArgs {
   return result;
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveParameterPath(config: DeployConfig, networkName: string): Promise<string | undefined> {
+  if (config.parameterFile) {
+    return config.parameterFile;
+  }
+
+  const baseDir = path.join(process.cwd(), 'ignition/parameters');
+  const candidates = ['json', 'ts', 'cjs', 'mjs'].map((ext) => path.join(baseDir, `${networkName}.${ext}`));
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
 async function loadParameters(parameterFile?: string): Promise<DeploymentParameters | undefined> {
   if (!parameterFile) {
     return undefined;
   }
 
-  const resolvedPath = path.isAbsolute(parameterFile)
-    ? parameterFile
-    : path.join(process.cwd(), parameterFile);
-
+  const resolvedPath = path.isAbsolute(parameterFile) ? parameterFile : path.join(process.cwd(), parameterFile);
   const extension = path.extname(resolvedPath);
+
   if (!SUPPORTED_PARAM_EXTENSIONS.has(extension)) {
     throw new Error(`Unsupported parameter file extension: ${extension}`);
   }
@@ -89,15 +113,21 @@ async function logAddress(label: string, contract: { getAddress(): Promise<strin
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs();
-  const parameters = await loadParameters(args.parameterFile);
-  const deploymentId = args.deploymentId ?? `evmfactory-${network.name}`;
+  const envConfig = readEnvConfig();
+  const config = mergeCliArgs(envConfig);
+  const networkName = network.name;
 
-  if (parameters) {
-    console.log(`Using parameters from ${args.parameterFile}`);
+  const parameterPath = await resolveParameterPath(config, networkName);
+  const parameters = await loadParameters(parameterPath);
+  const deploymentId = config.deploymentId ?? `evmfactory-${networkName}`;
+
+  if (parameterPath) {
+    console.log(`Using parameters from ${parameterPath}`);
+  } else {
+    console.log('No parameter file provided; using module defaults.');
   }
 
-  console.log(`Deploying ${deploymentId} to network ${network.name}...`);
+  console.log(`Deploying ${deploymentId} to network ${networkName}...`);
 
   const options: Parameters<typeof ignition.deploy>[1] = parameters
     ? { deploymentId, parameters }
@@ -112,6 +142,7 @@ async function main(): Promise<void> {
     paymentFeeProcessor,
     contestFactory,
     subscriptionManager,
+    planManager,
     marketplace,
   } = await ignition.deploy(DeploymentModule, options);
 
@@ -124,6 +155,7 @@ async function main(): Promise<void> {
   await logAddress('FeeProcessor', paymentFeeProcessor);
   await logAddress('ContestFactory', contestFactory);
   await logAddress('SubscriptionManager', subscriptionManager);
+  await logAddress('PlanManager', planManager);
   await logAddress('Marketplace', marketplace);
 }
 

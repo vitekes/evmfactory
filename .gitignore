@@ -29,3 +29,9 @@ node_modules
 # Solana workspace artifacts
 /solana/node_modules
 /solana/dist
+
+# Tron workspace artifacts
+/tron/artifacts
+/tron/cache
+/tron/dist
+/tron/.env

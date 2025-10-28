@@ -22,6 +22,7 @@ library CoreDefs {
     bytes32 internal constant MODULE_ROLE = keccak256('MODULE_ROLE');
     bytes32 internal constant AUTOMATION_ROLE = keccak256('AUTOMATION_ROLE');
     bytes32 internal constant GOVERNOR_ROLE = keccak256('GOVERNOR_ROLE');
+    bytes32 internal constant AUTHOR_ROLE = keccak256('AUTHOR_ROLE');
 
     // ------------------------------------------------------------------
     // Common time constants

@@ -9,7 +9,8 @@ EVM Factory provides a modular payment stack for Hardhat-based projects. It incl
 ## Features
 
 - PaymentGateway orchestrated by PaymentOrchestrator and ProcessorRegistry with plug-in processors (discount, fee, token filter).
-- SubscriptionManager with native token deposits, ERC-20 billing, Permit/Permit2 support, and automation hooks.
+- SubscriptionManager v2 with multi-plan storage `(user, planHash)`, retry scheduling, native deposits, and automation hooks.
+- PlanManager providing ACL-guarded plan CRUD and max active plan limits per merchant.
 - ContestFactory + ContestEscrow for prize distribution backed by CoreSystem services.
 - Ignition deployment modules for demo, local, and production networks.
 - Demo scenarios (`npm run demo:*`) showcasing payment, subscription, and contest flows.
@@ -19,7 +20,6 @@ EVM Factory provides a modular payment stack for Hardhat-based projects. It incl
 - Node.js 20+
 - npm
 - Hardhat (bundled in `devDependencies`)
-- (optional) Foundry if you run the full CI pipeline
 
 Install dependencies once:
 
@@ -29,13 +29,14 @@ npm install
 
 ## Useful Scripts
 
-- `npm run compile` вЂ“ Hardhat compile.
-- `npm run test` вЂ“ Hardhat unit/integration tests.
-- `npm run lint` вЂ“ Prettier check for Solidity contracts.
-- `npm run demo:payment` вЂ“ Runs the payment scenario against Hardhat network.
-- `npm run demo:subscription` вЂ“ Runs the subscription scenario (covers native deposits).
-- `npm run demo:contest` вЂ“ Runs the contest scenario.
-- `npm run demo:marketplace` вЂ“ Runs the marketplace scenario (off-chain listing purchase).
+- `npm run compile` – Hardhat compile.
+- `npm run test` – Hardhat unit/integration tests.
+- `npm run lint` – Prettier check for Solidity contracts.
+- `npm run demo:payment` – Runs the payment scenario against Hardhat network.
+- `npm run demo:subscription` – Updated subscription scenario (PlanManager + retry billing).
+- `npm run demo:contest` – Runs the contest scenario.
+- `npm run demo:marketplace` – Runs the marketplace scenario (off-chain listing purchase).
+- `npm run billing:worker` – Executes the billing worker (`scripts/run-billing-worker.ts`).
 
 See `package.json` for the full script list. Demo scripts rely on Ignition deployment helpers located in `ignition/modules/*`.
 
@@ -60,6 +61,7 @@ CI also executes demo scenarios through `.github/workflows/ci.yml`. When modifyi
 
 - Deployment notes: `docs/deployment.md`
 - Hardhat demos: `demo/scenarios/*`
+- Billing automation: `docs/subscription-billing-guide.md`
 - Tests: `test/modules`, `test/payments`, `test/integration`
 
 Feel free to open issues or PRs to expand processor coverage, add new modules, or improve the documentation.

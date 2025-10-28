@@ -1,0 +1,7 @@
+{
+  "subscriptionManager": "0xSubscriptionManagerAddress",
+  "subscribers": [
+    "0xUserAddress1",
+    "0xUserAddress2"
+  ]
+}
