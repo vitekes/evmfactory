@@ -80,7 +80,7 @@ sequenceDiagram
     Note right of PlanMgr: статус = Active по умолчанию
 ```
 - Обновление URI — PlanManager.updatePlanUri(planHash, newUri). Изменение цены/периода требует выпуска нового planHash через createPlan.
-- Деактивация — `PlanManager.deactivate(planHash)` → событие `PlanStatusChanged`.
+- Деактивация — `PlanManager.deactivatePlan(planHash)` → событие `PlanStatusChanged`.
 - Заморозка/разморозка — PlanManager.freezePlan(planHash, frozen) → события PlanFrozenToggled, PlanStatusChanged.
 - Переактивация — PlanManager.activatePlan (проверяет лимит maxActivePlans), деактивация — PlanManager.deactivatePlan.
 - Передача владения — PlanManager.transferPlanOwnership(planHash, newMerchant) (только операторы).
