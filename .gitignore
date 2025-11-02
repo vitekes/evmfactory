@@ -8,6 +8,7 @@ node_modules
 # Hardhat build artifacts
 /evm/cache
 /evm/artifacts
+/evm/ignition/deployments
 
 # TypeChain outputs
 /evm/typechain
