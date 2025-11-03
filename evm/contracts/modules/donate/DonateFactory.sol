@@ -10,9 +10,10 @@ import './Donate.sol';
 contract DonateFactory is BaseFactory {
     event DonateModuleCreated(address indexed creator, address donateModule);
 
-    constructor(address coreSystem, address paymentGateway)
-        BaseFactory(coreSystem, paymentGateway, CoreDefs.DONATE_MODULE_ID)
-    {}
+    constructor(
+        address coreSystem,
+        address paymentGateway
+    ) BaseFactory(coreSystem, paymentGateway, CoreDefs.DONATE_MODULE_ID) {}
 
     function createDonateModule() external onlyFactoryAdmin nonReentrant returns (address module) {
         bytes32 instanceId = _generateInstanceId('Donate');

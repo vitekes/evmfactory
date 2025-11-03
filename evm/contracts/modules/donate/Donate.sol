@@ -68,13 +68,7 @@ contract Donate is ReentrancyGuard {
         if (isNative) {
             if (msg.value < amount) revert InsufficientBalance();
 
-            netAmount = paymentGateway.processPayment{value: amount}(
-                MODULE_ID,
-                address(0),
-                msg.sender,
-                amount,
-                ''
-            );
+            netAmount = paymentGateway.processPayment{value: amount}(MODULE_ID, address(0), msg.sender, amount, '');
 
             if (netAmount > amount) revert InvalidState();
 
