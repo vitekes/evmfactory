@@ -14,6 +14,7 @@
     "demo:payment": "npx hardhat run demo/scenarios/run-payment-scenario.ts --network hardhat",
     "demo:subscription": "npx hardhat run demo/scenarios/run-subscription-scenario.ts --network hardhat",
     "demo:contest": "npx hardhat run demo/scenarios/run-contest-scenario.ts --network hardhat",
+    "demo:donate": "npx hardhat run demo/scenarios/run-donate-scenario.ts --network hardhat",
     "billing:worker": "npx hardhat run scripts/run-billing-worker.ts",
     "verify:sepolia": "npx hardhat ignition verify evmfactory-sepolia",
     "verify:mainnet": "npx hardhat ignition verify evmfactory-mainnet",

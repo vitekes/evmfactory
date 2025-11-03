@@ -1,78 +1,52 @@
 import { ethers } from 'hardhat';
-import type { SubscriptionManager, TestToken, PaymentGateway, PlanManager } from '../../typechain-types';
+import type { PlanManager, SubscriptionManager, TestToken, PaymentGateway } from '../../typechain-types';
 import { getDemoAddresses } from '../config/addresses';
 import { getDemoSigners } from '../utils/signers';
 import { log } from '../utils/logging';
-import { mintIfNeeded, ensureAllowance } from '../utils/tokens';
+import { ensureDemoToken, ensureAllowance, mintIfNeeded } from '../utils/tokens';
 import { authorizeModule } from '../utils/gateway';
 import { grantAuthorRole, grantAutomationRole } from '../utils/core';
-
-async function ensureTestToken(existing?: string): Promise<string> {
-  if (existing) {
-    return existing;
-  }
-
-  log.info('Deploying helper TestToken for subscription demo...');
-  const TokenFactory = await ethers.getContractFactory('contracts/mocks/TestToken.sol:TestToken');
-  const token = (await TokenFactory.deploy('SubToken', 'SUB', 18, 0)) as TestToken;
-  await token.waitForDeployment();
-  const tokenAddress = await token.getAddress();
-  log.success(`[token] deployed at ${tokenAddress}`);
-  return tokenAddress;
-}
-
-async function parsePaymentEvent(
-  receipt: Awaited<ReturnType<typeof ethers.ContractTransactionResponse.prototype.wait>>,
-  gateway: PaymentGateway,
-) {
-  if (!receipt) return;
-  const parsed = receipt.logs
-    .map((logEntry) => {
-      try {
-        return gateway.interface.parseLog(logEntry);
-      } catch {
-        return null;
-      }
-    })
-    .find((entry) => entry?.name === 'PaymentProcessed');
-
-  if (parsed) {
-    const net = parsed.args.netAmount as bigint;
-    const token = parsed.args.token as string;
-    log.info(
-      `PaymentProcessed => ${token === ethers.ZeroAddress ? ethers.formatEther(net) + ' ETH' : ethers.formatEther(net) + ' tokens'}`,
-    );
-  }
-}
+import {
+  chargeNextCycle,
+  ensurePlanRegistered,
+  fastForward,
+  signPlan,
+  subscribeWithLogging,
+} from '../utils/subscriptions';
 
 async function main() {
   const addresses = await getDemoAddresses();
   const { deployer, secondary: merchant, tertiary: subscriber } = await getDemoSigners();
 
-  const tokenAddress = await ensureTestToken(addresses.testToken);
+  const { address: tokenAddress } = await ensureDemoToken(addresses.testToken, {
+    name: 'SubToken',
+    symbol: 'SUB',
+  });
 
   const subscriptionManager = (await ethers.getContractAt(
     'SubscriptionManager',
-    addresses.subscriptionManager,
+    addresses.subscriptionManager
   )) as SubscriptionManager;
   const planManager = (await ethers.getContractAt('PlanManager', addresses.planManager)) as PlanManager;
-  const paymentGatewayAddress = addresses.paymentGateway;
+  const gateway = (await ethers.getContractAt('PaymentGateway', addresses.paymentGateway)) as PaymentGateway;
+  const token = (await ethers.getContractAt(
+    'contracts/mocks/TestToken.sol:TestToken',
+    tokenAddress
+  )) as TestToken;
 
   const planPrice = ethers.parseEther('25');
   const planPeriodSeconds = BigInt(30 * 24 * 60 * 60);
 
   log.info('Authorizing SubscriptionManager in PaymentGateway...');
   await authorizeModule(
-    paymentGatewayAddress,
+    addresses.paymentGateway,
     ethers.id('SubscriptionManager'),
     await subscriptionManager.getAddress(),
-    deployer,
+    deployer
   );
 
   await mintIfNeeded(tokenAddress, deployer, await subscriber.getAddress(), planPrice * 3n);
-  await ensureAllowance(tokenAddress, subscriber, paymentGatewayAddress, planPrice * 3n);
-
-  const token = (await ethers.getContractAt('contracts/mocks/TestToken.sol:TestToken', tokenAddress)) as TestToken;
+  await ensureAllowance(tokenAddress, subscriber, addresses.paymentGateway, planPrice * 3n);
 
   log.info('Ensuring merchant and automation roles...');
   await grantAuthorRole(addresses.core, await merchant.getAddress());
@@ -89,66 +63,46 @@ async function main() {
     expiry: BigInt(Math.floor(Date.now() / 1000) + 3600),
   };
 
-  const domain = {
-    chainId: network.chainId,
-    verifyingContract: addresses.subscriptionManager,
-  } as const;
+  const signature = await signPlan(merchant, addresses.subscriptionManager, plan);
+  const planHash = await ensurePlanRegistered(planManager, subscriptionManager, merchant, plan, signature, 'demo://tier');
 
-  const types = {
-    Plan: [
-      { name: 'chainIds', type: 'uint256[]' },
-      { name: 'price', type: 'uint256' },
-      { name: 'period', type: 'uint256' },
-      { name: 'token', type: 'address' },
-      { name: 'merchant', type: 'address' },
-      { name: 'salt', type: 'uint256' },
-      { name: 'expiry', type: 'uint64' },
-    ],
-  } as const;
+  const subscriberBalanceBefore = await token.balanceOf(await subscriber.getAddress());
 
-  log.info('Signing subscription plan...');
-  const signature = await merchant.signTypedData(domain, types, plan);
-  const planHash = await subscriptionManager.hashPlan(plan);
-
-  log.info('Registering plan in PlanManager...');
-  try {
-    await (await planManager.connect(merchant).createPlan(plan, signature, 'demo://tier')).wait();
-  } catch (error) {
-    if (!isPlanAlreadyExists(error)) {
-      throw error;
-    }
-    log.warn('Plan already registered, skipping create.');
-  }
-
-  log.info('Subscribing...');
-  const subscribeTx = await subscriptionManager.connect(subscriber).subscribe(plan, signature, '0x');
-  const subscribeReceipt = await subscribeTx.wait();
-  log.success('Subscription created.');
-
-  const gateway = (await ethers.getContractAt('PaymentGateway', paymentGatewayAddress)) as PaymentGateway;
-  await parsePaymentEvent(subscribeReceipt, gateway);
-
+  const subscribeResult = await subscribeWithLogging(subscriptionManager, subscriber, plan, signature, gateway, '0x');
   const merchantAfterSubscribe = await token.balanceOf(await merchant.getAddress());
   log.info(`Merchant balance after subscribe: ${ethers.formatEther(merchantAfterSubscribe)} tokens.`);
+  if (subscribeResult.event) {
+    log.info(`Net amount on subscribe: ${ethers.formatEther(subscribeResult.event.netAmount)} tokens.`);
+  }
 
-  log.info('Advancing time and charging again...');
-  await ethers.provider.send('evm_increaseTime', [Number(planPeriodSeconds)]);
-  await ethers.provider.send('evm_mine', []);
+  log.info('Advancing time to next billing period...');
+  await fastForward(planPeriodSeconds);
 
-  const chargeTx = await subscriptionManager
-    .connect(deployer)
-    ['charge(address,bytes32)'](await subscriber.getAddress(), planHash);
-  const chargeReceipt = await chargeTx.wait();
-  log.success('Recurring charge executed.');
-  await parsePaymentEvent(chargeReceipt, gateway);
+  const chargeResult = await chargeNextCycle(
+    subscriptionManager,
+    deployer,
+    await subscriber.getAddress(),
+    planHash,
+    gateway
+  );
+
+  if (chargeResult.event) {
+    log.info(`Net amount on renewal: ${ethers.formatEther(chargeResult.event.netAmount)} tokens.`);
+  }
 
   const merchantBalance = await token.balanceOf(await merchant.getAddress());
   const subscriberBalance = await token.balanceOf(await subscriber.getAddress());
-  log.info(`Merchant balance after charge: ${ethers.formatEther(merchantBalance)} tokens.`);
-  log.info(`Subscriber balance: ${ethers.formatEther(subscriberBalance)} tokens.`);
-  log.warn(
-    'Note: current processor chain does not forward funds to the merchant automatically. This demo only verifies successful charges.',
-  );
+  const totalDebited = subscriberBalanceBefore - subscriberBalance;
+
+  log.info(`Merchant balance after renewal: ${ethers.formatEther(merchantBalance)} tokens.`);
+  log.info(`Subscriber balance after renewal: ${ethers.formatEther(subscriberBalance)} tokens.`);
+  log.info(`Total debited from subscriber: ${ethers.formatEther(totalDebited)} tokens.`);
+
+  if (!subscribeResult.event || !chargeResult.event) {
+    log.warn(
+      'One of the payment events was not captured. Check processor configuration if values look unexpected.'
+    );
+  }
 
   log.success('Subscription scenario finished successfully.');
 }
@@ -158,8 +112,3 @@ main().catch((error) => {
   log.error(`Subscription scenario failed: ${message}`);
   process.exitCode = 1;
 });
-function isPlanAlreadyExists(error: unknown): boolean {
-  if (!error) return false;
-  const message = (error as Error).message ?? String(error);
-  return message.includes('PlanAlreadyExists');
-}

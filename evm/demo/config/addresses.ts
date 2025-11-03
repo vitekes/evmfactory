@@ -10,12 +10,14 @@ export interface DemoAddresses {
   core: string;
   paymentGateway: string;
   processorRegistry: string;
+  paymentOrchestrator: string;
   paymentTokenFilter?: string;
   paymentFeeProcessor?: string;
   contestFactory: string;
   subscriptionManager: string;
   planManager: string;
   marketplace?: string;
+  donate?: string;
   testToken?: string;
 }
 
@@ -29,14 +31,19 @@ async function isDeployed(address: string | undefined): Promise<boolean> {
 }
 
 async function verifyAddresses(addresses: DemoAddresses): Promise<boolean> {
+  if (!addresses.paymentOrchestrator) {
+    return false;
+  }
   const checks = [
     addresses.core,
     addresses.paymentGateway,
     addresses.processorRegistry,
+    addresses.paymentOrchestrator,
     addresses.contestFactory,
     addresses.subscriptionManager,
     addresses.planManager,
     addresses.marketplace,
+    addresses.donate,
     addresses.paymentTokenFilter,
     addresses.paymentFeeProcessor,
   ].filter((addr): addr is string => !!addr);
@@ -53,6 +60,7 @@ function readEnvAddresses(): DemoAddresses | null {
     'DEMO_CORE',
     'DEMO_PAYMENT_GATEWAY',
     'DEMO_PR_REGISTRY',
+    'DEMO_PAYMENT_ORCHESTRATOR',
     'DEMO_CONTEST_FACTORY',
     'DEMO_SUBSCRIPTION_MANAGER',
     'DEMO_PLAN_MANAGER',
@@ -71,17 +79,20 @@ function readEnvAddresses(): DemoAddresses | null {
   const optionalFilter = process.env.DEMO_TOKEN_FILTER;
   const optionalFee = process.env.DEMO_FEE_PROCESSOR;
   const optionalMarketplace = process.env.DEMO_MARKETPLACE;
+  const optionalDonate = process.env.DEMO_DONATE;
 
   return {
     core: values.DEMO_CORE!,
     paymentGateway: values.DEMO_PAYMENT_GATEWAY!,
     processorRegistry: values.DEMO_PR_REGISTRY!,
+    paymentOrchestrator: values.DEMO_PAYMENT_ORCHESTRATOR!,
     paymentTokenFilter: optionalFilter || undefined,
     paymentFeeProcessor: optionalFee || undefined,
     contestFactory: values.DEMO_CONTEST_FACTORY!,
     subscriptionManager: values.DEMO_SUBSCRIPTION_MANAGER!,
     planManager: values.DEMO_PLAN_MANAGER!,
     marketplace: optionalMarketplace || undefined,
+    donate: optionalDonate || undefined,
     testToken: optionalToken || undefined,
   };
 }
@@ -115,6 +126,7 @@ async function deployWithIgnition(): Promise<DemoAddresses> {
     core: await deployment.core.getAddress(),
     paymentGateway: await deployment.paymentGateway.getAddress(),
     processorRegistry: await deployment.paymentRegistry.getAddress(),
+    paymentOrchestrator: await deployment.paymentOrchestrator.getAddress(),
     paymentTokenFilter: await deployment.paymentTokenFilter.getAddress(),
     paymentFeeProcessor: await deployment.paymentFeeProcessor.getAddress(),
     contestFactory: await deployment.contestFactory.getAddress(),
@@ -122,6 +134,7 @@ async function deployWithIgnition(): Promise<DemoAddresses> {
     planManager: await deployment.planManager.getAddress(),
     marketplace:
       'marketplace' in deployment ? await (deployment as Record<string, any>).marketplace.getAddress() : undefined,
+    donate: 'donate' in deployment ? await (deployment as Record<string, any>).donate.getAddress() : undefined,
   };
 }
 

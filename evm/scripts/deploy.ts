@@ -144,6 +144,7 @@ async function main(): Promise<void> {
     subscriptionManager,
     planManager,
     marketplace,
+    donate,
   } = await ignition.deploy(DeploymentModule, options);
 
   console.log('Deployment successful. Contract addresses:');
@@ -157,6 +158,7 @@ async function main(): Promise<void> {
   await logAddress('SubscriptionManager', subscriptionManager);
   await logAddress('PlanManager', planManager);
   await logAddress('Marketplace', marketplace);
+  await logAddress('Donate', donate);
 }
 
 main()

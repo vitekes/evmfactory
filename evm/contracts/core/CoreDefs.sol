@@ -10,6 +10,7 @@ library CoreDefs {
     bytes32 internal constant MARKETPLACE_MODULE_ID = keccak256('Marketplace');
     bytes32 internal constant SUBSCRIPTION_MODULE_ID = keccak256('SubscriptionManager');
     bytes32 internal constant CONTEST_MODULE_ID = keccak256('Contest');
+    bytes32 internal constant DONATE_MODULE_ID = keccak256('Donate');
 
     // Упразднили константы сервисов - теперь используем строковые алиасы напрямую
 

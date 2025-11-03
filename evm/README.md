@@ -12,6 +12,7 @@ EVM Factory provides a modular payment stack for Hardhat-based projects. It incl
 - SubscriptionManager v2 with multi-plan storage `(user, planHash)`, retry scheduling, native deposits, and automation hooks.
 - PlanManager providing ACL-guarded plan CRUD and max active plan limits per merchant.
 - ContestFactory + ContestEscrow for prize distribution backed by CoreSystem services.
+- Donate module для приёма пожертвований с общей комиссией и белыми списками токенов.
 - Ignition deployment modules for demo, local, and production networks.
 - Demo scenarios (`npm run demo:*`) showcasing payment, subscription, and contest flows.
 
@@ -34,8 +35,9 @@ npm install
 - `npm run lint` – Prettier check for Solidity contracts.
 - `npm run demo:payment` – Runs the payment scenario against Hardhat network.
 - `npm run demo:subscription` – Updated subscription scenario (PlanManager + retry billing).
-- `npm run demo:contest` – Runs the contest scenario.
-- `npm run demo:marketplace` – Runs the marketplace scenario (off-chain listing purchase).
+- `npm run demo:contest` - Runs the contest scenario.
+- `npm run demo:marketplace` - Runs the marketplace scenario (off-chain listing purchase).
+- `npm run demo:donate` - Запускает сценарий с пожертвованием через Donate-модуль.
 - `npm run billing:worker` – Executes the billing worker (`scripts/run-billing-worker.ts`).
 
 See `package.json` for the full script list. Demo scripts rely on Ignition deployment helpers located in `ignition/modules/*`.
