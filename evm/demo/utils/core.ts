@@ -26,3 +26,9 @@ export async function grantAutomationRole(coreAddress: string, account: string) 
   const role = await core.AUTOMATION_ROLE();
   await grantRoleIfMissing(core, role, account);
 }
+
+export async function grantOperatorRole(coreAddress: string, account: string) {
+  const core = (await ethers.getContractAt('CoreSystem', coreAddress)) as CoreSystem;
+  const role = await core.OPERATOR_ROLE();
+  await grantRoleIfMissing(core, role, account);
+}

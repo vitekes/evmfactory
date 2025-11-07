@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
+import type { PayableOverrides } from 'ethers';
 import type {
   CoreSystem,
   PaymentGateway,
@@ -18,6 +19,8 @@ describe('SubscriptionManager (multi-tier)', function () {
   const AUTOMATION_ROLE = ethers.keccak256(ethers.toUtf8Bytes('AUTOMATION_ROLE'));
   const AUTHOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes('AUTHOR_ROLE'));
   const OPERATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes('OPERATOR_ROLE'));
+  const SUBSCRIBE_SELECTOR =
+    'subscribe((uint256[],uint256,uint256,address,address,uint256,uint64),bytes,bytes)';
 
   let core: CoreSystem;
   let gateway: PaymentGateway;
@@ -67,6 +70,7 @@ describe('SubscriptionManager (multi-tier)', function () {
 
     await core.connect(deployer).grantRole(AUTOMATION_ROLE, automation.address);
     await core.connect(deployer).grantRole(OPERATOR_ROLE, operator.address);
+    await core.connect(deployer).grantRole(OPERATOR_ROLE, await manager.getAddress());
     await core.connect(deployer).grantRole(AUTHOR_ROLE, merchant.address);
 
     token = await deployTestToken(deployer, 'SubToken', 'SUB', 18, 0);
@@ -139,19 +143,46 @@ describe('SubscriptionManager (multi-tier)', function () {
     expect(state.nextChargeAt).to.be.gt(0);
   }
 
+  async function callSubscribe(
+    caller: Awaited<ReturnType<typeof ethers.getSigners>>[number],
+    plan: SubscriptionManager.PlanStruct,
+    signature: string,
+    overrides: PayableOverrides = {},
+  ) {
+    return manager.connect(caller)[SUBSCRIBE_SELECTOR](plan, signature, '0x', overrides);
+  }
+
   describe('subscription lifecycle', function () {
-    it('reverts if plan not registered', async function () {
-      const { plan, signature } = await buildSignedPlan();
-      await expect(manager.connect(subscriber).subscribe(plan, signature, '0x')).to.be.revertedWithCustomError(
-        manager,
-        'PlanNotFound',
-      );
+    it('lazily registers plan during first subscription', async function () {
+      const { plan, planHash, signature } = await buildSignedPlan();
+      const tokenAddress = await token.getAddress();
+
+      await expect(
+        manager
+          .connect(subscriber)
+          [
+            'subscribe((uint256[],uint256,uint256,address,address,uint256,uint64),bytes,bytes,string)'
+          ](plan, signature, '0x', 'ipfs://tier'),
+      )
+        .to.emit(planManager, 'PlanCreated')
+        .withArgs(merchant.address, planHash, PLAN_PRICE, tokenAddress, PLAN_PERIOD_SECONDS, 'ipfs://tier')
+        .and.to.emit(planManager, 'PlanStatusChanged')
+        .withArgs(merchant.address, planHash, 1)
+        .and.to.emit(manager, 'SubscriptionActivated')
+        .withArgs(subscriber.address, planHash, merchant.address, anyValue)
+        .and.to.emit(manager, 'SubscriptionCharged')
+        .withArgs(subscriber.address, planHash, PLAN_PRICE, anyValue);
+
+      const storedPlan = await planManager.getPlan(planHash);
+      expect(storedPlan.merchant).to.equal(merchant.address);
+      expect(storedPlan.uri).to.equal('ipfs://tier');
+      await expectActiveSubscription(subscriber.address, planHash);
     });
 
     it('subscribes via ERC-20 payment and records state', async function () {
       const { plan, signature, planHash } = await createPlan();
 
-      await expect(manager.connect(subscriber).subscribe(plan, signature, '0x'))
+      await expect(callSubscribe(subscriber, plan, signature))
         .to.emit(manager, 'SubscriptionActivated')
         .withArgs(subscriber.address, planHash, merchant.address, anyValue)
         .and.to.emit(manager, 'SubscriptionCharged')
@@ -166,9 +197,9 @@ describe('SubscriptionManager (multi-tier)', function () {
       const first = await createPlan({ salt: 1n });
       const second = await createPlan({ salt: 2n, price: PLAN_PRICE + ethers.parseEther('5') });
 
-      await manager.connect(subscriber).subscribe(first.plan, first.signature, '0x');
+      await callSubscribe(subscriber, first.plan, first.signature);
 
-      await expect(manager.connect(subscriber).subscribe(second.plan, second.signature, '0x'))
+      await expect(callSubscribe(subscriber, second.plan, second.signature))
         .to.emit(manager, 'SubscriptionSwitched')
         .withArgs(subscriber.address, first.planHash, second.planHash, merchant.address)
         .and.to.emit(manager, 'SubscriptionActivated');
@@ -208,7 +239,7 @@ describe('SubscriptionManager (multi-tier)', function () {
 
     it('allows user to unsubscribe and withdraw native deposit', async function () {
       const { plan, signature, planHash } = await createPlan({ tokenOverride: ethers.ZeroAddress, price: PLAN_PRICE });
-      await manager.connect(subscriber).subscribe(plan, signature, '0x', { value: PLAN_PRICE + ethers.parseEther('1') });
+      await callSubscribe(subscriber, plan, signature, { value: PLAN_PRICE + ethers.parseEther('1') });
 
       await expect(manager.connect(subscriber).unsubscribe(merchant.address))
         .to.emit(manager, 'SubscriptionCancelled')
@@ -224,7 +255,7 @@ describe('SubscriptionManager (multi-tier)', function () {
   describe('charges and retries', function () {
     it('processes scheduled charge after period', async function () {
       const { plan, signature, planHash } = await createPlan();
-      await manager.connect(subscriber).subscribe(plan, signature, '0x');
+      await callSubscribe(subscriber, plan, signature);
 
       await ethers.provider.send('evm_increaseTime', [PLAN_PERIOD_SECONDS]);
       await ethers.provider.send('evm_mine', []);
@@ -247,11 +278,11 @@ describe('SubscriptionManager (multi-tier)', function () {
 
     it('processes chargeBatch for multiple users', async function () {
       const { plan, signature, planHash } = await createPlan();
-      await manager.connect(subscriber).subscribe(plan, signature, '0x');
+      await callSubscribe(subscriber, plan, signature);
 
       await token.mint(secondSubscriber.address, PLAN_PRICE * 5n);
       await token.connect(secondSubscriber).approve(await gateway.getAddress(), PLAN_PRICE * 5n);
-      await manager.connect(secondSubscriber).subscribe(plan, signature, '0x');
+      await callSubscribe(secondSubscriber, plan, signature);
 
       await ethers.provider.send('evm_increaseTime', [PLAN_PERIOD_SECONDS]);
       await ethers.provider.send('evm_mine', []);
@@ -278,7 +309,7 @@ describe('SubscriptionManager (multi-tier)', function () {
     it('marks retry on first failure and cancels on second', async function () {
       const { plan, signature, planHash } = await createPlan({ tokenOverride: ethers.ZeroAddress, price: PLAN_PRICE });
 
-      await manager.connect(subscriber).subscribe(plan, signature, '0x', { value: PLAN_PRICE });
+      await callSubscribe(subscriber, plan, signature, { value: PLAN_PRICE });
 
       // native deposit depleted, first charge will fail and mark retry
       await ethers.provider.send('evm_increaseTime', [PLAN_PERIOD_SECONDS]);
@@ -300,7 +331,7 @@ describe('SubscriptionManager (multi-tier)', function () {
   describe('operator tools', function () {
     it('allows operator to force cancel', async function () {
       const { plan, signature, planHash } = await createPlan();
-      await manager.connect(subscriber).subscribe(plan, signature, '0x');
+      await callSubscribe(subscriber, plan, signature);
 
       await expect(manager.connect(operator).forceCancel(subscriber.address, merchant.address, 0))
         .to.emit(manager, 'SubscriptionCancelled')
@@ -313,7 +344,7 @@ describe('SubscriptionManager (multi-tier)', function () {
 
     it('reactivates subscription manually', async function () {
       const { plan, signature, planHash } = await createPlan();
-      await manager.connect(subscriber).subscribe(plan, signature, '0x');
+      await callSubscribe(subscriber, plan, signature);
 
       await manager.connect(operator).forceCancel(subscriber.address, merchant.address, 0);
 
@@ -328,14 +359,32 @@ describe('SubscriptionManager (multi-tier)', function () {
   });
 
   describe('PlanManager integration', function () {
-    it('enforces author role on plan creation', async function () {
+    it('requires operator to supply merchant signature', async function () {
+      const { plan, planHash, signature } = await buildSignedPlan();
+      const tokenAddress = await token.getAddress();
+
+      await expect(planManager.connect(operator).createPlan(plan, '0x', 'ipfs://auto')).to.be.revertedWithCustomError(
+        planManager,
+        'InvalidSignature',
+      );
+
+      await expect(planManager.connect(operator).createPlan(plan, signature, 'ipfs://auto'))
+        .to.emit(planManager, 'PlanCreated')
+        .withArgs(merchant.address, planHash, PLAN_PRICE, tokenAddress, PLAN_PERIOD_SECONDS, 'ipfs://auto');
+
+      const stored = await planManager.getPlan(planHash);
+      expect(stored.merchant).to.equal(merchant.address);
+      expect(stored.uri).to.equal('ipfs://auto');
+    });
+
+    it('allows merchant plan creation without author role', async function () {
+      await core.connect(deployer).revokeRole(AUTHOR_ROLE, merchant.address);
       const signedPlan = await buildSignedPlan();
       await expect(
-        planManager.connect(operator).createPlan(signedPlan.plan, signedPlan.signature, 'ipfs://tier'),
-      ).to.be.revertedWithCustomError(
-        planManager,
-        'UnauthorizedMerchant',
-      );
+        planManager.connect(merchant).createPlan(signedPlan.plan, signedPlan.signature, 'ipfs://tier'),
+      )
+        .to.emit(planManager, 'PlanCreated')
+        .withArgs(merchant.address, signedPlan.planHash, PLAN_PRICE, await token.getAddress(), PLAN_PERIOD_SECONDS, 'ipfs://tier');
     });
 
     it('disallows activating frozen plan', async function () {

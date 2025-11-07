@@ -57,6 +57,11 @@ export const SubscriptionModule = buildModule('SubscriptionModule', (m) => {
     }),
   );
 
+  const operatorRoleCall = m.call(core, 'grantRole', [ethers.id('OPERATOR_ROLE'), subscriptionManager], {
+    id: 'SubscriptionModule_grantOperator',
+    after: [registerSubscription],
+  });
+
   m.call(gateway, 'setModuleAuthorization', [subscriptionModuleId, subscriptionManager, true], {
     id: 'SubscriptionModule_authorizeGateway',
     after: [setPaymentGateway, setPlanManager],
@@ -86,6 +91,7 @@ export const SubscriptionModule = buildModule('SubscriptionModule', (m) => {
     planManager,
     authorRoleCalls,
     automationRoleCalls,
+    operatorRoleCall,
   };
 });
 

@@ -61,8 +61,14 @@ contract PlanManager is IPlanManager {
 
     function createPlan(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, string calldata uri) external {
         if (plan.merchant == address(0)) revert ZeroAddress();
-        if (msg.sender != plan.merchant) revert UnauthorizedMerchant();
-        if (!core.hasRole(CoreDefs.AUTHOR_ROLE, msg.sender)) revert Forbidden();
+
+        bool isMerchantCall = msg.sender == plan.merchant;
+        bool isOperatorCall = core.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender);
+
+        if (!isMerchantCall) {
+            if (!isOperatorCall) revert UnauthorizedMerchant();
+            if (sigMerchant.length == 0) revert InvalidSignature();
+        }
         if (plan.price == 0 || plan.period == 0) revert InvalidParameters();
 
         if (plan.price > type(uint128).max || plan.period > type(uint32).max) revert InvalidParameters();
@@ -70,7 +76,9 @@ contract PlanManager is IPlanManager {
         bytes32 planHash = SignatureLib.hashPlan(plan, domainSeparator);
         if (plans[planHash].merchant != address(0)) revert PlanAlreadyExists();
 
-        if (ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
+        if (sigMerchant.length > 0) {
+            if (ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
+        }
 
         if (maxActivePlans > 0 && activePlans[plan.merchant].length >= maxActivePlans) revert ActivePlanLimitReached();
 
@@ -108,8 +116,9 @@ contract PlanManager is IPlanManager {
 
     function activatePlan(bytes32 planHash) external {
         PlanData storage plan = _requirePlan(planHash);
-        if (msg.sender != plan.merchant) revert UnauthorizedMerchant();
-        if (!core.hasRole(CoreDefs.AUTHOR_ROLE, msg.sender)) revert Forbidden();
+        bool isMerchantCall = msg.sender == plan.merchant;
+        bool isOperatorCall = core.hasRole(CoreDefs.OPERATOR_ROLE, msg.sender);
+        if (!isMerchantCall && !isOperatorCall) revert UnauthorizedMerchant();
 
         if (plan.status == PlanStatus.Frozen) revert PlanFrozen();
         if (plan.status == PlanStatus.Active) revert InvalidState();
@@ -160,8 +169,6 @@ contract PlanManager is IPlanManager {
 
         address oldMerchant = plan.merchant;
         if (oldMerchant == newMerchant) revert InvalidParameters();
-
-        if (!core.hasRole(CoreDefs.AUTHOR_ROLE, newMerchant)) revert Forbidden();
 
         plan.merchant = newMerchant;
         plan.updatedAt = uint48(block.timestamp);

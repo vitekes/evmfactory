@@ -8,6 +8,14 @@ import '../../lib/SignatureLib.sol';
 import '../../pay/interfaces/IPaymentGateway.sol';
 import '../../external/IPermit2.sol';
 import './interfaces/IPlanManager.sol';
+
+interface IPlanManagerCreator is IPlanManager {
+    function createPlan(
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        string calldata uri
+    ) external;
+}
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
@@ -146,7 +154,16 @@ contract SubscriptionManager is ReentrancyGuard {
         bytes calldata sigMerchant,
         bytes calldata permitSig
     ) external payable nonReentrant {
-        _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
+        _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price, '');
+    }
+
+    function subscribe(
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        bytes calldata permitSig,
+        string calldata planUri
+    ) external payable nonReentrant {
+        _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price, planUri);
     }
 
     function subscribeWithToken(
@@ -156,7 +173,18 @@ contract SubscriptionManager is ReentrancyGuard {
         address paymentToken,
         uint256 maxPaymentAmount
     ) external nonReentrant {
-        _subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, maxPaymentAmount);
+        _subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, maxPaymentAmount, '');
+    }
+
+    function subscribeWithToken(
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        bytes calldata permitSig,
+        address paymentToken,
+        uint256 maxPaymentAmount,
+        string calldata planUri
+    ) external nonReentrant {
+        _subscribeWithToken(plan, sigMerchant, permitSig, paymentToken, maxPaymentAmount, planUri);
     }
 
     function unsubscribe(address merchant) external nonReentrant {
@@ -301,14 +329,15 @@ contract SubscriptionManager is ReentrancyGuard {
         bytes calldata sigMerchant,
         bytes calldata permitSig,
         address paymentToken,
-        uint256 maxPaymentAmount
+        uint256 maxPaymentAmount,
+        string memory planUri
     ) internal {
         if (paymentToken == address(0)) revert InvalidAddress();
         if (plan.price == 0) revert InvalidAmount();
         if (plan.merchant == address(0)) revert ZeroAddress();
 
         if (paymentToken == plan.token) {
-            _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price);
+            _subscribe(plan, sigMerchant, permitSig, plan.token, plan.price, planUri);
             return;
         }
 
@@ -322,7 +351,7 @@ contract SubscriptionManager is ReentrancyGuard {
 
         if (maxPaymentAmount > 0 && paymentAmount > maxPaymentAmount) revert PriceExceedsMaximum();
 
-        _subscribe(plan, sigMerchant, permitSig, paymentToken, paymentAmount);
+        _subscribe(plan, sigMerchant, permitSig, paymentToken, paymentAmount, planUri);
     }
 
     function _subscribe(
@@ -330,7 +359,8 @@ contract SubscriptionManager is ReentrancyGuard {
         bytes calldata sigMerchant,
         bytes calldata permitSig,
         address paymentToken,
-        uint256 paymentAmount
+        uint256 paymentAmount,
+        string memory planUri
     ) internal {
         if (paymentAmount == 0) revert InvalidAmount();
         if (plan.merchant == address(0)) revert ZeroAddress();
@@ -356,6 +386,7 @@ contract SubscriptionManager is ReentrancyGuard {
         if (!chainAllowed) revert InvalidChain();
 
         bytes32 planHash = hashPlan(plan);
+        _ensurePlanRegistered(planHash, plan, sigMerchant, planUri);
         IPlanManager.PlanData memory storedPlan = _getPlan(planHash);
 
         if (storedPlan.merchant == address(0)) revert PlanNotFound();
@@ -367,7 +398,7 @@ contract SubscriptionManager is ReentrancyGuard {
             storedPlan.token != plan.token
         ) revert InvalidParameters();
 
-        if (ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
+        if (sigMerchant.length > 0 && ECDSA.recover(planHash, sigMerchant) != plan.merchant) revert InvalidSignature();
 
         address gatewayAddress = _getPaymentGateway();
         IPaymentGateway gateway = IPaymentGateway(gatewayAddress);
@@ -572,8 +603,7 @@ contract SubscriptionManager is ReentrancyGuard {
     }
 
     function _getPlan(bytes32 planHash) internal view returns (IPlanManager.PlanData memory) {
-        address service = core.getService(MODULE_ID, 'PlanManager');
-        if (service == address(0)) revert ServiceNotFound();
+        address service = _getPlanManagerAddress();
         return IPlanManager(service).getPlan(planHash);
     }
 
@@ -581,6 +611,63 @@ contract SubscriptionManager is ReentrancyGuard {
         address gatewayAddress = core.getService(MODULE_ID, 'PaymentGateway');
         if (gatewayAddress == address(0)) revert PaymentGatewayNotRegistered();
         return gatewayAddress;
+    }
+
+    function _getPlanManagerAddress() internal view returns (address) {
+        address service = core.getService(MODULE_ID, 'PlanManager');
+        if (service == address(0)) revert ServiceNotFound();
+        return service;
+    }
+
+    function _ensurePlanRegistered(
+        bytes32 planHash,
+        SignatureLib.Plan calldata plan,
+        bytes calldata sigMerchant,
+        string memory planUri
+    ) internal {
+        address planManagerAddress = _getPlanManagerAddress();
+
+        try IPlanManager(planManagerAddress).getPlan(planHash) {
+            return;
+        } catch (bytes memory reason) {
+            if (!_isPlanNotFound(reason)) {
+                _bubbleRevert(reason);
+            }
+        }
+
+        if (sigMerchant.length == 0) revert InvalidSignature();
+
+        try IPlanManagerCreator(planManagerAddress).createPlan(plan, sigMerchant, planUri) {
+            return;
+        } catch (bytes memory reason) {
+            if (_isPlanAlreadyExists(reason)) {
+                return;
+            }
+            _bubbleRevert(reason);
+        }
+    }
+
+    function _isPlanNotFound(bytes memory revertData) internal pure returns (bool) {
+        return _matchesSelector(revertData, PlanNotFound.selector);
+    }
+
+    function _isPlanAlreadyExists(bytes memory revertData) internal pure returns (bool) {
+        return _matchesSelector(revertData, PlanAlreadyExists.selector);
+    }
+
+    function _matchesSelector(bytes memory revertData, bytes4 selector) internal pure returns (bool) {
+        if (revertData.length < 4) return false;
+        bytes4 received;
+        assembly {
+            received := mload(add(revertData, 32))
+        }
+        return received == selector;
+    }
+
+    function _bubbleRevert(bytes memory revertData) internal pure {
+        assembly {
+            revert(add(revertData, 32), mload(revertData))
+        }
     }
 
     receive() external payable {}
