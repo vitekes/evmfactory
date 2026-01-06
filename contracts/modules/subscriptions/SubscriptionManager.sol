@@ -10,11 +10,7 @@ import '../../external/IPermit2.sol';
 import './interfaces/IPlanManager.sol';
 
 interface IPlanManagerCreator is IPlanManager {
-    function createPlan(
-        SignatureLib.Plan calldata plan,
-        bytes calldata sigMerchant,
-        string calldata uri
-    ) external;
+    function createPlan(SignatureLib.Plan calldata plan, bytes calldata sigMerchant, string calldata uri) external;
 }
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';

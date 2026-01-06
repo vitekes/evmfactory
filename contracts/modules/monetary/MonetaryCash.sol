@@ -65,16 +65,17 @@ contract MonetaryCash is EIP712, ReentrancyGuard {
     }
 
     modifier onlyAdminOrFeatureOwner() {
-        if (
-            !core.hasRole(CoreDefs.FEATURE_OWNER_ROLE, msg.sender) &&
-            !core.hasRole(0x00, msg.sender)
-        ) {
+        if (!core.hasRole(CoreDefs.FEATURE_OWNER_ROLE, msg.sender) && !core.hasRole(0x00, msg.sender)) {
             revert NotFeatureOwner();
         }
         _;
     }
 
-    function createCash(address token, uint256 amount, uint64 expiresAt) external payable onlyAdminOrFeatureOwner nonReentrant returns (uint256 cashId) {
+    function createCash(
+        address token,
+        uint256 amount,
+        uint64 expiresAt
+    ) external payable onlyAdminOrFeatureOwner nonReentrant returns (uint256 cashId) {
         if (amount == 0) revert InvalidAmount();
         if (amount > type(uint128).max) revert InvalidParameters();
         if (expiresAt != 0 && expiresAt <= block.timestamp) revert InvalidParameters();
@@ -117,9 +118,7 @@ contract MonetaryCash is EIP712, ReentrancyGuard {
         if (entry.status != CashStatus.Active) revert InvalidState();
         if (entry.expiresAt != 0 && block.timestamp > entry.expiresAt) revert Expired();
 
-        bytes32 digest = _hashTypedDataV4(
-            keccak256(abi.encode(ACTIVATE_TYPEHASH, cashId, recipient, deadline))
-        );
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ACTIVATE_TYPEHASH, cashId, recipient, deadline)));
         address signer = ECDSA.recover(digest, signature);
         if (signer != backendSigner) revert InvalidSignature();
 
