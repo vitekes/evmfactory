@@ -1,9 +1,0 @@
-{
-  "extends": "./client/tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "./",
-    "outDir": "dist",
-    "types": ["node", "mocha"]
-  },
-  "include": ["tests/**/*.ts"]
-}

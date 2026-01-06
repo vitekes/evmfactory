@@ -1,0 +1,80 @@
+﻿name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  evm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Lint Solidity sources
+        working-directory: .
+        run: npm run lint
+
+      - name: Compile contracts
+        working-directory: .
+        run: npm run compile
+
+      - name: Run unit/integration tests
+        working-directory: .
+        run: npm test
+
+      - name: Coverage
+        working-directory: .
+        run: npm run coverage
+
+      - name: Run demo scenarios
+        working-directory: .
+        run: |
+          npm run demo:payment
+          npm run demo:subscription
+          npm run demo:contest
+          npm run demo:marketplace
+          npm run demo:monetarycash
+
+  solana:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Solana CLI
+        uses: anza-labs/setup-solana@v0
+
+      - name: Install Anchor CLI
+        run: cargo install --locked anchor-cli --version 0.26.0
+
+      - name: Install dependencies
+        working-directory: ./solana
+        run: npm install
+
+      - name: Build TypeScript helpers
+        working-directory: ./solana
+        run: npm run build
+
+      - name: Anchor build
+        working-directory: ./solana
+        run: anchor build
+
+      - name: Anchor tests
+        working-directory: ./solana
+        run: npm test

@@ -1,38 +1,30 @@
 # Common secrets
 .env
+.env.*
+!.env.example
+!demo/.env.example
 
 # Node dependencies
 node_modules
-/evm/node_modules
 
 # Hardhat build artifacts
-/evm/cache
-/evm/artifacts
-/evm/ignition/deployments
+cache
+artifacts
+ignition/deployments
 
 # TypeChain outputs
-/evm/typechain
-/evm/typechain-types
+typechain
+typechain-types
 
 # Coverage reports
-/evm/coverage
-/evm/coverage.json
+coverage
+coverage.json
 
 # Misc generated files
-/evm/gas-report.txt
+gas-report.txt
 
 # Ignition local deployments
-/evm/ignition/deployments/chain-31337
+ignition/deployments/chain-31337
 
-# Lockfiles generated locally
-/evm/package-lock.json
-
-# Solana workspace artifacts
-/solana/node_modules
-/solana/dist
-
-# Tron workspace artifacts
-/tron/artifacts
-/tron/cache
-/tron/dist
-/tron/.env
+# Demo cache
+demo/.deployment.json

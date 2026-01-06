@@ -1,18 +1,70 @@
-# EVM Factory Monorepo
+﻿# EVM Factory (EVM project)
 
-This repository now groups multiple blockchain targets under a single tree:
+This directory hosts the Hardhat implementation. Run all npm commands from repository root.
 
-- `evm/` ? Hardhat project with Solidity contracts, Ignition modules, demos, and tests.
-- `solana/` ? Anchor workspace and TypeScript tests that implement the Solana port.
-- `move/` ? placeholder for future Move-based implementation.
-- `docs/` ? shared documentation that applies across targets.
+# EVM Factory
 
-To work with a specific target, switch into its folder and follow the local README instructions.
+EVM Factory provides a modular payment stack for Hardhat-based projects. It includes a Payment Gateway with processor orchestration, a Subscription Manager that supports ERC-20 and native cycles, and a Contest Factory for prize escrow flows. The repository ships demo scenarios, deployment modules, and end-to-end tests covering the main integrations.
 
-```bash
-cd evm   # or solana
+## Features
+
+- PaymentGateway orchestrated by PaymentOrchestrator and ProcessorRegistry with plug-in processors (discount, fee, token filter).
+- SubscriptionManager v2 with multi-plan storage `(user, planHash)`, retry scheduling, native deposits, and automation hooks.
+- PlanManager providing ACL-guarded plan CRUD and max active plan limits per merchant.
+- ContestFactory + ContestEscrow for prize distribution backed by CoreSystem services.
+- Donate module для приёма пожертвований с общей комиссией и белыми списками токенов.
+- Ignition deployment modules for demo, local, and production networks.
+- Demo scenarios (`npm run demo:*`) showcasing payment, subscription, and contest flows.
+
+## Requirements
+
+- Node.js 20+
+- npm
+- Hardhat (bundled in `devDependencies`)
+
+Install dependencies once:
+
+```
+npm install
 ```
 
-The EVM package retains the original npm scripts for compilation, testing, deployments, and demos. The Solana workspace includes Anchor configuration plus TypeScript helpers/tests; install its toolchain separately (Rust + Anchor CLI) before running `anchor test`.
+## Useful Scripts
 
-Shared CI configuration and hooks are left at the repository root (`.github/`, `.husky/`). Adjust or extend them as you wire additional targets.
+- `npm run compile` – Hardhat compile.
+- `npm run test` – Hardhat unit/integration tests.
+- `npm run lint` – Prettier check for Solidity contracts.
+- `npm run demo:payment` - Runs the payment scenario against Hardhat network.
+- `npm run demo:subscription` - Updated subscription scenario (PlanManager + retry billing).
+- `npm run demo:contest` - Runs the contest scenario.
+- `npm run demo:marketplace` - Runs the marketplace scenario (off-chain listing purchase).
+- `npm run demo:donate` - Запускает сценарий с пожертвованием через Donate-модуль.
+- `npm run demo:monetarycash` - Runs the MonetaryCash promo cash activation demo.
+- `npm run billing:worker` – Executes the billing worker (`scripts/run-billing-worker.ts`).
+
+See `package.json` for the full script list. Demo scripts rely on Ignition deployment helpers located in `ignition/modules/*`.
+
+## Native Subscription Flow
+
+Native currency subscriptions require prefunding:
+
+1. Call `SubscriptionManager.depositNativeFunds` to top up a user balance (or send extra `msg.value` during `subscribe`).
+2. `subscribe` or `subscribeWithToken` with `plan.token == address(0)` must include `msg.value >= plan.price` for the first cycle; any excess is stored in the user deposit.
+3. Automation can call `charge`/`chargeBatch`; the contract debits `nativeDeposits[user]` and forwards net proceeds via PaymentGateway.
+4. Users can withdraw unused funds with `withdrawNativeFunds` or automatically receive them during `unsubscribe`.
+
+## Testing
+
+```
+npx hardhat test
+```
+
+CI also executes demo scenarios through `.github/workflows/ci.yml`. When modifying processors or Ignition modules, update `docs/deployment.md` if new parameters are required.
+
+## Documentation
+
+- Deployment notes: `docs/deployment.md`
+- Hardhat demos: `demo/scenarios/*`
+- Billing automation: `docs/subscription-billing-guide.md`
+- Tests: `test/modules`, `test/payments`, `test/integration`
+
+Feel free to open issues or PRs to expand processor coverage, add new modules, or improve the documentation.
